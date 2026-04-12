@@ -8032,7 +8032,11 @@ function sbPullAll() {
       rows.forEach(function(r) { if (r.raw) byId[r.id] = r.raw; });
       var merged = Object.values(byId);
       if (merged.length > existing.length) {
-        localStorage.setItem('executions_cache', JSON.stringify(merged));
+        try {
+          localStorage.setItem('executions_cache', JSON.stringify(merged));
+        } catch(e) {
+          console.warn('[Supabase] executions too large for localStorage, using memory only');
+        }
         if (typeof executions !== 'undefined') try { executions = merged; } catch(e) {}
         console.log('[Supabase] Pulled ' + rows.length + ' executions');
       }
@@ -8051,7 +8055,14 @@ function sbPullAll() {
       try { existing = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
       if (rows.length >= existing.length) {
         var trades = rows.map(function(r) { return r.raw || r; });
-        localStorage.setItem('tvTrades', JSON.stringify(trades));
+        // Try localStorage first, fall back to memory-only if quota exceeded
+        try {
+          localStorage.setItem('tvTrades', JSON.stringify(trades));
+        } catch(e) {
+          console.warn('[Supabase] tvTrades too large for localStorage, using memory only');
+        }
+        // Always update in-memory variable regardless of localStorage success
+        try { if (typeof tvTrades !== 'undefined') { window.tvTrades = trades; } } catch(e) {}
         console.log('[Supabase] Pulled ' + rows.length + ' tv trades');
       }
     }),
@@ -8061,6 +8072,7 @@ function sbPullAll() {
       try { dayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       rows.forEach(function(r) { dayR[r.date] = r.r_value; });
       localStorage.setItem('tvDayR', JSON.stringify(dayR));
+      try { if (typeof tvDayR !== 'undefined') { window.tvDayR = dayR; } } catch(e) {}
     }),
     _sbFetch('tt_entries?select=*&limit=10000').then(function(rows) {
       if (!rows || !rows.length) return;
@@ -8104,9 +8116,11 @@ function sbPullAll() {
     .then(function() {
       _sbUpdateStatus('synced');
       console.log('[Supabase] Pull complete');
-      // Re-render if functions exist
+      // Re-render all panels with fresh data
       if (typeof renderExecutions === 'function') try { renderExecutions(); } catch(e) {}
       if (typeof renderTT === 'function') try { renderTT(); } catch(e) {}
+      if (typeof renderTvCal === 'function') try { renderTvCal(); } catch(e) {}
+      if (typeof kinfoRender === 'function') try { kinfoRender(); } catch(e) {}
     });
 }
 
