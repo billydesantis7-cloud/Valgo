@@ -8062,21 +8062,18 @@ function sbPullAll() {
       localStorage.setItem('execMeta', JSON.stringify(meta));
       console.log('[Supabase] Pulled ' + rows.length + ' exec meta');
     }),
-    _sbFetch('tv_trades?select=*&limit=10000').then(function(rows) {
+    _sbFetch('tv_trades?select=*&order=date.desc&limit=10000').then(function(rows) {
       if (!rows || !rows.length) return;
       var existing = [];
       try { existing = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
-      if (rows.length >= existing.length) {
+      // Use Supabase data if it has newer dates, regardless of count
+      var sbLatest = rows[0]?.date || '';
+      var localLatest = existing[0]?.date || '';
+      if (sbLatest >= localLatest) {
         var trades = rows.map(function(r) { return r.raw || r; });
-        // Try localStorage first, fall back to memory-only if quota exceeded
-        try {
-          localStorage.setItem('tvTrades', JSON.stringify(trades));
-        } catch(e) {
-          console.warn('[Supabase] tvTrades too large for localStorage, using memory only');
-        }
-        // Always update in-memory variable regardless of localStorage success
+        try { localStorage.setItem('tvTrades', JSON.stringify(trades)); } catch(e) {}
         try { if (typeof tvTrades !== 'undefined') { window.tvTrades = trades; } } catch(e) {}
-        console.log('[Supabase] Pulled ' + rows.length + ' tv trades');
+        console.log('[Supabase] Pulled ' + rows.length + ' tv trades, latest: ' + sbLatest);
       }
     }),
     _sbFetch('tv_day_r?select=*').then(function(rows) {
