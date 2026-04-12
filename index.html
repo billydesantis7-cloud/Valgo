@@ -7866,6 +7866,19 @@ function _sbFetch(path, method, body) {
   });
 }
 
+// Batch POST — splits large arrays into chunks to avoid request size limits
+function _sbFetchBatch(path, rows, chunkSize) {
+  chunkSize = chunkSize || 300;
+  if (!rows || !rows.length) return Promise.resolve();
+  var chunks = [];
+  for (var i = 0; i < rows.length; i += chunkSize) {
+    chunks.push(rows.slice(i, i + chunkSize));
+  }
+  return chunks.reduce(function(p, chunk) {
+    return p.then(function() { return _sbFetch(path, 'POST', chunk); });
+  }, Promise.resolve());
+}
+
 // ── Status indicator ───────────────────────────────────────
 function _sbUpdateStatus(state) {
   var el = document.getElementById('sbSyncStatus');
@@ -7923,7 +7936,7 @@ function sbSyncExecutions() {
         image_urls: e.image_urls||[], raw: e
       };
     });
-    return _sbFetch('executions', 'POST', rows);
+    return _sbFetchBatch('executions', rows);
   });
 }
 
@@ -7953,7 +7966,7 @@ function sbSyncTvTrades() {
         date: t.date||'', symbol: t.symbol||'', side: t.side||'',
         pnl: t.pnl||0, shares: t.shares||0, entry: t.entry||0, exit: t.exit||0, raw: t };
     });
-    return _sbFetch('tv_trades', 'POST', rows);
+    return _sbFetchBatch('tv_trades', rows);
   });
 }
 
