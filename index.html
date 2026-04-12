@@ -8032,8 +8032,11 @@ function sbSyncKv(key) {
 
 // ── PULL FROM SUPABASE → localStorage ────────────────────
 
+var _sbIsPulling = false;
+
 function sbPullAll() {
   _sbUpdateStatus('syncing');
+  _sbIsPulling = true;
   var pulls = [
     _sbFetch('executions?select=*&limit=5000').then(function(rows) {
       if (!rows || !rows.length) return;
@@ -8105,6 +8108,7 @@ function sbPullAll() {
 
   return Promise.all(pulls.map(function(p) { return p.catch(function(e) { console.warn('[Supabase pull error]', e.message); }); }))
     .then(function() {
+      _sbIsPulling = false;
       _sbUpdateStatus('synced');
       console.log('[Supabase] Pull complete');
       // Re-render all panels with fresh data
@@ -8126,6 +8130,7 @@ function _sbPatchSaves() {
   var origSetItem = localStorage.setItem.bind(localStorage);
   localStorage.setItem = function(key, value) {
     origSetItem(key, value);
+    if (_sbIsPulling) return; // Don't push while pulling — prevents sync loop
     // Trigger appropriate sync based on key
     switch(key) {
       case 'executions_cache': sbSyncExecutions(); break;
