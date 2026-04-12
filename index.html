@@ -57,6 +57,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
   <div class="header-right">
     <span id="sbSyncStatus" style="font-family:var(--mono);font-size:9px;color:#00e676;letter-spacing:1px;margin-right:12px;" title="Supabase cloud sync">☁ SYNCED</span>
     <button onclick="exportBackup()" style="font-family:var(--mono);font-size:10px;color:var(--accent);background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.3);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⬇ BACKUP</button>
+    <button onclick="sbPushAll()" style="font-family:var(--mono);font-size:10px;color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;" title="Force upload all local data to Supabase">☁ PUSH ALL</button>
     <button onclick="document.getElementById('restoreInput').click()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⬆ RESTORE</button>
     <input type="file" id="restoreInput" accept=".json,.html" style="display:none;" onchange="importBackup(event)">
     <div class="status-dot" id="statusDot"></div>
@@ -7912,7 +7913,7 @@ function _sbDrainQueue() {
 function sbSyncExecutions() {
   _sbQueue(function() {
     var execs = [];
-    try { execs = JSON.parse(localStorage.getItem('executions') || '[]'); } catch(e) {}
+    try { execs = JSON.parse(localStorage.getItem('executions_cache') || '[]'); } catch(e) {}
     if (!execs.length) return Promise.resolve();
     var rows = execs.map(function(e) {
       return {
@@ -8024,14 +8025,15 @@ function sbPullAll() {
     _sbFetch('executions?select=*&limit=5000').then(function(rows) {
       if (!rows || !rows.length) return;
       var existing = [];
-      try { existing = JSON.parse(localStorage.getItem('executions') || '[]'); } catch(e) {}
+      try { existing = JSON.parse(localStorage.getItem('executions_cache') || '[]'); } catch(e) {}
       // Merge: Supabase rows augment existing
       var byId = {};
       existing.forEach(function(e) { byId[(e.date||'')+'_'+(e.time||'')+'_'+(e.id||'')] = e; });
       rows.forEach(function(r) { if (r.raw) byId[r.id] = r.raw; });
       var merged = Object.values(byId);
       if (merged.length > existing.length) {
-        localStorage.setItem('executions', JSON.stringify(merged));
+        localStorage.setItem('executions_cache', JSON.stringify(merged));
+        if (typeof executions !== 'undefined') try { executions = merged; } catch(e) {}
         console.log('[Supabase] Pulled ' + rows.length + ' executions');
       }
     }),
@@ -8121,7 +8123,7 @@ function _sbPatchSaves() {
     origSetItem(key, value);
     // Trigger appropriate sync based on key
     switch(key) {
-      case 'executions':       sbSyncExecutions(); break;
+      case 'executions_cache': sbSyncExecutions(); break;
       case 'execMeta':         sbSyncExecMeta(); break;
       case 'tvTrades':         sbSyncTvTrades(); break;
       case 'tvDayR':           sbSyncDayR(); break;
@@ -8136,6 +8138,23 @@ function _sbPatchSaves() {
     }
   };
   console.log('[Supabase] localStorage writes intercepted');
+}
+
+// ── PUSH ALL (force upload everything from localStorage → Supabase) ──
+function sbPushAll() {
+  _sbUpdateStatus('syncing');
+  sbSyncExecutions();
+  sbSyncExecMeta();
+  sbSyncTvTrades();
+  sbSyncDayR();
+  sbSyncTtEntries();
+  sbSyncAlgoList();
+  sbSyncManualTrades();
+  // Also push kv_store keys
+  var kvKeys = ['rollingNVBOverrides','discordImageCache','myTradeImages','tvTradeImages'];
+  kvKeys.forEach(function(k) { var v = localStorage.getItem(k); if (v) sbSyncKv(k); });
+  setTimeout(function() { _sbUpdateStatus('synced'); }, 3000);
+  console.log('[Supabase] Push all triggered');
 }
 
 // ── INIT ──────────────────────────────────────────────────
