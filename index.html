@@ -1240,6 +1240,39 @@ function exportBackup(){
   next();
 }
 
+// Upload all images from a backup object to Supabase Storage
+async function _uploadImagesToSupabase(imgData) {
+  var stores = ['myTradeImages','tvTradeImages','tvDayImages'];
+  var total = 0, done = 0;
+  stores.forEach(function(s){ if(imgData[s]) total += Object.keys(imgData[s]).length; });
+  if(!total){ _sbSetStatus('☁ SYNCED'); return; }
+  _sbSetStatus('☁ UPLOADING 0/' + total + ' IMGS...', '#f5c518');
+  for(var si=0; si<stores.length; si++){
+    var store = stores[si];
+    var imgs = imgData[store] || {};
+    // Also load into memory
+    var memObj = window[store] || {};
+    Object.assign(memObj, imgs);
+    window[store] = memObj;
+    var keys = Object.keys(imgs);
+    for(var ki=0; ki<keys.length; ki++){
+      var imgKey = keys[ki];
+      var dataUrl = imgs[imgKey];
+      if(dataUrl && dataUrl.startsWith('data:')){
+        await sbImgSave(store, imgKey, dataUrl);
+        done++;
+        _sbSetStatus('☁ ' + done + '/' + total + ' IMGS...', '#f5c518');
+      }
+    }
+  }
+  _sbSetStatus('☁ SYNCED ✓ ' + done + ' IMGS');
+  setTimeout(function(){ _sbSetStatus('☁ SYNCED'); }, 4000);
+  // Re-render so images appear
+  if(typeof renderExecutions==='function' && execView!=='ai') renderExecutions();
+  if(typeof renderTvTrades==='function') renderTvTrades();
+  if(typeof renderTvCal==='function') renderTvCal();
+}
+
 function importBackup(event){
   var file=event.target.files[0];if(!file)return;
   var reader=new FileReader();
@@ -1250,29 +1283,28 @@ function importBackup(event){
       if(file.name.endsWith('.html')||content.trim().startsWith('<!DOCTYPE')||content.trim().startsWith('<html')){
         var match=content.match(/<script id="__valhalla_restore__">([\s\S]*?)<\/script>/);
         if(match){
-          // Execute the restore script to load localStorage, then reload page with new HTML
-          var blob=new Blob([content],{type:'text/html'});
-          var url=URL.createObjectURL(blob);
-          // Write the new HTML directly to the current document and reload data
-          var tempA=document.createElement('a');tempA.href=url;tempA.download=file.name;tempA.click();
-          URL.revokeObjectURL(url);
-          alert('HTML backup downloaded — open that file to restore everything. Or: your data is being restored now from the embedded backup.');
-          // Also restore data inline from the script content
+          // Restore text data inline from the script content
           var dataMatch=match[1].match(/var d=([\s\S]+?);\s*for/);
           if(dataMatch){
             var data=JSON.parse(dataMatch[1]);
             for(var k in data){try{localStorage.setItem(k,data[k]);}catch(er){}}
+            // Push text data to Supabase
+            var _sbKeys=['executions_cache','execMeta','tvTrades','tvDayR','ttEntries','rollingNVBOverrides'];
+            _sbKeys.forEach(function(k){var v=localStorage.getItem(k);if(v&&v!=='[]'&&v!=='{}')sbSave(k,v);});
             if(typeof executions!=='undefined')try{executions=JSON.parse(localStorage.getItem('executions_cache')||'[]');}catch(er){}
             if(typeof execMeta!=='undefined')try{execMeta=JSON.parse(localStorage.getItem('execMeta')||'{}');}catch(er){}
-            try{discordImageCache=JSON.parse(localStorage.getItem('discordImageCache')||'{}');}catch(er){}
-            setTimeout(cacheAllDiscordImages, 2000);
             if(typeof tvTrades!=='undefined')try{tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(er){}
             if(typeof tvDayR!=='undefined')try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(er){}
-            if(typeof tvTradeImages!=='undefined')try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(er){}
-            try{myTradeImages=JSON.parse(localStorage.getItem('myTradeImages')||'{}');}catch(er){}
             if(typeof refreshMyTradesFromTv==='function')refreshMyTradesFromTv();
             if(execView!=='ai') renderExecutions();
-            alert('Data restored from HTML backup!');
+          }
+          // Extract and upload images from __valhalla_images__ block
+          var imgMatch=content.match(/<script id="__valhalla_images__">\s*window\.__pendingImages=([\s\S]+?);\s*<\/script>/);
+          if(imgMatch){
+            try{
+              var imgData=JSON.parse(imgMatch[1]);
+              _uploadImagesToSupabase(imgData);
+            }catch(er){console.warn('Image parse error',er);}
           }
         } else {
           alert('This HTML file has no embedded backup data. Use the .json backup file, or a VALGO_BACKUP_.html file.');
