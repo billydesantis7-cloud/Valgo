@@ -45,19 +45,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 <body>
 
 <!-- HEADER -->
-<div class="header">
+<div class="header" id="mainHeader">
   <div class="nav-tabs">
     <button class="nav-tab" id="mainTabValgo" onclick="switchMainTab('valgo')">VALGO</button>
     <button class="nav-tab" id="mainTabTv" onclick="switchMainTab('tv')">TRADERVUE</button>
     <button class="nav-tab" id="mainTabTt" onclick="switchMainTab('tt')">TICKER TRACKER</button>
-    <button class="nav-tab" id="mainTabSca" onclick="switchMainTab('sca')">SCA / MATCH VAL</button>
-    <button class="nav-tab" id="mainTabAlgo" onclick="switchMainTab('algo')">ALGO</button>
+    <button class="nav-tab" id="mainTabSca" onclick="switchMainTab('sca')">CALCULATOR</button>
+    
     <button class="nav-tab" id="mainTabKinfo" onclick="switchMainTab('kinfo')">KINFO</button>
   </div>
   <div class="header-right">
     <span id="sbSyncStatus" style="font-family:var(--mono);font-size:9px;color:#00e676;letter-spacing:1px;margin-right:12px;" title="Supabase cloud sync">☁ SYNCED</span>
+    <button onclick="migrateLocalToSupabase()" style="font-family:var(--mono);font-size:10px;color:#f5c518;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;" title="One-time: push all local data to Supabase cloud">⬆ MIGRATE</button>
     <button onclick="exportBackup()" style="font-family:var(--mono);font-size:10px;color:var(--accent);background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.3);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⬇ BACKUP</button>
-    <button onclick="sbPushAll()" style="font-family:var(--mono);font-size:10px;color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;" title="Force upload all local data to Supabase">☁ PUSH ALL</button>
     <button onclick="document.getElementById('restoreInput').click()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⬆ RESTORE</button>
     <input type="file" id="restoreInput" accept=".json,.html" style="display:none;" onchange="importBackup(event)">
     <div class="status-dot" id="statusDot"></div>
@@ -134,6 +134,56 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 
   <!-- IMPORT TAB -->
   <div id="tvImportPane" style="padding:32px;max-width:700px;margin:0 auto;">
+    <!-- DAS Hotkey + Account (moved from Calculator page) -->
+    <div id="scaHtkTool" style="background:#0d1117;border:2px solid rgba(0,200,200,0.2);border-radius:8px;padding:18px 20px;margin-bottom:22px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-family:var(--display);font-size:14px;letter-spacing:3px;color:#00ffff;margin-bottom:3px;">⚡ DAS HOTKEY UPDATER</div>
+          <div style="font-family:var(--mono);font-size:10px;color:#666;">Upload your .htk file → R values auto-updated → download new file</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-family:var(--mono);font-size:10px;color:#888;">NEW R:</span>
+          <span id="htkRValue" style="font-family:var(--display);font-size:20px;color:#00ffff;font-weight:bold;min-width:60px;">—</span>
+          <label style="font-family:var(--display);font-size:11px;letter-spacing:1px;color:#000;background:#00ffff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;">
+            📂 LOAD .HTK<input type="file" id="htkFileInput" accept=".htk,.txt" style="display:none;" onchange="htkLoadFile(event)">
+          </label>
+          <button id="htkDownloadBtn" onclick="htkDownload()" style="display:none;font-family:var(--display);font-size:11px;letter-spacing:1px;color:#000;background:#00e000;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;">⬇ DOWNLOAD UPDATED</button>
+        </div>
+      </div>
+      <div id="htkStatus" style="display:none;font-family:var(--mono);font-size:11px;padding:10px 14px;background:#0a1a0a;border:1px solid rgba(0,200,0,0.2);border-radius:4px;margin-bottom:12px;"></div>
+      <div id="htkPreview" style="display:none;">
+        <div style="font-family:var(--mono);font-size:9px;color:#666;letter-spacing:1px;margin-bottom:6px;">CHANGES PREVIEW</div>
+        <div id="htkChangesTable" style="max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,0.07);border-radius:4px;"></div>
+      </div>
+    </div>
+    <div style="background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:22px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--mono);font-size:11px;color:#e8d000;">ACCOUNT</span>
+          <span id="scaAccount" style="width:110px;background:#1a1a2e;border:1px solid #e8d000;color:#e8d000;font-family:var(--display);font-size:14px;padding:4px 10px;border-radius:4px;text-align:center;display:inline-block;">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--mono);font-size:11px;letter-spacing:1px;color:#00ffff;font-weight:bold;">R</span>
+          <span id="scaRDisplay" style="font-family:var(--display);font-size:18px;color:#00ffff;font-weight:bold;">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--mono);font-size:11px;letter-spacing:1px;color:#00cccc;font-weight:bold;">0.5R</span>
+          <span id="scaHalfRDisplay" style="font-family:var(--display);font-size:18px;color:#00cccc;font-weight:bold;">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
+          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">DAILY MAX LOSS (-2R)</span>
+          <span id="scaDailyMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
+          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">TICKER MAX LOSS (-2R)</span>
+          <span id="scaTickerMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(200,169,0,0.15);border:1px solid #e8d000;border-radius:4px;padding:3px 10px;">
+          <span style="font-family:var(--mono);font-size:9px;color:#e8d000;letter-spacing:1px;">A++ PYRAMID (3R)</span>
+          <span id="scaAplusplus" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#e8d000;">—</span>
+        </div>
+      </div>
+    </div>
     <div style="font-family:var(--display);font-size:28px;letter-spacing:4px;color:var(--accent);margin-bottom:6px;">IMPORT TRADES</div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:28px;">Upload your daily execution CSV — trades will be parsed, split, and saved automatically</div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:18px;">
@@ -520,77 +570,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 </div>
 
 <!-- SCA PANEL -->
-<div id="scaPanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:16px 20px;box-sizing:border-box;background:var(--bg);overflow-x:auto;">
-<div style="max-width:860px;">
-
-  <!-- HTK Updater -->
-  <div id="scaHtkTool" style="background:#0d1117;border:2px solid rgba(0,200,200,0.2);border-radius:8px;padding:18px 20px;margin-bottom:22px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <div>
-        <div style="font-family:var(--display);font-size:14px;letter-spacing:3px;color:#00ffff;margin-bottom:3px;">⚡ DAS HOTKEY UPDATER</div>
-        <div style="font-family:var(--mono);font-size:10px;color:#666;">Upload your .htk file → R values auto-updated → download new file</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-family:var(--mono);font-size:10px;color:#888;">NEW R:</span>
-        <span id="htkRValue" style="font-family:var(--display);font-size:20px;color:#00ffff;font-weight:bold;min-width:60px;">—</span>
-        <label style="font-family:var(--display);font-size:11px;letter-spacing:1px;color:#000;background:#00ffff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;">
-          📂 LOAD .HTK<input type="file" id="htkFileInput" accept=".htk,.txt" style="display:none;" onchange="htkLoadFile(event)">
-        </label>
-        <button id="htkDownloadBtn" onclick="htkDownload()" style="display:none;font-family:var(--display);font-size:11px;letter-spacing:1px;color:#000;background:#00e000;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;">⬇ DOWNLOAD UPDATED</button>
-      </div>
-    </div>
-    <div id="htkStatus" style="display:none;font-family:var(--mono);font-size:11px;padding:10px 14px;background:#0a1a0a;border:1px solid rgba(0,200,0,0.2);border-radius:4px;margin-bottom:12px;"></div>
-    <div id="htkPreview" style="display:none;">
-      <div style="font-family:var(--mono);font-size:9px;color:#666;letter-spacing:1px;margin-bottom:6px;">CHANGES PREVIEW</div>
-      <div id="htkChangesTable" style="max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,0.07);border-radius:4px;"></div>
-    </div>
-  </div>
-
-  <!-- Global header -->
-  <div style="background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:18px;">
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-family:var(--mono);font-size:11px;color:#e8d000;">ACCOUNT</span>
-        <span id="scaAccount" style="width:110px;background:#1a1a2e;border:1px solid #e8d000;color:#e8d000;font-family:var(--display);font-size:14px;padding:4px 10px;border-radius:4px;text-align:center;display:inline-block;">—</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-family:var(--mono);font-size:11px;letter-spacing:1px;color:#00ffff;font-weight:bold;">R</span>
-        <span id="scaRDisplay" style="font-family:var(--display);font-size:18px;color:#00ffff;font-weight:bold;">—</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-family:var(--mono);font-size:11px;letter-spacing:1px;color:#00cccc;font-weight:bold;">0.5R</span>
-        <span id="scaHalfRDisplay" style="font-family:var(--display);font-size:18px;color:#00cccc;font-weight:bold;">—</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
-        <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">DAILY MAX LOSS (-2R)</span>
-        <span id="scaDailyMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
-        <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">TICKER MAX LOSS (-2R)</span>
-        <span id="scaTickerMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;background:rgba(200,169,0,0.15);border:1px solid #e8d000;border-radius:4px;padding:3px 10px;">
-        <span style="font-family:var(--mono);font-size:9px;color:#e8d000;letter-spacing:1px;">A++ PYRAMID (3R)</span>
-        <span id="scaAplusplus" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#e8d000;">—</span>
-      </div>
-    </div>
-  </div>
+<div id="scaPanel" style="display:none;position:fixed;top:0;right:0;width:310px;height:100%;max-height:100vh;padding:0 0 60px 0;box-sizing:border-box;background:var(--bg);overflow-y:scroll;overflow-x:hidden;z-index:100;border-left:1px solid rgba(255,255,255,0.08);">
+<div style="width:100%;padding:0;">
 
   <!-- Pyramid Blocks -->
-  <div id="scaPyramidBlocks" style="margin-bottom:22px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <span style="font-family:var(--display);font-size:11px;letter-spacing:3px;color:#e8d000;">POSITION SIZE CALCULATOR</span>
-      <div style="display:flex;gap:8px;">
-        <button onclick="scaAddBlock('short')" style="font-family:var(--mono);font-size:10px;color:#ef5350;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.4);padding:5px 14px;border-radius:4px;cursor:pointer;">+ SHORT</button>
-        <button onclick="scaAddBlock('long')"  style="font-family:var(--mono);font-size:10px;color:#26a69a;background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.4);padding:5px 14px;border-radius:4px;cursor:pointer;">+ LONG</button>
-        <button onclick="scaClearAll()" style="font-family:var(--mono);font-size:10px;color:#555;background:none;border:1px solid #333;padding:5px 14px;border-radius:4px;cursor:pointer;">CLEAR ALL</button>
+  <div id="scaPyramidBlocks" style="margin-bottom:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#0d1117;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <span style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:#e8d000;">POS SIZE</span>
+      <div style="display:flex;gap:4px;">
+        <button onclick="scaAddBlock('short')" style="font-family:var(--mono);font-size:9px;color:#ef5350;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.4);padding:3px 8px;border-radius:3px;cursor:pointer;">+ SHORT</button>
+        <button onclick="scaAddBlock('long')"  style="font-family:var(--mono);font-size:9px;color:#26a69a;background:rgba(38,166,154,0.1);border:1px solid rgba(38,166,154,0.4);padding:3px 8px;border-radius:3px;cursor:pointer;">+ LONG</button>
+        <button onclick="scaClearAll()" style="font-family:var(--mono);font-size:9px;color:#555;background:none;border:1px solid #333;padding:3px 8px;border-radius:3px;cursor:pointer;">CLEAR</button>
       </div>
     </div>
     <div id="scaBlocksContainer"></div>
   </div>
 
-  <!-- Cards container -->
-  <div id="scaMatchCards" style="display:flex;flex-direction:column;gap:16px;"></div>
+  <div id="scaMatchCards" style="display:none;"></div>
 
 </div><!-- end max-width -->
 </div>
@@ -599,12 +595,177 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 <div id="mvPanel" style="display:none;"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
-//  IMAGE STORAGE — Dual-write: localStorage (instant) + IndexedDB (unlimited)
-//  localStorage = primary, always read on startup immediately
-//  IndexedDB    = overflow + backup export source
-//  If localStorage gets full for an image, it goes IDB-only
+//  SUPABASE CLOUD SYNC
+//  All data + images live in Supabase. localStorage = fast cache only.
+// ═══════════════════════════════════════════════════════════
+var SUPA_URL = 'https://ffykmqncabvvvlqznobn.supabase.co';
+var SUPA_KEY = 'sb_publishable_nApad8VROoLPtePyj84I3A_j8XQwbnj';
+var _supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+var SUPA_BUCKET = 'Valgo-images';
+
+// Update the header sync indicator
+function _sbSetStatus(msg, color) {
+  var el = document.getElementById('sbSyncStatus');
+  if (el) { el.textContent = msg; el.style.color = color || '#00e676'; }
+}
+
+// ── Generic data key save/load ──────────────────────────────
+async function sbSave(key, value) {
+  var str = typeof value === 'string' ? value : JSON.stringify(value);
+  try {
+    localStorage.setItem(key, str);
+  } catch(e) {}
+  try {
+    await _supa.from('valgo_data').upsert({ key: key, value: str, updated_at: new Date().toISOString() });
+  } catch(e) { _sbSetStatus('☁ SYNC ERR', '#ef5350'); }
+}
+
+async function sbLoad(key, fallback) {
+  try {
+    var { data, error } = await _supa.from('valgo_data').select('value').eq('key', key).single();
+    if (!error && data && data.value != null) return data.value;
+  } catch(e) {}
+  // Fall back to localStorage
+  return localStorage.getItem(key) || fallback || null;
+}
+
+// ── Image save/load via Supabase Storage ────────────────────
+async function sbImgSave(store, imgKey, dataUrl) {
+  // Keep in memory
+  var memObj = window[store];
+  if (memObj) memObj[imgKey] = dataUrl;
+  // Cache in localStorage (best effort)
+  try {
+    var obj = JSON.parse(localStorage.getItem(store) || '{}');
+    obj[imgKey] = dataUrl;
+    localStorage.setItem(store, JSON.stringify(obj));
+  } catch(e) {}
+  // Upload to Supabase Storage
+  try {
+    var fileName = store + '/' + imgKey.replace(/[^a-zA-Z0-9_\-\.]/g, '_') + '.webp';
+    var blob = _dataUrlToBlob(dataUrl);
+    var { error } = await _supa.storage.from(SUPA_BUCKET).upload(fileName, blob, { upsert: true, contentType: blob.type });
+    if (!error) {
+      // Also record the public URL in valgo_images table
+      var { data: urlData } = _supa.storage.from(SUPA_BUCKET).getPublicUrl(fileName);
+      await _supa.from('valgo_images').upsert({ img_key: store + '::' + imgKey, store: store, data_url: urlData.publicUrl, updated_at: new Date().toISOString() });
+    }
+  } catch(e) { console.warn('sbImgSave error', e); }
+}
+
+async function sbImgDelete(store, imgKey) {
+  var memObj = window[store];
+  if (memObj) delete memObj[imgKey];
+  try {
+    var obj = JSON.parse(localStorage.getItem(store) || '{}');
+    delete obj[imgKey];
+    localStorage.setItem(store, JSON.stringify(obj));
+  } catch(e) {}
+  try {
+    var fileName = store + '/' + imgKey.replace(/[^a-zA-Z0-9_\-\.]/g, '_') + '.webp';
+    await _supa.storage.from(SUPA_BUCKET).remove([fileName]);
+    await _supa.from('valgo_images').delete().eq('img_key', store + '::' + imgKey);
+  } catch(e) {}
+}
+
+// Load all images for a store from Supabase into memory
+async function sbImgLoadAll(store) {
+  try {
+    var { data, error } = await _supa.from('valgo_images').select('img_key,data_url').eq('store', store);
+    if (error || !data) return;
+    var memObj = window[store] || {};
+    data.forEach(function(row) {
+      var imgKey = row.img_key.replace(store + '::', '');
+      if (row.data_url && row.data_url.startsWith('http')) {
+        // It's a public URL — store it directly
+        memObj[imgKey] = row.data_url;
+      }
+    });
+    window[store] = memObj;
+  } catch(e) { console.warn('sbImgLoadAll error', e); }
+}
+
+function _dataUrlToBlob(dataUrl) {
+  var arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+  var bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
+  return new Blob([u8arr], { type: mime });
+}
+
+// ── One-time migration from localStorage/IDB → Supabase ────
+async function migrateLocalToSupabase() {
+  _sbSetStatus('☁ MIGRATING...', '#f5c518');
+  var keys = ['executions_cache','execMeta','manualTrades','tvTrades','tvDayR','tvTradeMeta','ttEntries','rollingNVBOverrides'];
+  for (var i = 0; i < keys.length; i++) {
+    var v = localStorage.getItem(keys[i]);
+    if (v && v !== '[]' && v !== '{}' && v !== 'null') {
+      await sbSave(keys[i], v);
+    }
+  }
+  // Migrate images
+  var imgStores = ['myTradeImages','tvTradeImages','tvDayImages'];
+  for (var s = 0; s < imgStores.length; s++) {
+    var store = imgStores[s];
+    var imgs = {};
+    try { imgs = JSON.parse(localStorage.getItem(store) || '{}'); } catch(e) {}
+    var imgKeys = Object.keys(imgs);
+    for (var k = 0; k < imgKeys.length; k++) {
+      if (imgs[imgKeys[k]] && imgs[imgKeys[k]].startsWith('data:')) {
+        await sbImgSave(store, imgKeys[k], imgs[imgKeys[k]]);
+        _sbSetStatus('☁ ' + s + '/' + imgStores.length + ' stores, img ' + (k+1) + '/' + imgKeys.length, '#f5c518');
+      }
+    }
+  }
+  _sbSetStatus('☁ MIGRATED ✓', '#00e676');
+  setTimeout(function() { _sbSetStatus('☁ SYNCED'); }, 3000);
+}
+
+// ── Load all data from Supabase on startup ──────────────────
+async function _sbInitLoad() {
+  _sbSetStatus('☁ LOADING...', '#f5c518');
+  try {
+    var { data, error } = await _supa.from('valgo_data').select('key,value');
+    if (error) throw error;
+    var hasData = data && data.length > 0;
+    if (hasData) {
+      data.forEach(function(row) {
+        if (row.value) try { localStorage.setItem(row.key, row.value); } catch(e) {}
+      });
+      // Reload in-memory variables from freshly-updated localStorage
+      try { executions = JSON.parse(localStorage.getItem('executions_cache') || '[]'); } catch(e) {}
+      try {
+        var _sm = JSON.parse(localStorage.getItem('manualTrades') || '[]');
+        _sm.forEach(function(m) { if (!executions.some(function(ex) { return ex.id === m.id; })) executions.push(m); });
+      } catch(e) {}
+      try { execMeta = JSON.parse(localStorage.getItem('execMeta') || '{}'); } catch(e) {}
+      try { tvTradeMeta = JSON.parse(localStorage.getItem('tvTradeMeta') || '{}'); } catch(e) {}
+      if (typeof tvTrades !== 'undefined') try { tvTrades = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
+      if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
+      if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
+    }
+    // Load images from Supabase Storage references
+    await sbImgLoadAll('myTradeImages');
+    await sbImgLoadAll('tvTradeImages');
+    await sbImgLoadAll('tvDayImages');
+    _sbSetStatus('☁ SYNCED');
+    // Re-render visible panel
+    if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
+    if (typeof renderTvTrades === 'function') renderTvTrades();
+    if (typeof renderTvCal === 'function') renderTvCal();
+  } catch(e) {
+    _sbSetStatus('☁ OFFLINE', '#ef5350');
+    console.warn('Supabase load failed, using localStorage', e);
+  }
+}
+// Fire after page loads
+window.addEventListener('load', function() { setTimeout(_sbInitLoad, 800); });
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════
+//  IMAGE STORAGE — Supabase-backed (localStorage = cache only)
 // ═══════════════════════════════════════════════════════════
 var _imgDB = null;
 
@@ -620,48 +781,13 @@ function _openImgDB(cb) {
   req.onerror = function() { cb(null); };
 }
 
-// Save to localStorage first (immediate), then IDB (background, no size limit)
+// Save image — Supabase Storage is primary, localStorage is cache
 function imgSave(lsKey, imgKey, dataUrl) {
-  // 1. Update in-memory object immediately
-  var memObj = window[lsKey];
-  if(memObj) memObj[imgKey] = dataUrl;
-  // 2. Save to localStorage (primary — instant read on reload)
-  try {
-    var obj = JSON.parse(localStorage.getItem(lsKey)||'{}');
-    obj[imgKey] = dataUrl;
-    localStorage.setItem(lsKey, JSON.stringify(obj));
-  } catch(e) {
-    console.warn('localStorage full for '+lsKey+', image only in IndexedDB');
-  }
-  // 3. Also save to IndexedDB (backup)
-  _openImgDB(function(db) {
-    if(!db) return;
-    var tx = db.transaction('images','readwrite');
-    tx.objectStore('images').put(dataUrl, lsKey+'::'+imgKey);
-  });
-  // 4. Save to bridge disk (permanent folder on desktop)
-  if(lsKey==='myTradeImages'||lsKey==='tvTradeImages'){
-    fetch('http://localhost:7842/saveimg',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({imgKey:imgKey,dataUrl:dataUrl})
-    }).catch(function(){});// silent — bridge may not be running
-  }
+  sbImgSave(lsKey, imgKey, dataUrl);
 }
 
 function imgDelete(lsKey, imgKey) {
-  var memObj = window[lsKey];
-  if(memObj) delete memObj[imgKey];
-  try {
-    var obj = JSON.parse(localStorage.getItem(lsKey)||'{}');
-    delete obj[imgKey];
-    localStorage.setItem(lsKey, JSON.stringify(obj));
-  } catch(e){}
-  _openImgDB(function(db) {
-    if(!db) return;
-    var tx = db.transaction('images','readwrite');
-    tx.objectStore('images').delete(lsKey+'::'+imgKey);
-  });
+  sbImgDelete(lsKey, imgKey);
 }
 
 // Get all images from IDB for backup export (includes IDB-only overflow images)
@@ -836,7 +962,7 @@ try{execMeta=JSON.parse(localStorage.getItem('execMeta')||'{}');}catch(e){}
 // MY TRADE TAGS - separate from Val's execMeta, never mixed
 var tvTradeMeta={};
 try{tvTradeMeta=JSON.parse(localStorage.getItem('tvTradeMeta')||'{}');}catch(e){}
-function _saveTvTradeMeta(){try{localStorage.setItem('tvTradeMeta',JSON.stringify(tvTradeMeta));}catch(e){}}
+function _saveTvTradeMeta(){sbSave('tvTradeMeta',JSON.stringify(tvTradeMeta));}
 function _tvMetaKey(d,sym,side){return d+'__'+sym.toUpperCase()+'__'+(side||'');}
 // Load execMeta from IndexedDB (authoritative - no size limit)
 // This overwrites the localStorage version which may be stale/incomplete
@@ -865,19 +991,7 @@ setTimeout(function(){
 
 function _saveExecMeta(){
   var data=JSON.stringify(execMeta);
-  // Primary: IndexedDB (no size limit)
-  _openImgDB(function(db){
-    if(db){
-      try{
-        var tx=db.transaction('images','readwrite');
-        tx.objectStore('images').put(data,'__execMeta__');
-      }catch(er){}
-    }
-  });
-  // Secondary: localStorage (best effort, may fail if full)
-  try{localStorage.setItem('execMeta',data);}catch(e){
-    try{localStorage.removeItem('myTradeImages');localStorage.removeItem('tvTradeImages');localStorage.removeItem('discordImageCache');localStorage.setItem('execMeta',data);}catch(e2){}
-  }
+  sbSave('execMeta', data);
 }
 // Load trade images from localStorage synchronously (immediate, no delay)
 try{myTradeImages=JSON.parse(localStorage.getItem('myTradeImages')||'{}');}catch(e){}
@@ -893,19 +1007,6 @@ setTimeout(function(){
         if(typeof renderTvCal==='function') renderTvCal();
         if(typeof renderTvTrades==='function') renderTvTrades();
         if(document.querySelector('.exec-panel')&&document.querySelector('.exec-panel').style.display!=='none') if(execView!=='ai') renderExecutions();
-        // Export all trade images to disk (one-time sync of existing images)
-        setTimeout(function(){
-          var allImgs={};
-          Object.assign(allImgs, myTradeImages||{}, typeof tvTradeImages!=='undefined'?tvTradeImages:{});
-          var keys=Object.keys(allImgs);
-          if(!keys.length) return;
-          fetch('http://localhost:7842/exportimages',{
-            method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({images:allImgs})
-          }).then(function(r){return r.json();}).then(function(d){
-            if(d.saved>0) console.log('[EXPORT] Saved '+d.saved+' trade images to disk');
-          }).catch(function(){});
-        }, 1000);
         return;
       }
       var k=c.key, v=c.value;
@@ -933,9 +1034,31 @@ function tickerMatchesTrade(ticker,trade){var parts=splitTickers(ticker);return 
 
 // ── Tab switching ─────────────────────────────────────────
 function switchMainTab(tab){
-  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel'];
-  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabAlgo','mainTabKinfo'];
-  var tabNames=['valgo','tv','tt','sca','algo','kinfo'];
+  var hdr = document.getElementById('mainHeader');
+  if (hdr) hdr.style.display = tab==='sca' ? 'none' : '';
+  var scaP = document.getElementById('scaPanel');
+  if (scaP) scaP.style.paddingTop = tab==='sca' ? '4px' : '';
+  // Show/hide vertical side nav when on calculator
+  var sideNav = document.getElementById('scaSideNav');
+  if (!sideNav && tab==='sca') {
+    sideNav = document.createElement('div');
+    sideNav.id = 'scaSideNav';
+    sideNav.style.cssText = 'position:fixed;top:0;left:0;width:28px;height:100vh;background:#0a0e1a;border-right:1px solid rgba(255,255,255,0.08);z-index:200;display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:2px;';
+    var tabs=[['V','valgo','#c8a96e'],['TV','tv','#26a69a'],['TT','tt','#90caf9'],['CAL','sca','#e8d000'],['KI','kinfo','#c8a96e']];
+    tabs.forEach(function(t){
+      var btn=document.createElement('button');
+      btn.style.cssText='writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);font-size:7px;letter-spacing:1px;color:'+(t[1]==='sca'?t[2]:'rgba(255,255,255,0.35)')+';background:'+(t[1]==='sca'?'rgba(232,208,0,0.1)':'transparent')+';border:none;padding:4px 2px;cursor:pointer;width:24px;border-radius:2px;';
+      btn.textContent=t[0];
+      btn.onclick=function(){switchMainTab(t[1]);};
+      sideNav.appendChild(btn);
+    });
+    document.body.appendChild(sideNav);
+  } else if (sideNav) {
+    sideNav.style.display = tab==='sca' ? 'flex' : 'none';
+  }
+  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','kinfoPanel'];
+  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabKinfo'];
+  var tabNames=['valgo','tv','tt','sca','kinfo'];
   document.querySelector('.exec-panel').style.display='none';
   ['tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   tabIds.forEach(function(id){var b=document.getElementById(id);if(b){b.style.background='transparent';b.style.color='var(--muted)';}});
@@ -945,8 +1068,8 @@ function switchMainTab(tab){
   else if(tab==='tv'){var p=document.getElementById('tvPanel');if(p){p.style.display='block';if(typeof tvTab==='function'){var lastTvTab=localStorage.getItem('lastTvTab')||'import';tvTab(lastTvTab);}}}
   else if(tab==='tt'){var p=document.getElementById('ttPanel');if(p){p.style.display='block';if(typeof renderTT==='function')renderTT();}}
   else if(tab==='sca'){var p=document.getElementById('scaPanel');if(p){p.style.display='block';if(typeof scaInit==='function')scaInit();}}
-  else if(tab==='algo'){var p=document.getElementById('algoPanel');if(p){p.style.display='block';if(typeof algoRender==='function')algoRender();}}
-  else if(tab==='kinfo'){var p=document.getElementById('kinfoPanel');if(p){p.style.display='block';setTimeout(function(){if(typeof kinfoRender==='function')kinfoRender();},100);}}
+  
+  else if(tab==='kinfo'){var p=document.getElementById('kinfoPanel');if(p){p.style.display='block';setTimeout(function(){if(typeof kinfoRender==='function'){kinfoRender();}},150);}}
 }
 
 // ── Filters ───────────────────────────────────────────────
@@ -1175,23 +1298,24 @@ function importBackup(event){
           if(!alreadyExists) executions.push(m);
         });
         localStorage.setItem('executions_cache',JSON.stringify(executions));
+        sbSave('executions_cache', JSON.stringify(executions));
         setTimeout(cacheAllDiscordImages,1000);
       }
       if(data.execMeta){Object.assign(execMeta,data.execMeta);_saveExecMeta();}
-      if(data.tvTrades)localStorage.setItem('tvTrades',JSON.stringify(data.tvTrades));
-      if(data.tvDayR)localStorage.setItem('tvDayR',JSON.stringify(data.tvDayR));
-      if(data.tvDayImages)localStorage.setItem('tvDayImages',data.tvDayImages);
-      if(data.tvTradeImages)localStorage.setItem('tvTradeImages',data.tvTradeImages);
-      if(data.myTradeImages)localStorage.setItem('myTradeImages',data.myTradeImages);
-      if(data.ttEntries)localStorage.setItem('ttEntries',data.ttEntries);
-      if(data.rollingNVBOverrides)localStorage.setItem('rollingNVBOverrides',data.rollingNVBOverrides);
+      if(data.tvTrades){localStorage.setItem('tvTrades',JSON.stringify(data.tvTrades));sbSave('tvTrades',JSON.stringify(data.tvTrades));}
+      if(data.tvDayR){localStorage.setItem('tvDayR',JSON.stringify(data.tvDayR));sbSave('tvDayR',JSON.stringify(data.tvDayR));}
+      if(data.tvDayImages){localStorage.setItem('tvDayImages',data.tvDayImages);sbSave('tvDayImages',data.tvDayImages);}
+      if(data.tvTradeImages){localStorage.setItem('tvTradeImages',data.tvTradeImages);}
+      if(data.myTradeImages){localStorage.setItem('myTradeImages',data.myTradeImages);}
+      if(data.ttEntries){localStorage.setItem('ttEntries',data.ttEntries);sbSave('ttEntries',data.ttEntries);}
+      if(data.rollingNVBOverrides){localStorage.setItem('rollingNVBOverrides',data.rollingNVBOverrides);sbSave('rollingNVBOverrides',data.rollingNVBOverrides);}
       try{if(typeof tvTrades!=='undefined')tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(er){}
       try{if(typeof tvDayR!=='undefined')tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(er){}
       try{if(typeof tvTradeImages!=='undefined')tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(er){}
       try{myTradeImages=JSON.parse(localStorage.getItem('myTradeImages')||'{}');}catch(er){}
       if(typeof refreshMyTradesFromTv==='function')refreshMyTradesFromTv();
       if(execView!=='ai') renderExecutions();
-      alert('Backup restored!');
+      alert('Backup restored! Your data is now saved to Supabase cloud.');
     }catch(err){alert('Restore error: '+err.message);}
   };
   reader.readAsText(file);
@@ -1310,11 +1434,10 @@ function valgoAddManualTrade(){
     // Push to executions array
     executions.push(newExec);
     // Persist to dedicated manualTrades store so bridge can never wipe them
-    try{
-      var _mt=JSON.parse(localStorage.getItem('manualTrades')||'[]');
-      if(!_mt.some(function(x){return x.id===newExec.id;})) _mt.push(newExec);
-      localStorage.setItem('manualTrades',JSON.stringify(_mt));
-    }catch(_mte){}
+    var _mt=[];
+    try{ _mt=JSON.parse(localStorage.getItem('manualTrades')||'[]'); }catch(_mte){}
+    if(!_mt.some(function(x){return x.id===newExec.id;})) _mt.push(newExec);
+    sbSave('manualTrades', JSON.stringify(_mt));
     // Write execMeta entry so trade shows ticker/direction/setup correctly everywhere
     var eKey=getExecKey(newExec);
     if(!execMeta[eKey]) execMeta[eKey]={};
@@ -1322,13 +1445,8 @@ function valgoAddManualTrade(){
     execMeta[eKey].direction=selDir;
     execMeta[eKey].date=dt;
     execMeta[eKey].manual=true;
-    // Save both stores with error handling
-    try{
-      localStorage.setItem('executions_cache',JSON.stringify(executions));
-    } catch(e){
-      console.warn('executions_cache save failed:',e);
-    }
     _saveExecMeta();
+    sbSave('executions_cache', JSON.stringify(executions));
     if(pendingImg){
       var imgKey=dt+'_'+tk+'_'+selDir;
       valgoImgSave(imgKey,pendingImg);
@@ -1347,62 +1465,22 @@ function valgoMarkTraded(eKey,yes){if(!execMeta[eKey])execMeta[eKey]={};execMeta
 function updateClock(){var now=new Date(),h=String(now.getHours()).padStart(2,'0'),m=String(now.getMinutes()).padStart(2,'0'),s=String(now.getSeconds()).padStart(2,'0');var el=document.getElementById('clock');if(el)el.textContent=h+':'+m+':'+s;}
 setInterval(updateClock,1000);updateClock();
 
-// ── Bridge ────────────────────────────────────────────────
+// ── Bridge (disabled — using Supabase cloud) ──────────────
 function connectToBridge(){
-  fetch('http://localhost:7842/executions').then(function(r){return r.json();}).then(function(data){
-    if(data&&data.executions){
-      var manuals2=executions.filter(function(e){return e.manual===true;});
-      try{var _sm2=JSON.parse(localStorage.getItem('manualTrades')||'[]');
-        _sm2.forEach(function(m){if(!manuals2.some(function(x){return x.id===m.id;}))manuals2.push(m);});}catch(_be){}
-      executions=data.executions.slice();
-      manuals2.forEach(function(m){if(!executions.some(function(e){return e.id===m.id;}))executions.push(m);});
-      localStorage.setItem('executions_cache',JSON.stringify(executions));
-      // MERGE execMeta — never overwrite local edits with bridge data
-      // Bridge execMeta is typically empty; local has your ticker names, directions, etc.
-      var bridgeMeta=data.execMeta||{};
-      Object.keys(bridgeMeta).forEach(function(k){
-        if(!execMeta[k]) execMeta[k]=bridgeMeta[k]; // only add new keys, never overwrite existing
-      });
-      // DO NOT write execMeta back to localStorage here — that would risk overwriting user edits
-      // execMeta is already in sync because saves write immediately on each change{discordImageCache=data.discordImageCache;localStorage.setItem('discordImageCache',JSON.stringify(discordImageCache));}
-      if(typeof refreshMyTradesFromTv==='function')refreshMyTradesFromTv();
-      if(execView!=='ai') renderExecutions();
-      // Cache Discord images immediately with fresh URLs, then fix any broken img tags
-      cacheAllDiscordImages();
-      setTimeout(function(){
-        document.querySelectorAll('img[data-orig-url]').forEach(function(img){
-          var u=img.getAttribute('data-orig-url');
-          if(!u) return;
-          var cached=discordImageCache[_discordKey(u)];
-          if(cached && img.src!==cached) img.src=cached;
-          else if(!cached) getDiscordImage(u,function(d){if(d)document.querySelectorAll('img[data-orig-url="'+u+'"]').forEach(function(i){i.src=d;});});
-        });
-      }, 800);
-    }
-    var dot=document.getElementById('statusDot');if(dot)dot.className='status-dot connected';
-    var txt=document.getElementById('statusText');if(txt)txt.textContent='LIVE \u2014 CONNECTED TO BRIDGE';
-    // Reconnect after 4s to pick up local image URLs that bridge downloads in background
-    setTimeout(connectToBridge, 4000);
-  }).catch(function(){
-    if(location.protocol==='file:') return; // backup file — don't retry bridge
-    var dot=document.getElementById('statusDot');if(dot)dot.className='status-dot';
-    var txt=document.getElementById('statusText');if(txt)txt.textContent='CONNECTING...';
-    setTimeout(connectToBridge,1500);
-  });
+  // Bridge is not used in cloud mode — data comes from Supabase
+  var dot=document.getElementById('statusDot');if(dot)dot.className='status-dot connected';
+  var txt=document.getElementById('statusText');if(txt)txt.textContent='CLOUD \u2014 SUPABASE CONNECTED';
 }
 
 // ── Init ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
-  // If this is a backup file, restore images from __pendingImages into memory + IDB
+  // If this is a backup file, restore images from __pendingImages into memory
   if(window.__pendingImages){
     var pi=window.__pendingImages;
     if(pi.myTradeImages){Object.assign(myTradeImages,pi.myTradeImages);try{localStorage.setItem('myTradeImages',JSON.stringify(myTradeImages));}catch(e){}}
     if(pi.tvTradeImages&&typeof tvTradeImages!=='undefined'){Object.assign(tvTradeImages,pi.tvTradeImages);try{localStorage.setItem('tvTradeImages',JSON.stringify(tvTradeImages));}catch(e){}}
     if(pi.tvDayImages&&typeof tvDayImages!=='undefined'){Object.assign(tvDayImages,pi.tvDayImages);try{localStorage.setItem('tvDayImages',JSON.stringify(tvDayImages));}catch(e){}}
-    if(pi.discordImageCache){Object.assign(discordImageCache,pi.discordImageCache);
-      // Seed IDB with Discord images so they're available offline going forward
-      _openImgDB(function(db){if(!db)return;Object.keys(pi.discordImageCache).forEach(function(url){imgDBSet('discord',url,pi.discordImageCache[url]);});});
-    }
+    if(pi.discordImageCache){Object.assign(discordImageCache,pi.discordImageCache);}
     delete window.__pendingImages;
   }
 
@@ -1420,8 +1498,7 @@ document.addEventListener('DOMContentLoaded',function(){
     if(rr.length){var la=rr[rr.length-1].acc,cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
   }catch(er){}
   if(execView!=='ai') renderExecutions();
-  // Only connect to bridge when running on localhost (not when opening backup file directly)
-  if(location.protocol!=='file:') connectToBridge();
+  connectToBridge();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -3579,7 +3656,7 @@ try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
 
-function tvSave(){localStorage.setItem('tvTrades',JSON.stringify(tvTrades));localStorage.setItem('tvDayR',JSON.stringify(tvDayR));}
+function tvSave(){sbSave('tvTrades',JSON.stringify(tvTrades));sbSave('tvDayR',JSON.stringify(tvDayR));}
 
 function tvTab(t){
   var panes={import:'tvImportPane',calendar:'tvCalPane',trades:'tvTradesPane',reports:'tvReportsPane'};
@@ -3592,7 +3669,11 @@ function tvTab(t){
   if(t==='calendar') renderTvCal();
   if(t==='trades') renderTvTrades();
   if(t==='reports') renderTvReports();
-  if(t==='import') renderTvRecentImports();
+  if(t==='import') {
+    renderTvRecentImports();
+    if(typeof scaUpdateAccountFromRolling==='function') scaUpdateAccountFromRolling();
+    if(typeof htkInit==='function') htkInit();
+  }
 }
 
 function tvSetUnit(u){
@@ -4133,8 +4214,8 @@ function tvTradeImgDeleteAndRefresh(imgKey,date){
   renderTvTrades();
 }
 
-function tvDayImgUploadInline(e,date){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){tvDayImages[date]=ev.target.result;localStorage.setItem('tvDayImages',JSON.stringify(tvDayImages));renderTvCal();_renderDayPanel(date);};reader.readAsDataURL(file);}
-function tvDayImgDeleteInline(date){delete tvDayImages[date];localStorage.setItem('tvDayImages',JSON.stringify(tvDayImages));renderTvCal();_renderDayPanel(date);}
+function tvDayImgUploadInline(e,date){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){tvDayImages[date]=ev.target.result;sbSave('tvDayImages',JSON.stringify(tvDayImages));renderTvCal();_renderDayPanel(date);};reader.readAsDataURL(file);}
+function tvDayImgDeleteInline(date){delete tvDayImages[date];sbSave('tvDayImages',JSON.stringify(tvDayImages));renderTvCal();_renderDayPanel(date);}
 
 // ── TV TRADES ─────────────────────────────────────────────
 var _tvDateFrom='',_tvDateTo='',_tvDateMode='';
@@ -4829,28 +4910,48 @@ function renderJeppez(){
     var avgRisk=dayRVals.length?dayRVals.reduce(function(s,v){return s+v;},0)/dayRVals.length:100;
     return{pnl:pnl,pct:null,cagr:null,trades:mt.length,wr:wr,avgW:avgW,avgL:avgL,lgW:lgW,lgL:lgL,wlRel:wlRel,lgWL:lgWL,pf:pf,totalR:totalR,avgRisk:avgRisk,live:true};
   }
-  var ms2=ms('2026-03');
+  // Dynamic: always compute from current month onwards
+  var _now = new Date();
+  var _curYear = _now.getFullYear();
+  var _curMonthIdx = _now.getMonth(); // 0=Jan
   var yearStart=JEPPEZ_STATIC[0]?JEPPEZ_STATIC[0].start:4684;
-  // Simple cumulative % return from starting capital (not annualized)
   function cumReturn(cumPnl){return yearStart>0?parseFloat((cumPnl/yearStart*100).toFixed(2)):null;}
-  // Cumulative P&L
   var janPnl=JEPPEZ_STATIC[0]?JEPPEZ_STATIC[0].pnl:0;
   var febPnl=JEPPEZ_STATIC[1]?JEPPEZ_STATIC[1].pnl:0;
-  var marchPnl=ms2?ms2.pnl:0;
-  var cumMar=janPnl+febPnl+marchPnl;
-  var marchRow=ms2?{
-    month:'March',start:7500,end:7500+ms2.pnl,pnl:ms2.pnl,pct:null,
-    r:ms2.totalR,cagr:cumReturn(cumMar),total:cumMar,
-    trades:ms2.trades,wr:ms2.wr,wlRel:ms2.wlRel,lgWL:ms2.lgWL,pf:ms2.pf,
-    avgW:ms2.avgW,avgL:ms2.avgL,lgW:ms2.lgW,lgL:ms2.lgL,
-    avgRisk:ms2.avgRisk,live:true
-  }:{month:'March',start:7500,live:true};
-  // Patch static rows with cumulative total + cumulative % return
   var cumJan=janPnl, cumFeb=janPnl+febPnl;
   var patchedStatic=JEPPEZ_STATIC.map(function(r,i){
     return Object.assign({},r,{total:i===0?cumJan:cumFeb,cagr:i===0?cumReturn(cumJan):cumReturn(cumFeb)});
   });
-  var allRows=patchedStatic.concat([marchRow]);
+  // Build live rows for March through current month
+  var liveRows=[];
+  var cumRunning=cumFeb;
+  for(var _mi=2;_mi<=_curMonthIdx;_mi++){
+    var _mPad=String(_mi+1).padStart(2,'0');
+    var _prefix=_curYear+'-'+_mPad;
+    var _mdata=ms(_prefix);
+    var _mname=JEPPEZ_MONTHS[_mi];
+    var _isCurrentMonth=(_mi===_curMonthIdx);
+    // start = end of previous month (last row's end, or static end)
+    var _prevEnd = liveRows.length>0 ? (liveRows[liveRows.length-1].end||null)
+                 : (patchedStatic.length>0 ? patchedStatic[patchedStatic.length-1].end : 7500);
+    if(!_prevEnd && _mi===2) _prevEnd=7500;
+    if(_mdata){
+      cumRunning+=_mdata.pnl;
+      var _mEnd = _prevEnd!=null ? _prevEnd+_mdata.pnl : null;
+      var _mPct = _prevEnd!=null&&_prevEnd>0 ? (_mdata.pnl/_prevEnd)*100 : null;
+      liveRows.push({
+        month:_mname, start:_prevEnd, end:_mEnd,
+        pnl:_mdata.pnl, pct:_mPct, r:_mdata.totalR, cagr:cumReturn(cumRunning),
+        total:cumRunning, trades:_mdata.trades, wr:_mdata.wr, wlRel:_mdata.wlRel,
+        lgWL:_mdata.lgWL, pf:_mdata.pf, avgW:_mdata.avgW, avgL:_mdata.avgL,
+        lgW:_mdata.lgW, lgL:_mdata.lgL, avgRisk:_mdata.avgRisk,
+        live:_isCurrentMonth
+      });
+    } else {
+      liveRows.push({month:_mname, start:_prevEnd, live:_isCurrentMonth});
+    }
+  }
+  var allRows=patchedStatic.concat(liveRows);
   el.innerHTML=JEPPEZ_MONTHS.map(function(mon){
     var row=allRows.find(function(r){return r.month===mon;});
     if(!row)return '<div style="display:grid;grid-template-columns:'+COLS+';gap:0;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="font-size:12px;color:var(--muted);">'+mon+'</span></div>';
@@ -4955,14 +5056,12 @@ try{
   var saved=localStorage.getItem('ttEntries');
   if(saved){
     ttEntries=JSON.parse(saved).filter(function(e){return !ttIsAutoImport(e);});
-    localStorage.setItem('ttEntries',JSON.stringify(ttEntries));
   } else {
     ttEntries=TT_SEED_DATA.map(function(e){return Object.assign({},e);}).filter(function(e){return !ttIsAutoImport(e);});
-    localStorage.setItem('ttEntries',JSON.stringify(ttEntries));
   }
 } catch(e){ttEntries=TT_SEED_DATA.map(function(e){return Object.assign({},e);}).filter(function(e){return !ttIsAutoImport(e);});}
 
-function ttSaveLS(){localStorage.setItem('ttEntries',JSON.stringify(ttEntries));}
+function ttSaveLS(){sbSave('ttEntries',JSON.stringify(ttEntries));}
 
 function ttEdgeColorBg(score){
   if(score==null) return ['var(--muted)','rgba(255,255,255,0.02)'];
@@ -5563,7 +5662,7 @@ function getRollingMerged(){
 var _nvbOverrides={};
 try{_nvbOverrides=JSON.parse(localStorage.getItem('rollingNVBOverrides')||'{}');}catch(e){}
 function _nvbKey(r){return r.ds+'__'+r.t+'__'+r.pnl.toFixed(2);}
-function _nvbSave(){localStorage.setItem('rollingNVBOverrides',JSON.stringify(_nvbOverrides));}
+function _nvbSave(){sbSave('rollingNVBOverrides',JSON.stringify(_nvbOverrides));}
 // Cycle: null -> 1 -> 0.5 -> null  (N and V)
 // Cycle for B: null -> 1 -> 0.5 -> null (same cycle)
 function _nvbCycle(val){if(val===null||val===undefined)return 1;if(val===1)return 0.5;return null;}
@@ -5887,20 +5986,70 @@ function scaUpdateAccountFromRolling(){
     var lastAcc=rows[rows.length-1].acc;
     var accEl=document.getElementById('scaAccount');
     if(accEl) accEl.textContent=Math.round(lastAcc);
+    // Populate all R display spans
+    var R = lastAcc * 0.02;
+    var halfR = lastAcc * 0.01;
+    var rEl=document.getElementById('scaRDisplay'); if(rEl) rEl.textContent='$'+R.toFixed(2);
+    var hrEl=document.getElementById('scaHalfRDisplay'); if(hrEl) hrEl.textContent='$'+halfR.toFixed(2);
+    var dmEl=document.getElementById('scaDailyMax'); if(dmEl) dmEl.textContent='-$'+(R*2).toFixed(2);
+    var tmEl=document.getElementById('scaTickerMax'); if(tmEl) tmEl.textContent='-$'+(R*2).toFixed(2);
+    var apEl=document.getElementById('scaAplusplus'); if(apEl) apEl.textContent='$'+(R*3).toFixed(2);
     return lastAcc;
   }catch(e){return null;}
 }
 
-function scaClearAll(){
+function scaToggleSizeOverride(id, r) {
+  var spanEl = document.getElementById(id+'_'+r+'_size');
+  var inpEl  = document.getElementById(id+'_'+r+'_size_inp');
+  if (!spanEl || !inpEl) return;
+  if (inpEl.style.display !== 'none') {
+    // Back to auto
+    inpEl.style.display = 'none';
+    spanEl.style.display = 'block';
+    inpEl.value = '';
+    scaRecalcAll();
+  } else {
+    // Show override input
+    spanEl.style.display = 'none';
+    inpEl.style.display = 'block';
+    inpEl.focus();
+  }
+}
+function scaClearRow(id, r) {
+  // Clear just one row's inputs
+  var fields = r===0
+    ? ['_0_entry','_0_stop','_0_size']
+    : ['_'+r+'_entry','_'+r+'_stop'];
+  // Also hide override input for add rows
+  if(r>0){
+    var inpEl=document.getElementById(id+'_'+r+'_size_inp');
+    var spanEl=document.getElementById(id+'_'+r+'_size');
+    if(inpEl){inpEl.style.display='none';inpEl.value='';}
+    if(spanEl)spanEl.style.display='block';
+  }
+  fields.forEach(function(f){
+    var el = document.getElementById(id+f);
+    if(el) el.value = '';
+  });
+  scaRecalcAll();
+}
+function scaClearAll(){_scaBlockCounts={short:0,long:0};
   var c=document.getElementById('scaBlocksContainer');if(c)c.innerHTML='';
   document.querySelectorAll('.sca-clr-hdr').forEach(function(el){el.closest('[id^="sca_"]') && el.closest('[id^="sca_"]').remove();});
 }
 function scaClearBlock(id){var el=document.getElementById(id);if(el)el.remove();}
+var _scaBlockCounts={short:0,long:0};
 function scaAddBlock(dir){
   var c=document.getElementById('scaBlocksContainer');
   if(!c)return;
-  var existing=c.querySelectorAll('[id^="sca_'+dir+'_"]');
-  var idx=existing.length+1;
+  // Add separator if there are already blocks
+  if(c.children.length>0){
+    var sep=document.createElement('div');
+    sep.style.cssText='height:36px;background:linear-gradient(180deg,#0a0e1a 0%,#1a1f2e 50%,#0a0e1a 100%);border-top:2px solid #2a3040;border-bottom:2px solid #2a3040;';
+    c.appendChild(sep);
+  }
+  _scaBlockCounts[dir]=(_scaBlockCounts[dir]||0)+1;
+  var idx=_scaBlockCounts[dir];
   var div=document.createElement('div');
   div.innerHTML=scaBuildBlock(dir,idx);
   var block=div.firstChild;
@@ -5933,7 +6082,6 @@ function scaInit(){
   var c=document.getElementById('scaBlocksContainer');
   if(c&&!c.children.length){
     scaAddBlock('short');
-    scaAddBlock('long');
   }
 }
 
@@ -6141,13 +6289,7 @@ function scaMatchRender(){
     }catch(err){console.error('scaMatch card err',err);}
   });
 
-  // Add ticker button
-  var addRow=document.createElement('div');
-  addRow.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border:1px dashed rgba(255,255,255,0.1);border-radius:10px;cursor:pointer;opacity:0.6;transition:opacity 0.15s;';
-  addRow.innerHTML='<span style="font-size:20px;color:var(--muted);">+</span><span style="font-size:13px;color:var(--muted);">Add ticker...</span>';
-  addRow.onmouseover=function(){addRow.style.opacity='1';};addRow.onmouseout=function(){addRow.style.opacity='0.6';};
-  addRow.onclick=function(){scaMatchWatchlist.push({ticker:'',setup:'',dir:'short',myTrade:{entrySigs:[],stopLosses:[],profitTargets:[]}});scaMatchSave();scaMatchRender();};
-  container.appendChild(addRow);
+
 }
 
 function _scaGetSetupOptions(){
@@ -6163,68 +6305,133 @@ function _scaGetSetupOptions(){
 function scaBuildBlock(dir,idx){
   var id='sca_'+dir+'_'+idx;
   var isShort=dir==='short';
-  var W=[60,72,64,60,72,72,64,70];
-  var cellStyle=function(bg,color,fw){return 'style="font-family:var(--mono);font-size:12px;font-weight:'+(fw||'normal')+';background:'+bg+';border:1px solid rgba(255,255,255,0.1);padding:4px 6px;text-align:center;color:'+color+';"';};
-  var inputCell=function(fieldId,width){return '<td style="width:'+width+'px;"><input id="'+fieldId+'" class="sca-input sca-yellow-input" type="number" step="0.01" style="width:100%;font-family:var(--mono);font-size:12px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 6px;text-align:center;outline:none;box-sizing:border-box;"></td>';};
-  var sizeCell=function(fieldId,width){return '<td style="width:'+width+'px;"><input id="'+fieldId+'" class="sca-input sca-yellow-input" type="number" step="1" style="width:100%;font-family:var(--mono);font-size:12px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 6px;text-align:center;outline:none;box-sizing:border-box;"></td>';};
-  var outputCell=function(cellId,width){return '<td style="width:'+width+'px;"><span id="'+cellId+'" style="display:block;font-family:var(--mono);font-size:12px;font-weight:bold;background:rgba(255,140,0,0.2);border:1px solid rgba(255,140,0,0.3);color:#ff8c00;padding:4px 6px;text-align:center;min-height:24px;">—</span></td>';};
+  var TAB_BASE=idx*20;
+  var inp=function(fid,ti,w){return '<input id="'+fid+'" class="sca-input sca-yellow-input" type="number" step="0.01" tabindex="'+ti+'" style="width:'+(w||'62px')+';font-family:var(--mono);font-size:11px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;">';};
+  var szi=function(fid,ti){return '<input id="'+fid+'" class="sca-input sca-yellow-input" type="number" step="1" tabindex="'+ti+'" style="width:62px;font-family:var(--mono);font-size:10px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;">';};
+  var out=function(cid){return '<span id="'+cid+'" style="display:block;font-family:var(--mono);font-size:9px;font-weight:bold;background:rgba(255,140,0,0.2);border:1px solid rgba(255,140,0,0.3);color:#ff8c00;padding:2px 3px;text-align:center;min-height:16px;border-radius:2px;">—</span>';};
+  var lbl=function(t){return '<span style="font-family:var(--mono);font-size:6px;color:rgba(255,255,255,0.3);letter-spacing:0.5px;display:block;margin-bottom:1px;">'+t+'</span>';};
 
-  var html='<div id="'+id+'" style="margin-bottom:16px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:6px;overflow:hidden;">';
-  // Ticker + Target row above block header
-  html+='<div style="display:flex;align-items:center;gap:12px;background:#111827;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);">';
-  html+='<div style="display:flex;align-items:center;gap:6px;">'
-    +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">TICKER</span>'
-    +'<input id="'+id+'_ticker" class="sca-input sca-yellow-input" type="text" style="width:70px;font-family:var(--mono);font-size:13px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:3px 6px;text-align:center;outline:none;text-transform:uppercase;">'
+  // Build a row card: takes a row prefix, clear onclick, tab offsets
+  function rowCard(prefix,stepLabel,clearFn,tabEntry,tabStop,tabSize,isSizeAuto){
+    var sizeHtml=isSizeAuto
+      ?'<div style="position:relative;">'
+        +'<span id="'+prefix+'_size" style="display:block;font-family:var(--mono);font-size:11px;font-weight:bold;background:rgba(255,140,0,0.2);border:1px solid rgba(255,140,0,0.3);color:#ff8c00;padding:4px 5px;text-align:center;min-height:20px;cursor:pointer;border-radius:2px;width:72px;box-sizing:border-box;" title="Click to override" onclick="scaToggleSizeOverride(\''+id+'\','+tabSize+')">—</span>'
+        +'<input id="'+prefix+'_size_inp" type="number" step="1" class="sca-input" style="display:none;width:62px;font-family:var(--mono);font-size:10px;font-weight:bold;background:#b8860b;border:2px solid #00ffff;color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;" placeholder="ovr" oninput="scaRecalcAll()">'
+        +'</div>'
+      :szi(prefix+'_size',tabSize);
+    return '<div style="background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.08);padding:5px 6px;">'
+      // Step label + clear
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;color:rgba(255,255,255,0.4);">'+stepLabel+'</span>'
+        +'<span onclick="'+clearFn+'" style="cursor:pointer;color:rgba(255,255,255,0.25);font-size:10px;" title="Clear">✕</span>'
+      +'</div>'
+      // Input row: ENTRY STOP SIZE
+      +'<div style="display:flex;gap:6px;margin-bottom:6px;">'
+        +'<div>'+lbl('ENTRY')+inp(prefix+'_entry',tabEntry)+'</div>'
+        +'<div>'+lbl('STOP')+inp(prefix+'_stop',tabStop)+'</div>'
+        +'<div>'+lbl('SIZE')+sizeHtml+'</div>'
+      +'</div>'
+      // Output row: TOTAL  AVG  R RISK  R@TGT
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;">'
+        +'<div>'+lbl('TOTAL SZ')+out(prefix+'_total')+'</div>'
+        +'<div>'+lbl('AVG PRICE')+out(prefix+'_avg')+'</div>'
+        +'<div>'+lbl('R RISK')+out(prefix+'_rrisk')+'</div>'
+        +'<div>'+lbl('R @ TGT')+out(prefix+'_rtarget')+'</div>'
+      +'</div>'
     +'</div>';
-  html+='<div style="display:flex;align-items:center;gap:6px;">'
-    +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">TARGET</span>'
-    +'<input id="'+id+'_target" class="sca-input sca-yellow-input" type="number" step="0.01" style="width:80px;font-family:var(--mono);font-size:13px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:3px 6px;text-align:center;outline:none;">'
-    +'</div>';
-  html+='<div style="display:flex;align-items:center;gap:6px;">'
-    +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">SETUP</span>'
-    +'<select id="'+id+'_setup" onchange="scaSetupChanged(\''+id+'\')" style="font-family:var(--mono);font-size:11px;background:#1a1a2e;border:1px solid rgba(200,169,110,0.4);color:var(--accent);padding:3px 6px;border-radius:3px;outline:none;">'
-    +'<option value="">— pick —</option>'
-    +_scaGetSetupOptions()
-    +'</select>'
-    +'</div>';
-  html+='<span style="font-family:var(--display);font-size:11px;letter-spacing:2px;color:'+(isShort?'#ef5350':'var(--bull)')+';font-weight:bold;margin-left:auto;">'+(isShort?'⬇ SHORT':'⬆ LONG')+' PYRAMID '+idx+'</span>';
-  html+='<div class="sca-clr-hdr" data-bid="'+id+'" style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);padding:2px 8px;border-radius:3px;cursor:pointer;"><span style="font-size:11px;color:#888;">✕</span></div>';
-  html+='</div>';
-  // Table
-  html+='<table style="width:100%;border-collapse:collapse;">';
-  // Column headers — no TARGET or TICKER
-  html+='<tr style="background:rgba(0,0,0,0.3);">';
-  ['STEP','ENTRY','STOP','SIZE','TOTAL SZ','AVG PRICE','R RISK','R @ TARGET'].forEach(function(h2,ci){
-    html+='<th style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:4px 6px;text-align:center;font-weight:normal;width:'+W[ci]+'px;">'+h2+'</th>';
-  });
-  html+='</tr>';
-  // Average row (row 0)
-  html+='<tr>';
-  html+='<td '+cellStyle('rgba(255,255,255,0.05)','var(--muted)','bold')+'>AVG</td>';
-  html+=inputCell(id+'_0_entry',W[1]);
-  html+=inputCell(id+'_0_stop',W[2]);
-  html+=sizeCell(id+'_0_size',W[3]);
-  html+=outputCell(id+'_0_total',W[4]);
-  html+=outputCell(id+'_0_avg',W[5]);
-  html+=outputCell(id+'_0_rrisk',W[6]);
-  html+=outputCell(id+'_0_rtarget',W[7]);
-  html+='</tr>';
-  // Add rows 1-5
-  for(var r=1;r<=5;r++){
-    html+='<tr style="border-top:1px solid rgba(255,255,255,0.04);">';
-    html+='<td '+cellStyle('rgba(0,0,0,0.3)','var(--muted)')+'>'+'Add #'+r+'</td>';
-    html+=inputCell(id+'_'+r+'_entry',W[1]);
-    html+=inputCell(id+'_'+r+'_stop',W[2]);
-    html+=outputCell(id+'_'+r+'_size',W[3]);
-    html+=outputCell(id+'_'+r+'_total',W[4]);
-    html+=outputCell(id+'_'+r+'_avg',W[5]);
-    html+=outputCell(id+'_'+r+'_rrisk',W[6]);
-    html+=outputCell(id+'_'+r+'_rtarget',W[7]);
-    html+='</tr>';
   }
-  html+='</table></div>';
+
+  var html='<div id="'+id+'" style="margin-bottom:0;background:#0d1117;border-bottom:1px solid rgba(255,255,255,0.12);width:100%;">';
+
+  // Header
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;background:#111827;padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.07);">';
+  html+='<span style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:'+(isShort?'#ef5350':'#26a69a')+';font-weight:bold;">'+(isShort?'⬇ SHORT':'⬆ LONG')+'</span>';
+  html+='<div class="sca-clr-hdr" data-bid="'+id+'" style="cursor:pointer;padding:1px 6px;"><span style="font-size:11px;color:#555;">✕</span></div>';
+  html+='</div>';
+
+  // Body
+  html+='<div style="padding:4px 6px 2px;">';
+
+  // AVG row card (size = manual input)
+  html+=rowCard(id+'_0','AVG','scaClearRow(\''+id+'\',0)',TAB_BASE+1,TAB_BASE+2,TAB_BASE+3,false);
+
+  // Placeholder for dynamic add rows
+  html+='<div id="'+id+'_addrows_container"></div>';
+
+  // + ADD button
+  html+='<div id="'+id+'_addbtn" onclick="scaAddTableRow(\''+id+'\')" style="text-align:center;padding:4px;cursor:pointer;color:rgba(255,255,255,0.3);font-size:10px;font-family:var(--mono);border:1px dashed rgba(255,255,255,0.1);border-radius:4px;margin-bottom:6px;" onmouseover="this.style.color=\'rgba(255,255,255,0.7)\';this.style.borderColor=\'rgba(255,255,255,0.3)\'" onmouseout="this.style.color=\'rgba(255,255,255,0.3)\';this.style.borderColor=\'rgba(255,255,255,0.1)\'">+ ADD ROW</div>';
+
+  // Target
+  html+='<div style="display:flex;align-items:center;gap:6px;padding:3px 6px 4px;background:#0d1117;border-top:1px solid rgba(255,255,255,0.07);">';
+  html+='<span style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;">TARGET</span>';
+  html+='<input id="'+id+'_target" class="sca-input sca-yellow-input" type="number" step="0.01" tabindex="'+(TAB_BASE+19)+'" style="width:72px;font-family:var(--mono);font-size:11px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:3px 5px;text-align:center;outline:none;">';
+  html+='<span style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;margin-left:4px;">TICKER</span>';
+  html+='<input id="'+id+'_ticker" class="sca-input" type="text" tabindex="'+(TAB_BASE+20)+'" style="width:55px;font-family:var(--mono);font-size:11px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:3px 5px;text-align:center;outline:none;text-transform:uppercase;" placeholder="SYM">';
+  html+='</div>';
+
+  html+='</div></div>';
   return html;
 }
+
+function scaAddTableRow(id) {
+  var container = document.getElementById(id+'_addrows_container');
+  if (!container) return;
+  var existing = container.querySelectorAll('[id^="'+id+'_row"]');
+  var r = existing.length + 1;
+  if (r > 2) return;
+
+  var isShort = id.indexOf('_short_') >= 0;
+  var idx = parseInt(id.split('_').pop()) || 1;
+  var TAB_BASE = idx * 20;
+  var prefix = id+'_'+r;
+
+  var lbl=function(t){return '<span style="font-family:var(--mono);font-size:6px;color:rgba(255,255,255,0.3);letter-spacing:0.5px;display:block;margin-bottom:1px;">'+t+'</span>';};
+  var out=function(cid){return '<span id="'+cid+'" style="display:block;font-family:var(--mono);font-size:9px;font-weight:bold;background:rgba(255,140,0,0.2);border:1px solid rgba(255,140,0,0.3);color:#ff8c00;padding:2px 3px;text-align:center;min-height:16px;border-radius:2px;">—</span>';};
+
+  var tabEntry=TAB_BASE+4+(r-1)*2, tabStop=TAB_BASE+5+(r-1)*2;
+
+  var div = document.createElement('div');
+  div.id = id+'_row'+r;
+  div.style.cssText = 'background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.08);padding:5px 6px;margin-bottom:0;';
+  div.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+      +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;color:rgba(255,255,255,0.4);">ADD #'+r+'</span>'
+      +'<span onclick="scaRemoveTableRow(\''+id+'\','+r+')" style="cursor:pointer;color:rgba(255,255,255,0.25);font-size:10px;" title="Remove">✕</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:6px;">'
+      +'<div>'+lbl('ENTRY')+'<input id="'+prefix+'_entry" class="sca-input sca-yellow-input" type="number" step="0.01" tabindex="'+tabEntry+'" style="width:62px;font-family:var(--mono);font-size:10px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;"></div>'
+      +'<div>'+lbl('STOP')+'<input id="'+prefix+'_stop" class="sca-input sca-yellow-input" type="number" step="0.01" tabindex="'+tabStop+'" style="width:62px;font-family:var(--mono);font-size:10px;font-weight:bold;background:#b8860b;border:1px solid rgba(255,255,0,0.3);color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;"></div>'
+      +'<div>'+lbl('SIZE')
+        +'<div style="position:relative;">'
+          +'<span id="'+prefix+'_size" style="display:block;font-family:var(--mono);font-size:11px;font-weight:bold;background:rgba(255,140,0,0.2);border:1px solid rgba(255,140,0,0.3);color:#ff8c00;padding:4px 5px;text-align:center;min-height:20px;cursor:pointer;border-radius:2px;width:72px;box-sizing:border-box;" title="Click to override" onclick="scaToggleSizeOverride(\''+id+'\','+r+')">—</span>'
+          +'<input id="'+prefix+'_size_inp" type="number" step="1" class="sca-input" style="display:none;width:62px;font-family:var(--mono);font-size:10px;font-weight:bold;background:#b8860b;border:2px solid #00ffff;color:#000;padding:4px 5px;text-align:center;outline:none;box-sizing:border-box;" placeholder="ovr" oninput="scaRecalcAll()">'
+        +'</div>'
+      +'</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;">'
+      +'<div>'+lbl('TOTAL SZ')+out(prefix+'_total')+'</div>'
+      +'<div>'+lbl('AVG PRICE')+out(prefix+'_avg')+'</div>'
+      +'<div>'+lbl('R RISK')+out(prefix+'_rrisk')+'</div>'
+      +'<div>'+lbl('R @ TGT')+out(prefix+'_rtarget')+'</div>'
+    +'</div>';
+
+  container.appendChild(div);
+
+  // Wire inputs
+  div.querySelectorAll('.sca-input').forEach(function(el){ el.addEventListener('input', scaRecalcAll); });
+
+  if (r >= 2) { var btn=document.getElementById(id+'_addbtn'); if(btn) btn.style.display='none'; }
+  scaRecalcAll();
+}
+
+function scaRemoveTableRow(id, r) {
+  var el = document.getElementById(id+'_row'+r);
+  if (el) el.remove();
+  for(var i=r+1;i<=2;i++){var e2=document.getElementById(id+'_row'+i);if(e2)e2.remove();}
+  var btn=document.getElementById(id+'_addbtn'); if(btn){btn.style.display='block';}
+  scaRecalcAll();
+}
+
 
 function scaRecalcAll(){
   var accEl=document.getElementById('scaAccount');
@@ -6238,8 +6445,8 @@ function scaRecalcAll(){
   var apEl=document.getElementById('scaAplusplus'); if(apEl) apEl.textContent=R?'+$'+(R*3).toFixed(2):'—';
   if(!R) return;
   ['short','long'].forEach(function(dir){
-    for(var i=1;i<=5;i++){
-      scaCalcBlock(dir,i,R);
+    for(var i=1;i<=(_scaBlockCounts[dir]||2);i++){
+      if(document.getElementById('sca_'+dir+'_'+i)) scaCalcBlock(dir,i,R);
     }
   });
   htkInit();
@@ -6249,12 +6456,12 @@ function scaCalcBlock(dir,idx,R){
   var id='sca_'+dir+'_'+idx;
   var isShort=dir==='short';
   function val(suffix){var el=document.getElementById(id+suffix);return el?parseFloat(el.value)||null:null;}
-  function set(suffix,v){var el=document.getElementById(id+suffix);if(el)el.textContent=(v!=null?v:'—');}
+  function set(suffix,v){var el=document.getElementById(id+suffix);if(!el)return;if(el.tagName==='INPUT'){/* never overwrite input value from set */}else{el.textContent=(v!=null?v:'—');}}
 
   var entry0=val('_0_entry'), stop0=val('_0_stop'), size0=val('_0_size');
   var target=val('_target');
   if(!entry0||!stop0||!size0){set('_0_total','—');set('_0_avg','—');set('_0_rrisk','—');set('_0_rtarget','—');
-    for(var r=1;r<=5;r++){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}
+    for(var r=1;r<=2;r++){if(document.getElementById(id+'_'+r+'_entry')){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}}
     return;
   }
 
@@ -6269,15 +6476,21 @@ function scaCalcBlock(dir,idx,R){
   }
 
   var prevAvgP=entry0, prevTotal=size0;
-  for(var r=1;r<=5;r++){
+  var maxAddRows=2;
+  for(var r=1;r<=maxAddRows;r++){
+    if(!document.getElementById(id+'_'+r+'_entry')) break;
     var entryR=val('_'+r+'_entry'), stopR=val('_'+r+'_stop');
     if(!entryR||!stopR){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');continue;}
     // Size formula
+    // Check for manual override
+    var overrideInp = document.getElementById(id+'_'+r+'_size_inp');
+    var overrideVal = overrideInp && overrideInp.style.display!=='none' ? parseFloat(overrideInp.value)||null : null;
     var sizeR;
-    if(r===1){
+    if(overrideVal!==null){ sizeR=overrideVal; }
+    else if(r===1){
       if(isShort) sizeR=Math.floor((R-Math.abs(prevAvgP-stopR)*prevTotal)/Math.abs(entryR-stopR));
       else sizeR=Math.max(0,Math.floor((R-(prevAvgP-stopR)*prevTotal)/(entryR-stopR)));
-    } else {
+    } else if(overrideVal===null) {
       var prevStop=val('_'+(r-1)+'_stop')||stopR;
       if(isShort) sizeR=Math.floor((R+(prevAvgP-stopR)*prevTotal)/(stopR-entryR));
       else sizeR=Math.floor((R-(prevAvgP-stopR)*prevTotal)/(entryR-stopR));
@@ -6287,6 +6500,9 @@ function scaCalcBlock(dir,idx,R){
     var avgPR=(prevAvgP*prevTotal+entryR*sizeR)/(totalR||1);
     var rriskR=isShort?(avgPR-stopR)*totalR/R:(stopR-avgPR)*totalR/R;
     set('_'+r+'_size',sizeR.toFixed(0));
+    // Ensure auto span is visible (in case override was never toggled)
+    var sSpan=document.getElementById(id+'_'+r+'_size');
+    if(sSpan && sSpan.getAttribute('data-auto')==='1' && document.getElementById(id+'_'+r+'_size_inp') && document.getElementById(id+'_'+r+'_size_inp').style.display==='none') sSpan.style.display='block';
     set('_'+r+'_total',totalR.toFixed(0));
     set('_'+r+'_avg',avgPR.toFixed(2));
     set('_'+r+'_rrisk',rriskR.toFixed(2)+'R');
@@ -6785,34 +7001,46 @@ function videoShowSetup(){
 
 <!-- VALGO CONDENSED PANEL -->
 <div id="kinfoPanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:12px 16px;box-sizing:border-box;background:var(--bg);overflow-y:auto;">
-  <div style="max-width:960px;margin:0 auto;">
-    <!-- Filter buttons -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <!-- Top bar -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <span style="font-family:var(--display);font-size:13px;font-weight:900;letter-spacing:3px;color:var(--accent);">KINFO</span>
+      <!-- Main view tabs -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-left:8px;">
+        <button onclick="kinfoSwitchView('chart')" id="kinfoViewChart" style="font-family:var(--mono);font-size:10px;padding:4px 12px;border:none;background:var(--accent);color:var(--bg);cursor:pointer;letter-spacing:1px;">CHART</button>
+        <button onclick="kinfoSwitchView('errors')" id="kinfoViewErrors" style="font-family:var(--mono);font-size:10px;padding:4px 12px;border:none;background:transparent;color:var(--muted);cursor:pointer;letter-spacing:1px;">ERRORS</button>
+        <button onclick="kinfoSwitchView('grades')" id="kinfoViewGrades" style="font-family:var(--mono);font-size:10px;padding:4px 12px;border:none;background:transparent;color:var(--muted);cursor:pointer;letter-spacing:1px;">1/2</button>
+      </div>
+      <!-- Range buttons (shared) -->
       <div style="display:flex;gap:4px;margin-left:8px;" id="kinfoFilters">
         <button onclick="kinfoSetRange('1W')" id="kinfoBtn1W" class="kinfo-range-btn" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">1W</button>
+        <button onclick="kinfoSetRange('MTD')" id="kinfoBtnMTD" class="kinfo-range-btn" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">MTD</button>
         <button onclick="kinfoSetRange('1M')" id="kinfoBtn1M" class="kinfo-range-btn" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);">1M</button>
         <button onclick="kinfoSetRange('3M')" id="kinfoBtn3M" class="kinfo-range-btn" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">3M</button>
         <button onclick="kinfoSetRange('1Y')" id="kinfoBtn1Y" class="kinfo-range-btn" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">1Y</button>
       </div>
-      <!-- Summary stats -->
-      <div style="display:flex;gap:4px;margin-left:12px;">
+      <div id="kinfoChartUnitBtns" style="display:flex;gap:4px;margin-left:8px;">
         <button onclick="kinfoSetUnit('$')" id="kinfoBtnDollar" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">$</button>
         <button onclick="kinfoSetUnit('R')" id="kinfoBtnR" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);">R</button>
       </div>
       <div style="margin-left:auto;display:flex;gap:16px;align-items:center;" id="kinfoSummary"></div>
     </div>
-    <!-- Chart -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
-      <div style="position:relative;height:290px;width:100%;"><canvas id="kinfoChart" style="display:block;"></canvas></div>
-    </div>
-    <!-- Day detail panel -->
-    <div id="kinfoDayPanel" style="display:none;"></div>
-
-        <button onclick="kinfoRunPareto()" id="paretoBtn" style="font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--accent);border:none;padding:7px 18px;border-radius:5px;cursor:pointer;font-weight:bold;">⚡ ANALYZE</button>
+    <!-- CHART VIEW -->
+    <div id="kinfoChartView">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="position:relative;height:290px;width:100%;"><canvas id="kinfoChart" style="display:block;"></canvas><div id="kinfoStarOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></div></div>
       </div>
-      <div id="paretoOutput" style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--muted);font-style:italic;min-height:60px;">Click ANALYZE to get your Pareto coaching for the selected period.</div>
     </div>
+    <!-- ERRORS VIEW -->
+    <div id="kinfoErrorsView" style="display:none;">
+      <div id="kinfoErrorsContent"></div>
+    </div>
+    <!-- GRADES VIEW -->
+    <div id="kinfoGradesView" style="display:none;">
+      <div id="kinfoGradesContent"></div>
+    </div>
+    <!-- DAY PANEL — shown over either view -->
+    <div id="kinfoDayPanel" style="display:none;"></div>
   </div>
 </div>
 
@@ -7242,7 +7470,8 @@ var kinfoSelectedDate = null;
 
 function kinfoSetRange(r) {
   kinfoRange = r;
-  ['1W','1M','3M','1Y'].forEach(function(rr) {
+  if (_kinfoView === 'errors') { kinfoRenderErrors(); }
+  ['1W','MTD','1M','3M','1Y'].forEach(function(rr) {
     var btn = document.getElementById('kinfoBtn'+rr);
     if (!btn) return;
     var isActive = rr === r;
@@ -7266,6 +7495,7 @@ function kinfoGetDateRange() {
   var now = new Date();
   var from = new Date(now);
   if (kinfoRange === '1W') from.setDate(now.getDate() - 7);
+  else if (kinfoRange === 'MTD') { from = new Date(now.getFullYear(), now.getMonth(), 1); }
   else if (kinfoRange === '1M') from.setMonth(now.getMonth() - 1);
   else if (kinfoRange === '3M') from.setMonth(now.getMonth() - 3);
   else if (kinfoRange === '1Y') from.setFullYear(now.getFullYear() - 1);
@@ -7287,6 +7517,7 @@ function kinfoGetAllDates(fromDate) {
   (typeof executions !== 'undefined' ? executions : []).forEach(function(e) {
     if (e.date >= fromDate) dateSet.add(e.date);
   });
+  if(typeof tvDayR!=='undefined'){Object.keys(tvDayR).forEach(function(d){if(d>=fromDate)dateSet.add(d);});}
   // Filter weekdays only, sort
   return Array.from(dateSet).filter(function(d) {
     var dow = new Date(d + 'T12:00:00').getDay();
@@ -7300,6 +7531,678 @@ function kinfoDayPnl(date) {
   if (!trades.length) return null;
   return trades.reduce(function(s, t) { return s + t.pnl; }, 0);
 }
+
+var _kinfoView = 'chart';
+function kinfoSwitchView(v) {
+  _kinfoView = v;
+  var cv = document.getElementById('kinfoChartView');
+  var ev = document.getElementById('kinfoErrorsView');
+  var gv = document.getElementById('kinfoGradesView');
+  var ub = document.getElementById('kinfoChartUnitBtns');
+  var bc = document.getElementById('kinfoViewChart');
+  var be = document.getElementById('kinfoViewErrors');
+  var bg = document.getElementById('kinfoViewGrades');
+  if (cv) cv.style.display = v === 'chart' ? 'block' : 'none';
+  if (ev) ev.style.display = v === 'errors' ? 'block' : 'none';
+  if (gv) gv.style.display = v === 'grades' ? 'block' : 'none';
+  if (ub) ub.style.display = v === 'chart' ? 'flex' : 'none';
+  var views = ['chart','errors','grades'];
+  var btns = [bc, be, bg];
+  btns.forEach(function(b,i){ if(b){ b.style.background=v===views[i]?'var(--accent)':'transparent'; b.style.color=v===views[i]?'var(--bg)':'var(--muted)'; }});
+  if (v === 'errors') kinfoRenderErrors();
+  if (v === 'grades') kinfoRenderGrades();
+}
+
+function kinfoGetErrorsInRange() {
+  var fromDate = kinfoGetDateRange();
+  var results = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (!k || !k.startsWith('kinfo_debrief_')) continue;
+    var date = k.replace('kinfo_debrief_', '');
+    if (date < fromDate) continue;
+    var db = {}; try { db = JSON.parse(localStorage.getItem(k)||'{}'); } catch(e) {}
+    (db.sel||[]).forEach(function(e) { results.push({ date:date, cat:'sel', label:e.label, color:e.color||'#ef5350', ticker:e.ticker||'', why:e.why||'', fix:e.fix||'' }); });
+    (db.exec||[]).forEach(function(e) { results.push({ date:date, cat:'exec', label:e.label, color:e.color||'#ef5350', ticker:e.ticker||'', why:e.why||'', fix:e.fix||'' }); });
+    (db.size||[]).forEach(function(e) { results.push({ date:date, cat:'size', label:e.label, color:e.color||'#4fc3f7', ticker:e.ticker||'', why:e.why||'', fix:e.fix||'' }); });
+  }
+  results.sort(function(a,b){return a.date<b.date?-1:1;});
+  return results;
+}
+
+function kinfoRenderErrors() {
+  var el = document.getElementById('kinfoErrorsContent');
+  if (!el) return;
+  var errors = kinfoGetErrorsInRange();
+  var _ef  = el._errFilter || null;
+  var _gridMode = el._gridMode || false;
+
+  var C_MISSED = '#ef5350', C_TOOK = '#9c6fde', C_EXEC = '#ff9800', C_SIZE = '#4fc3f7';
+
+  function errColor(e) {
+    if (e.cat==='exec') return C_EXEC;
+    if (e.cat==='size') return C_SIZE;
+    return e.label.indexOf('Missed')>=0 ? C_MISSED : C_TOOK;
+  }
+
+  var missedList = errors.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')>=0;});
+  var tookList   = errors.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')<0;});
+  var execList   = errors.filter(function(e){return e.cat==='exec';});
+  var sizeList   = errors.filter(function(e){return e.cat==='size';});
+  var selList    = missedList.concat(tookList);
+
+  var filtered = errors.filter(function(e) {
+    if (!_ef) return true;
+    if (_ef==='sel')    return e.cat==='sel';
+    if (_ef==='missed') return e.cat==='sel'&&e.label.indexOf('Missed')>=0;
+    if (_ef==='took')   return e.cat==='sel'&&e.label.indexOf('Missed')<0;
+    if (_ef==='exec')   return e.cat==='exec';
+    if (_ef==='size')   return e.cat==='size';
+    return true;
+  });
+  filtered.forEach(function(e){ e._c = errColor(e); });
+  errors.forEach(function(e){ e._c = errColor(e); });
+
+  el.innerHTML = '';
+
+  // ── TOP SUMMARY CARDS ──
+  var summary = document.createElement('div');
+  summary.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;';
+
+  function makeCard(title, headerColor, rows) {
+    var card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:10px;font-weight:bold;letter-spacing:2px;color:'+headerColor+';margin-bottom:10px;';
+    hdr.textContent = title;
+    card.appendChild(hdr);
+    rows.forEach(function(r) {
+      var isActive = _ef === r.fk;
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:5px;border-radius:6px;cursor:pointer;border:1px solid '+(isActive?r.c+'cc':r.c+'44')+';background:'+(isActive?r.c+'38':r.c+'18')+';transition:all 0.12s;';
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:12px;color:'+r.c+(isActive?'':';opacity:0.75')+';';
+      lbl.textContent = r.label;
+      var cnt = document.createElement('span');
+      cnt.style.cssText = 'font-size:24px;font-weight:bold;color:'+r.c+';min-width:28px;text-align:right;';
+      cnt.textContent = r.count;
+      row.appendChild(lbl); row.appendChild(cnt);
+      row.onclick = function() {
+        el._errFilter = (_ef===r.fk)?null:r.fk;
+        el._gridMode = false;
+        kinfoRenderErrors();
+      };
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  summary.appendChild(makeCard('SELECTION ERROR', C_MISSED, [
+    {label:'All Selection Errors',       count:selList.length,    c:'rgba(255,255,255,0.6)', fk:'sel'},
+    {label:'Missed something Val did',   count:missedList.length, c:C_MISSED,  fk:'missed'},
+    {label:"Val didn't take",            count:tookList.length,   c:C_TOOK,    fk:'took'}
+  ]));
+  summary.appendChild(makeCard('EXECUTION ERROR', C_EXEC, [
+    {label:'Chart does not match his', count:execList.length, c:C_EXEC, fk:'exec'}
+  ]));
+  summary.appendChild(makeCard('SIZING ERROR', C_SIZE, [
+    {label:'Sized too big or too small', count:sizeList.length, c:C_SIZE, fk:'size'}
+  ]));
+  el.appendChild(summary);
+
+  // ── ERROR TOTALS (3 rows, above calendar) ──
+  var totDiv = document.createElement('div');
+  totDiv.style.cssText = 'margin-bottom:20px;';
+  var totHdr = document.createElement('div');
+  totHdr.style.cssText = 'font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;';
+  var totHdrSpan = document.createElement('span'); totHdrSpan.textContent = 'ERROR TOTALS';
+  var sortBtn = document.createElement('button');
+  var _sortAsc = el._sortAsc||false;
+  sortBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);letter-spacing:1px;';
+  sortBtn.textContent = _sortAsc ? '↑ LOWEST FIRST' : '↓ HIGHEST FIRST';
+  sortBtn.onclick = function(){ el._sortAsc=!el._sortAsc; kinfoRenderErrors(); };
+  totHdr.appendChild(totHdrSpan); totHdr.appendChild(sortBtn);
+  totDiv.appendChild(totHdr);
+
+  var totTypes = [
+    {key:'missed', label:'Missed Something Val Did', c:C_MISSED},
+    {key:'took',   label:"Val Didn't Take",           c:C_TOOK},
+    {key:'exec',   label:'Chart Does Not Match His',  c:C_EXEC},
+    {key:'size',   label:'Sizing Error',              c:C_SIZE}
+  ];
+  var _sa = el._sortAsc||false;
+  function _cntKey(list,key){
+    if(key==='missed') return list.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')>=0;}).length;
+    if(key==='took')   return list.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')<0;}).length;
+    if(key==='size')   return list.filter(function(e){return e.cat==='size';}).length;
+    return list.filter(function(e){return e.cat==='exec';}).length;
+  }
+  totTypes.sort(function(a,b){ return _sa?_cntKey(errors,a.key)-_cntKey(errors,b.key):_cntKey(errors,b.key)-_cntKey(errors,a.key); });
+  totTypes.forEach(function(t) {
+    var cnt = _cntKey(errors, t.key);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;margin-bottom:4px;border-radius:6px;background:'+t.c+'18;border:1px solid '+t.c+'33;cursor:pointer;';
+    row.innerHTML = '<span style="font-size:12px;color:'+t.c+';">'+t.label+'</span>'
+      +'<span style="font-size:20px;font-weight:bold;color:'+t.c+';">'+cnt+'</span>';
+    row.onclick = function(){ el._errFilter=(_ef===t.key)?null:t.key; el.scrollTop=0; kinfoRenderErrors(); };
+    totDiv.appendChild(row);
+  });
+  el.appendChild(totDiv);
+
+  // ── CALENDAR ──
+  if (!filtered.length) {
+    var none = document.createElement('div');
+    none.style.cssText = 'font-size:12px;color:var(--muted);font-style:italic;padding:30px 0;text-align:center;';
+    none.textContent = _ef ? 'No errors of this type for the selected period.' : 'No errors logged yet.';
+    el.appendChild(none);
+  } else {
+    // Toolbar
+    var toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+    var totLbl = document.createElement('span');
+    totLbl.style.cssText = 'font-family:var(--mono);font-size:11px;color:var(--muted);';
+    totLbl.textContent = filtered.length + ' error'+(filtered.length!==1?'s':'')+(_ef?' (filtered)':'');
+    toolbar.appendChild(totLbl);
+    var gridBtn = document.createElement('button');
+    gridBtn.style.cssText = 'font-family:var(--mono);font-size:10px;padding:4px 12px;border-radius:4px;cursor:pointer;border:1px solid '+(_gridMode?'var(--accent)':'var(--border)')+';background:'+(_gridMode?'rgba(200,169,110,0.15)':'transparent')+';color:'+(_gridMode?'var(--accent)':'var(--muted)')+';letter-spacing:1px;';
+    gridBtn.textContent = '⊞ GRID';
+    gridBtn.onclick = function(){ el._gridMode=!el._gridMode; kinfoRenderErrors(); };
+    toolbar.appendChild(gridBtn);
+    el.appendChild(toolbar);
+
+    if (_gridMode) {
+      // Grid view
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:24px;';
+      filtered.forEach(function(e) {
+        var cell = document.createElement('div');
+        cell.style.cssText = 'background:var(--surface);border:1px solid '+e._c+'44;border-radius:8px;overflow:hidden;cursor:pointer;';
+        var gbLabel = e.cat==='exec'?'EXEC ERROR':e.cat==='size'?'SIZE ERR':e.label.indexOf('Missed')>=0?'MISS':"VAL DIDN'T TAKE";
+        var ch = document.createElement('div');
+        ch.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:'+e._c+'18;';
+        ch.innerHTML = '<span style="font-size:10px;font-weight:bold;color:'+e._c+';letter-spacing:1px;">'+gbLabel+'</span>'
+          +(e.ticker?'<span style="font-size:12px;font-weight:bold;color:#f5c518;margin-left:auto;">'+e.ticker+'</span>':'')
+          +'<span style="font-size:9px;color:var(--muted);margin-left:'+(e.ticker?'4px':'auto')+';">'+new Date(e.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>';
+        cell.appendChild(ch);
+        if (e.why) { var wd=document.createElement('div'); wd.style.cssText='font-size:10px;color:rgba(255,255,255,0.55);font-style:italic;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.06);'; wd.textContent=e.why; cell.appendChild(wd); }
+        var imgSrc=null;
+        if(e.cat==='sel'&&e.label.indexOf('Missed')>=0){var dEx=(typeof executions!=='undefined'?executions:[]).filter(function(x){return x.date===e.date;});if(typeof resolveDiscordImg==='function')dEx.forEach(function(x){if(x.image_urls&&x.image_urls.length&&!imgSrc)imgSrc=resolveDiscordImg(x.image_urls[0]);});}
+        else if(e.ticker&&typeof tvTradeImages!=='undefined'){var sym=e.ticker;imgSrc=tvTradeImages[e.date+'_'+sym+'_short']||tvTradeImages[e.date+'_'+sym+'_long']||tvTradeImages[e.date+'_'+sym.toLowerCase()+'_short']||tvTradeImages[e.date+'_'+sym.toLowerCase()+'_long']||null;}
+        if(imgSrc){var img=document.createElement('img');img.src=imgSrc;img.style.cssText='width:100%;height:140px;object-fit:cover;display:block;background:#080c14;';img.onerror=function(){this.style.display='none';};(function(src){img.onclick=function(ev){ev.stopPropagation();if(typeof expandMyImg==='function')expandMyImg(src);};})(imgSrc);cell.appendChild(img);}
+        else{var ni=document.createElement('div');ni.style.cssText='height:60px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,0.2);font-style:italic;';ni.textContent='No image';cell.appendChild(ni);}
+        cell.onclick=function(ev){if(ev.target.tagName!=='IMG'){kinfoSwitchView('chart');kinfoOpenDay(e.date);}};
+        grid.appendChild(cell);
+      });
+      el.appendChild(grid);
+    } else {
+      // Calendar view
+      function getWeekKey(date){var d=new Date(date+'T12:00:00');var dow=d.getDay(),diff=dow===0?-6:1-dow;var mon=new Date(d);mon.setDate(d.getDate()+diff);return mon.toISOString().slice(0,10);}
+      var byWeek={};
+      filtered.forEach(function(e){var wk=getWeekKey(e.date);if(!byWeek[wk])byWeek[wk]={};if(!byWeek[wk][e.date])byWeek[wk][e.date]=[];byWeek[wk][e.date].push(e);});
+      var DAYS=['MON','TUE','WED','THU','FRI'];
+      Object.keys(byWeek).sort().forEach(function(wkKey){
+        var wkData=byWeek[wkKey];
+        var wkWrap=document.createElement('div'); wkWrap.style.cssText='margin-bottom:18px;';
+        var wkHdr=document.createElement('div'); wkHdr.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;';
+        wkHdr.textContent='WEEK OF '+new Date(wkKey+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
+        wkWrap.appendChild(wkHdr);
+        var calGrid=document.createElement('div'); calGrid.style.cssText='display:grid;grid-template-columns:repeat(5,1fr);gap:6px;';
+        for(var di=0;di<5;di++){
+          var dayD=new Date(wkKey+'T12:00:00'); dayD.setDate(dayD.getDate()+di);
+          var dayStr=dayD.toISOString().slice(0,10);
+          var dayErrs=wkData[dayStr]||[];
+          var cell=document.createElement('div');
+          var hasErrs=dayErrs.length>0;
+          cell.style.cssText='border-radius:7px;border:1px solid '+(hasErrs?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.04)')+';background:'+(hasErrs?'rgba(255,255,255,0.03)':'transparent')+';padding:8px 8px 6px;min-height:80px;'+(hasErrs?'cursor:pointer;':'');
+          var dlbl=document.createElement('div'); dlbl.style.cssText='font-family:var(--mono);font-size:9px;color:'+(hasErrs?'var(--text)':'rgba(255,255,255,0.15)')+';margin-bottom:6px;display:flex;justify-content:space-between;';
+          dlbl.innerHTML='<span>'+DAYS[di]+'</span><span style="color:var(--muted);">'+dayD.getDate()+'</span>';
+          cell.appendChild(dlbl);
+          dayErrs.sort(function(a,b){
+            function rank(e){ if(e.cat==='size') return 3; if(e.cat==='exec') return 2; return e.label.indexOf('Missed')>=0?0:1; }
+            return rank(a)-rank(b);
+          });
+          dayErrs.forEach(function(e, i){
+            // Insert gap between group 1 (sel) and group 2 (exec/size)
+            if(i>0){
+              var prevRank = (function(x){ if(x.cat==='size') return 3; if(x.cat==='exec') return 2; return x.label.indexOf('Missed')>=0?0:1; })(dayErrs[i-1]);
+              var thisRank = (function(x){ if(x.cat==='size') return 3; if(x.cat==='exec') return 2; return x.label.indexOf('Missed')>=0?0:1; })(e);
+              if(prevRank<=1 && thisRank>=2){
+                var gap=document.createElement('div'); gap.style.cssText='height:14px;'; cell.appendChild(gap);
+              }
+            }
+            var pill=document.createElement('div');
+            pill.style.cssText='font-size:9px;font-weight:bold;padding:2px 6px;border-radius:3px;margin-bottom:3px;background:'+e._c+'22;color:'+e._c+';border:1px solid '+e._c+'44;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+            var pillPrefix=e.cat==='exec'?'EXEC ERROR':e.cat==='size'?'SIZE ERR':e.label.indexOf('Missed')>=0?'MISS':"VAL DIDN'T TAKE";
+            pill.textContent=pillPrefix+(e.ticker?' / '+e.ticker:'');
+            if(e.why) pill.title=e.why;
+            cell.appendChild(pill);
+          });
+          if(hasErrs) cell.onclick=(function(d){return function(){kinfoSwitchView('chart');kinfoOpenDay(d);};})(dayStr);
+          calGrid.appendChild(cell);
+        }
+        wkWrap.appendChild(calGrid);
+        el.appendChild(wkWrap);
+      });
+    }
+  }
+
+  // ── WHY SECTION ──
+  var whyDiv = document.createElement('div');
+  whyDiv.style.cssText = 'margin-top:28px;';
+  var whyHdr = document.createElement('div');
+  whyHdr.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:3px;color:var(--accent);margin-bottom:12px;';
+  whyHdr.textContent = 'WHY';
+  whyDiv.appendChild(whyHdr);
+
+  var whyTypes = [
+    {key:'missed', label:'Missed Something Val Did', c:C_MISSED},
+    {key:'took',   label:"Val Didn't Take",          c:C_TOOK},
+    {key:'exec',   label:'Chart Does Not Match His', c:C_EXEC},
+    {key:'size',   label:'Sizing Error',             c:C_SIZE}
+  ];
+  whyTypes.forEach(function(t) {
+    var typeErrs = errors.filter(function(e){
+      if(t.key==='missed') return e.cat==='sel'&&e.label.indexOf('Missed')>=0;
+      if(t.key==='took')   return e.cat==='sel'&&e.label.indexOf('Missed')<0;
+      if(t.key==='size')   return e.cat==='size';
+      return e.cat==='exec';
+    });
+    var accord = document.createElement('div');
+    accord.style.cssText = 'margin-bottom:8px;border:1px solid '+t.c+'33;border-radius:6px;overflow:hidden;';
+    var _open = false;
+    var accHdr = document.createElement('div');
+    accHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;background:'+t.c+'12;';
+    var arrowSpan = document.createElement('span'); arrowSpan.className='acc-arrow'; arrowSpan.textContent='▼'; arrowSpan.style.cssText='font-size:10px;';
+    accHdr.innerHTML='<span style="font-size:11px;font-weight:bold;color:'+t.c+';">'+t.label+'</span>';
+    var rightSide=document.createElement('span'); rightSide.style.cssText='display:flex;align-items:center;gap:8px;color:'+t.c+';'; rightSide.innerHTML='<span style="font-size:13px;font-weight:bold;">'+typeErrs.length+'</span>'; rightSide.appendChild(arrowSpan);
+    accHdr.appendChild(rightSide);
+    var accBody = document.createElement('div'); accBody.style.cssText='display:none;';
+    accHdr.onclick = function(){
+      _open=!_open; accBody.style.display=_open?'block':'none'; arrowSpan.textContent=_open?'▲':'▼';
+    };
+    typeErrs.forEach(function(e) {
+      var eRow = document.createElement('div');
+      eRow.style.cssText = 'display:grid;grid-template-columns:52px 48px 1fr 1fr;gap:8px;align-items:start;padding:8px 14px;border-top:1px solid rgba(255,255,255,0.05);cursor:pointer;';
+      var dateSpan = document.createElement('span');
+      dateSpan.style.cssText = 'font-size:10px;color:var(--muted);white-space:nowrap;';
+      dateSpan.textContent = new Date(e.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      var tkSpan = document.createElement('span');
+      tkSpan.style.cssText = 'font-size:11px;font-weight:bold;color:#f5c518;';
+      tkSpan.textContent = e.ticker||'';
+      var whySpan = document.createElement('span');
+      whySpan.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.6);font-style:italic;';
+      whySpan.innerHTML = e.why ? '<span style="font-size:9px;color:var(--muted);display:block;margin-bottom:1px;">WHY</span>'+e.why : '<span style="color:rgba(255,255,255,0.2);">—</span>';
+      var fixSpan = document.createElement('span');
+      fixSpan.style.cssText = 'font-size:11px;color:rgba(38,166,154,0.85);font-style:italic;';
+      fixSpan.innerHTML = e.fix ? '<span style="font-size:9px;color:var(--muted);display:block;margin-bottom:1px;">FIX</span>'+e.fix : '<span style="color:rgba(255,255,255,0.2);">—</span>';
+      eRow.appendChild(dateSpan); eRow.appendChild(tkSpan); eRow.appendChild(whySpan); eRow.appendChild(fixSpan);
+      eRow.onclick = function(){ kinfoSwitchView('chart'); kinfoOpenDay(e.date); };
+      accBody.appendChild(eRow);
+    });
+    accord.appendChild(accHdr); accord.appendChild(accBody);
+    whyDiv.appendChild(accord);
+  });
+  el.appendChild(whyDiv);
+
+  // ── WEEKLY / MONTHLY TABLE ──
+  var brkDiv = document.createElement('div');
+  brkDiv.style.cssText = 'margin-top:28px;';
+  var _period = el._brkPeriod||'weekly';
+  var periodRow = document.createElement('div');
+  periodRow.style.cssText = 'display:flex;gap:0;margin-bottom:12px;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;';
+  ['weekly','monthly'].forEach(function(p){
+    var pb=document.createElement('button');
+    pb.style.cssText='font-family:var(--mono);font-size:10px;padding:5px 16px;border:none;cursor:pointer;letter-spacing:1px;background:'+(p===_period?'var(--accent)':'transparent')+';color:'+(p===_period?'var(--bg)':'var(--muted)')+';';
+    pb.textContent=p.toUpperCase();
+    pb.onclick=function(){el._brkPeriod=p;kinfoRenderErrors();};
+    periodRow.appendChild(pb);
+  });
+  brkDiv.appendChild(periodRow);
+
+  function getPeriodKey(date){if(_period==='monthly')return date.slice(0,7);var d=new Date(date+'T12:00:00');var dow=d.getDay(),diff=dow===0?-6:1-dow;var mon=new Date(d);mon.setDate(d.getDate()+diff);return mon.toISOString().slice(0,10);}
+  function getPeriodLabel(key){if(_period==='monthly'){return new Date(key+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();}return 'WK OF '+new Date(key+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase();}
+  var buckets={};
+  errors.forEach(function(e){var pk=getPeriodKey(e.date);if(!buckets[pk])buckets[pk]=[];buckets[pk].push(e);});
+
+  var COLS=[
+    {key:'all',    label:'All Errors',              c:'var(--text)'},
+    {key:'missed', label:'Missed Something Val Did', c:C_MISSED},
+    {key:'took',   label:"Val Didn't Take",          c:C_TOOK},
+    {key:'exec',   label:'Chart Does Not Match His', c:C_EXEC},
+    {key:'size',   label:'Sizing Error',             c:C_SIZE}
+  ];
+  function countType(list,type){
+    if(type==='all') return list.length;
+    if(type==='missed') return list.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')>=0;}).length;
+    if(type==='took')   return list.filter(function(e){return e.cat==='sel'&&e.label.indexOf('Missed')<0;}).length;
+    if(type==='exec')   return list.filter(function(e){return e.cat==='exec';}).length;
+    if(type==='size')   return list.filter(function(e){return e.cat==='size';}).length;
+    return 0;
+  }
+
+  var tbl=document.createElement('div'); tbl.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+  var hdrRow=document.createElement('div'); hdrRow.style.cssText='display:grid;grid-template-columns:150px repeat(5,1fr);gap:0;padding:10px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);align-items:start;';
+  hdrRow.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">PERIOD</span>';
+  COLS.forEach(function(c){hdrRow.innerHTML+='<span style="font-family:var(--mono);font-size:9px;color:'+c.c+';letter-spacing:1px;text-align:center;line-height:1.4;">'+c.label+'</span>';});
+  tbl.appendChild(hdrRow);
+
+  Object.keys(buckets).sort().reverse().forEach(function(pk,ri){
+    var bList=buckets[pk];
+    var dataRow=document.createElement('div');
+    dataRow.style.cssText='display:grid;grid-template-columns:150px repeat(5,1fr);gap:0;padding:8px 14px;border-top:1px solid rgba(255,255,255,0.04);background:'+(ri%2===0?'transparent':'rgba(255,255,255,0.015)')+';align-items:center;';
+    dataRow.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+getPeriodLabel(pk)+'</span>';
+    COLS.forEach(function(c){var cnt=countType(bList,c.key);dataRow.innerHTML+='<span style="font-family:var(--mono);font-size:14px;font-weight:bold;color:'+(cnt>0?c.c:'rgba(255,255,255,0.15)')+';text-align:center;">'+cnt+'</span>';});
+    tbl.appendChild(dataRow);
+  });
+  brkDiv.appendChild(tbl);
+  el.appendChild(brkDiv);
+}
+
+function kinfoSaveGrade(tradeKey, field, value) {
+  var store = {}; try { store = JSON.parse(localStorage.getItem('kinfo_grades')||'{}'); } catch(e){}
+  if (!store[tradeKey]) store[tradeKey] = {};
+  if (value === null || value === undefined) { delete store[tradeKey][field]; }
+  else { store[tradeKey][field] = value; }
+  localStorage.setItem('kinfo_grades', JSON.stringify(store));
+}
+function kinfoLoadGrades() { try { return JSON.parse(localStorage.getItem('kinfo_grades')||'{}'); } catch(e){ return {}; } }
+
+function kinfoGetGradeTrades() {
+  var fromDate = kinfoGetDateRange();
+  var groups = {};
+  try {
+    var all = JSON.parse(localStorage.getItem('tvTrades')||'[]');
+    var dayRaw = JSON.parse(localStorage.getItem('tvDayR')||'{}');
+    all.forEach(function(t) {
+      if (!t.date || t.date < fromDate) return;
+      var sym = t.symbol||t.ticker||'';
+      var side = (t.side||'').toLowerCase().indexOf('short')>=0 ? 'short' : 'long';
+      var key = t.date+'_'+sym+'_'+side;
+      var R = dayRaw[t.date] ? parseFloat(dayRaw[t.date]) : null;
+      if (!groups[key]) {
+        groups[key] = { date:t.date, symbol:sym, side:side, pnl:0, R:R, images:[], key:key };
+      }
+      groups[key].pnl += (t.pnl||0);
+    });
+  } catch(e){}
+  // Pull images from tvTradeImages using date_SYMBOL_side key
+  var tvi = (typeof tvTradeImages !== 'undefined') ? tvTradeImages : {};
+  Object.keys(groups).forEach(function(k) {
+    var g = groups[k];
+    var imgKey = g.date+'_'+g.symbol+'_'+g.side;
+    // Try exact key first, then case variants
+    var src = tvi[imgKey] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_'+g.side]
+      || tvi[g.date+'_'+g.symbol+'_short'] || tvi[g.date+'_'+g.symbol+'_long']
+      || tvi[g.date+'_'+g.symbol.toLowerCase()+'_short'] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_long']
+      || null;
+    if (src) g.images = [src];
+    // Also collect all keys matching this date+symbol
+    Object.keys(tvi).forEach(function(ik){
+      if(ik.startsWith(g.date+'_'+g.symbol+'_')||ik.startsWith(g.date+'_'+g.symbol.toLowerCase()+'_')){
+        if(g.images.indexOf(tvi[ik])<0) g.images.push(tvi[ik]);
+      }
+    });
+  });
+  var trades = Object.values ? Object.values(groups) : Object.keys(groups).map(function(k){return groups[k];});
+  trades.sort(function(a,b){ return a.date<b.date?1:a.date>b.date?-1:(a.symbol<b.symbol?-1:1); });
+  trades.forEach(function(t){ t.r = t.R ? t.pnl/t.R : null; });
+  return trades;
+}
+
+// Grade review modal
+var _gradeReviewIdx = 0;
+var _gradeReviewTrades = [];
+function kinfoOpenGradeReview(trades, idx) {
+  _gradeReviewTrades = trades;
+  _gradeReviewIdx = idx;
+  var existing = document.getElementById('gradeReviewModal');
+  if (existing) existing.remove();
+
+  var grades = kinfoLoadGrades();
+  var t = trades[idx];
+  var g = grades[t.key] || {};
+
+  var modal = document.createElement('div');
+  modal.id = 'gradeReviewModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#0d1117;border:1px solid var(--border);border-radius:10px;width:860px;max-width:95vw;max-height:92vh;overflow-y:auto;padding:24px;position:relative;';
+
+  function renderModal() {
+    var g2 = kinfoLoadGrades()[t.key] || {};
+    box.innerHTML = '';
+
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
+    hdr.innerHTML = '<div style="display:flex;align-items:center;gap:12px;">'
+      +'<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>'
+      +'<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">'+t.date+' · '+(t.side==='short'?'<span style="color:#ef5350">SHORT</span>':'<span style="color:#26a69a">LONG</span>')+'</span>'
+      +'<span style="font-family:var(--mono);font-size:13px;font-weight:bold;color:'+(t.pnl>0?'var(--bull)':'var(--bear)')+';">'+(t.pnl>0?'+':'')+t.pnl.toFixed(0)+'</span>'
+      +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+      +'<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx>0?idx-1:idx)+')" style="font-size:16px;background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;"'+(idx===0?' disabled':'')+'">◀</button>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+(idx+1)+' / '+trades.length+'</span>'
+      +'<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx<trades.length-1?idx+1:idx)+')" style="font-size:16px;background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;"'+(idx===trades.length-1?' disabled':'')+'">▶</button>'
+      +'<button onclick="document.getElementById(\'gradeReviewModal\').remove();kinfoRenderGrades();" style="font-size:14px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;">✕</button>'
+      +'</div>';
+    box.appendChild(hdr);
+
+    // Images
+    if (t.images && t.images.length) {
+      var imgWrap = document.createElement('div');
+      imgWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:16px;';
+      t.images.slice(0,4).forEach(function(src) {
+        var resolved = typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src;
+        var img = document.createElement('img');
+        img.src = resolved;
+        img.style.cssText = 'width:100%;border-radius:6px;background:#080c14;cursor:zoom-in;border:1px solid rgba(255,255,255,0.1);margin-bottom:8px;';
+        img.onerror = function(){ this.style.display='none'; };
+        img.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
+        imgWrap.appendChild(img);
+      });
+      box.appendChild(imgWrap);
+    } else {
+      var noImg = document.createElement('div');
+      noImg.style.cssText = 'height:80px;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.2);font-style:italic;margin-bottom:16px;border:1px dashed rgba(255,255,255,0.1);border-radius:6px;';
+      noImg.textContent = 'No chart image saved for this trade.';
+      box.appendChild(noImg);
+    }
+
+    // Grading section
+    function makeGradeSection(label, field, current) {
+      // current can be a single value or array
+      var currentArr = Array.isArray(current) ? current : (current!=null?[current]:[]);
+      var sec = document.createElement('div');
+      sec.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
+      lbl.textContent = label;
+      sec.appendChild(lbl);
+      [0,0.5,1].forEach(function(v) {
+        var isAct = currentArr.indexOf(v)>=0;
+        var col = v===0?'#ef5350':v===0.5?'#ff9800':'#4caf50';
+        var btn = document.createElement('button');
+        btn.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;width:52px;height:32px;border-radius:4px;cursor:pointer;border:2px solid '+(isAct?col:'rgba(255,255,255,0.15)')+';background:'+(isAct?col+'33':'transparent')+';color:'+(isAct?col:'rgba(255,255,255,0.4)')+';transition:all 0.1s;';
+        btn.textContent = v===0.5?'0.5':v.toString();
+        btn.onclick = function(){
+          var arr = Array.isArray(current)?current.slice():(current!=null?[current]:[]);
+          var pos = arr.indexOf(v);
+          if(pos>=0) arr.splice(pos,1); else arr.push(v);
+          kinfoSaveGrade(t.key, field, arr.length===0?null:(arr.length===1?arr[0]:arr));
+          renderModal();
+        };
+        sec.appendChild(btn);
+      });
+      return sec;
+    }
+    var navBar = document.createElement('div');
+    navBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);';
+    navBar.innerHTML = '<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx>0?idx-1:idx)+')" style="font-family:var(--mono);font-size:12px;background:none;border:1px solid var(--border);color:var(--text);padding:5px 16px;border-radius:4px;cursor:pointer;"'+(idx===0?' disabled':'')+'>◀ PREV</button>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+(idx+1)+' / '+trades.length+'</span>'
+      +'<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx<trades.length-1?idx+1:idx)+')" style="font-family:var(--mono);font-size:12px;background:none;border:1px solid var(--border);color:var(--text);padding:5px 16px;border-radius:4px;cursor:pointer;"'+(idx===trades.length-1?' disabled':'')+'>NEXT ▶</button>';
+    box.appendChild(navBar);
+    box.appendChild(makeGradeSection('DISCRETION SELECTION', 'disc', g2.disc));
+    box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
+  }
+
+  renderModal();
+  modal.appendChild(box);
+  modal.onclick = function(e){ if(e.target===modal){ modal.remove(); kinfoRenderGrades(); } };
+  document.body.appendChild(modal);
+}
+
+function kinfoRenderGrades() {
+  var el = document.getElementById('kinfoGradesContent');
+  if (!el) return;
+  var trades = kinfoGetGradeTrades();
+  var grades = kinfoLoadGrades();
+  var _tab = el._gradesTab || 'trades';
+
+  el.innerHTML = '';
+
+  // ── TAB SWITCHER ──
+  var tabBar = document.createElement('div');
+  tabBar.style.cssText = 'display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:16px;';
+  ['trades','stats'].forEach(function(tb) {
+    var btn = document.createElement('button');
+    btn.style.cssText = 'font-family:var(--mono);font-size:10px;padding:5px 16px;border:none;cursor:pointer;letter-spacing:1px;background:'+(tb===_tab?'var(--accent)':'transparent')+';color:'+(tb===_tab?'var(--bg)':'var(--muted)')+';';
+    btn.textContent = tb.toUpperCase();
+    btn.onclick = function(){ el._gradesTab = tb; kinfoRenderGrades(); };
+    tabBar.appendChild(btn);
+  });
+  el.appendChild(tabBar);
+
+  if (!trades.length) {
+    el.innerHTML += '<div style="padding:40px;text-align:center;font-size:12px;color:var(--muted);font-style:italic;">No trades in this period.</div>';
+    return;
+  }
+
+  if (_tab === 'stats') {
+    // ── STATS VIEW ──
+    var gradedTrades = trades.filter(function(t){ var g=grades[t.key]||{}; return g.disc!=null||g.exec!=null; });
+
+    function statBlock(title, color, field) {
+      var relevant = gradedTrades.filter(function(t){ return (grades[t.key]||{})[field] != null; });
+      var wins = relevant.filter(function(t){ return t.pnl>0; });
+      var losses = relevant.filter(function(t){ return t.pnl<=0; });
+
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;';
+      wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';margin-bottom:12px;">'+title+'</div>';
+
+      function pct(arr, v) { var sub=arr.filter(function(t){return (grades[t.key]||{})[field]===v;}); return arr.length?Math.round(sub.length/arr.length*100):0; }
+      function avgR(arr) { var rs=arr.filter(function(t){return t.r!=null;}).map(function(t){return t.r;}); return rs.length?rs.reduce(function(a,b){return a+b;},0)/rs.length:null; }
+
+      [
+        {label:'WINS', trades:wins, color:'var(--bull)'},
+        {label:'LOSSES', trades:losses, color:'var(--bear)'}
+      ].forEach(function(grp) {
+        if (!grp.trades.length) return;
+        var sec = document.createElement('div');
+        sec.style.cssText = 'margin-bottom:12px;';
+        sec.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:'+grp.color+';letter-spacing:1px;margin-bottom:6px;">'+grp.label+' ('+grp.trades.length+')</div>';
+        var row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
+        [{v:0,label:'0',col:'#ef5350'},{v:0.5,label:'0.5',col:'#9e9e9e'},{v:1,label:'1',col:'#4caf50'}].forEach(function(gv) {
+          var sub = grp.trades.filter(function(t){return (grades[t.key]||{})[field]===gv.v;});
+          var p = grp.trades.length ? Math.round(sub.length/grp.trades.length*100) : 0;
+          var ar = avgR(sub);
+          var card = document.createElement('div');
+          card.style.cssText = 'background:'+gv.col+'14;border:1px solid '+gv.col+'33;border-radius:6px;padding:8px;text-align:center;';
+          card.innerHTML = '<div style="font-size:14px;font-weight:bold;color:'+gv.col+';">'+gv.label+'</div>'
+            +'<div style="font-family:var(--mono);font-size:18px;font-weight:bold;color:var(--text);">'+p+'%</div>'
+            +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sub.length+' trades</div>'
+            +(ar!=null?'<div style="font-family:var(--mono);font-size:9px;color:'+(ar>0?'var(--bull)':'var(--bear)')+';">avg '+(ar>0?'+':'')+ar.toFixed(2)+'R</div>':'');
+          row.appendChild(card);
+        });
+        sec.appendChild(row);
+        wrap.appendChild(sec);
+      });
+      return wrap;
+    }
+
+    var ungraded = trades.length - gradedTrades.length;
+    var notice = document.createElement('div');
+    notice.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px;';
+    notice.textContent = gradedTrades.length+' graded trades · '+ungraded+' ungraded';
+    el.appendChild(notice);
+    el.appendChild(statBlock('DISCRETION SELECTION', '#f5c518', 'disc'));
+    el.appendChild(statBlock('SYSTEM / ALGO EXECUTION', '#90caf9', 'exec'));
+    return;
+  }
+
+  // ── TRADES VIEW ──
+  var COLS = '90px 80px 80px 65px 120px 120px 40px';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
+  ['DATE','SYMBOL','P&L','R','DISCRETION\nSELECTION','SYSTEM\nALGO EXEC',''].forEach(function(h) {
+    var s = document.createElement('span');
+    s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
+    s.textContent = h;
+    hdr.appendChild(s);
+  });
+  el.appendChild(hdr);
+
+  function gradeCell(key, field, currentVal) {
+    var currentArr = Array.isArray(currentVal)?currentVal:(currentVal!=null?[currentVal]:[]);
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:2px;align-items:center;';
+    [0,0.5,1].forEach(function(v) {
+      var isAct = currentArr.indexOf(v)>=0;
+      var col = v===0?'#ef5350':v===0.5?'#ff9800':'#4caf50';
+      var btn = document.createElement('button');
+      btn.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;width:30px;height:20px;border-radius:3px;cursor:pointer;border:1px solid '+(isAct?col:'rgba(255,255,255,0.12)')+';background:'+(isAct?col:'transparent')+';color:'+(isAct?'#fff':'rgba(255,255,255,0.3)')+';';
+      btn.textContent = v===0.5?'.5':v.toString();
+      btn.onclick = function(e){ e.stopPropagation();
+        var arr=Array.isArray(currentVal)?currentVal.slice():(currentVal!=null?[currentVal]:[]);
+        var pos=arr.indexOf(v); if(pos>=0)arr.splice(pos,1); else arr.push(v);
+        kinfoSaveGrade(key,field,arr.length===0?null:(arr.length===1?arr[0]:arr));
+        kinfoRenderGrades(); };
+      wrap.appendChild(btn);
+    });
+    return wrap;
+  }
+
+  var tbody = document.createElement('div');
+  tbody.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;';
+  var prevDate = null;
+  trades.forEach(function(t, i) {
+    var g = grades[t.key] || {};
+    if (t.date !== prevDate) {
+      var sep = document.createElement('div');
+      sep.style.cssText = 'padding:4px 12px;background:rgba(0,0,0,0.25);font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;border-top:'+(prevDate?'1px solid var(--border)':'none')+';';
+      sep.textContent = new Date(t.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase();
+      tbody.appendChild(sep);
+      prevDate = t.date;
+    }
+    var row = document.createElement('div');
+    var isPos = t.pnl > 0;
+    row.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:5px 12px;align-items:center;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;';
+    row.onmouseover=function(){this.style.background='rgba(255,255,255,0.03)';};
+    row.onmouseout=function(){this.style.background='transparent';};
+    row.onclick = function(){ kinfoOpenGradeReview(trades, i); };
+
+    var dateEl=document.createElement('span'); dateEl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);'; dateEl.textContent=t.date.slice(5); row.appendChild(dateEl);
+    var symEl=document.createElement('span'); symEl.style.cssText='font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);'; symEl.textContent=t.symbol+(t.side==='short'?' ↓':' ↑'); row.appendChild(symEl);
+    var pnlEl=document.createElement('span'); pnlEl.style.cssText='font-family:var(--mono);font-size:10px;font-weight:bold;color:'+(isPos?'var(--bull)':'var(--bear)')+';'; pnlEl.textContent=t.pnl!=null?(isPos?'+':'')+t.pnl.toFixed(0):'—'; row.appendChild(pnlEl);
+    var rEl=document.createElement('span'); rEl.style.cssText='font-family:var(--mono);font-size:10px;font-weight:bold;color:'+(t.r>0?'var(--bull)':t.r<0?'var(--bear)':'var(--muted)')+';'; rEl.textContent=t.r!=null?(t.r>0?'+':'')+t.r.toFixed(2)+'R':'—'; row.appendChild(rEl);
+
+    row.appendChild(gradeCell(t.key,'disc',g.disc!=null?g.disc:undefined));
+    row.appendChild(gradeCell(t.key,'exec',g.exec!=null?g.exec:undefined));
+
+    // View button
+    var viewBtn=document.createElement('span'); viewBtn.style.cssText='font-size:13px;cursor:pointer;color:rgba(255,255,255,0.3);'; viewBtn.textContent='⤢';
+    viewBtn.onclick=function(e){e.stopPropagation();kinfoOpenGradeReview(trades,i);};
+    row.appendChild(viewBtn);
+
+    tbody.appendChild(row);
+  });
+  el.appendChild(tbody);
+}
+
 
 function kinfoRender() {
   var fromDate = kinfoGetDateRange();
@@ -7330,7 +8233,13 @@ function kinfoRender() {
       + '<span style="font-size:13px;color:' + (wr >= 50 ? '#26a69a' : '#ef5350') + ';">' + wr + '% WR</span>';
   }
 
-  if (typeof Chart === 'undefined') return;
+  if (typeof Chart === 'undefined') {
+    // Chart.js not loaded yet — wait for it then re-render
+    var _kinfoWait = setInterval(function() {
+      if (typeof Chart !== 'undefined') { clearInterval(_kinfoWait); kinfoRender(); }
+    }, 100);
+    return;
+  }
 
   // Build chart arrays with weekend gaps
   var chartDates = [], labels = [], bgColors = [], values = [];
@@ -7348,51 +8257,28 @@ function kinfoRender() {
     var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(parts[1])-1];
     chartDates.push(d);
     labels.push(mo + ' ' + parseInt(parts[2]));
-    var chartVal = useR ? (dayR(d) !== null ? dayR(d) : (pnl !== null ? pnl : 0)) : (pnl !== null ? pnl : 0);
-    var chartPos = useR ? (dayR(d) !== null ? dayR(d) >= 0 : pnl >= 0) : (pnl !== null ? pnl >= 0 : false);
-    bgColors.push(pnl === null && (!useR||dayR(d)===null) ? 'rgba(255,255,255,0.04)' : chartPos ? 'rgba(0,210,100,0.9)' : 'rgba(220,30,30,0.9)');
-    values.push(chartVal);
+    var rForDay=dayR(d);var chartVal=useR?(rForDay!==null?rForDay:0):(pnl!==null?pnl:0);
+    var chartPos=useR?(rForDay!==null?rForDay>=0:false):(pnl!==null?pnl>=0:false);var noData=useR?(rForDay===null):(pnl===null);
+    bgColors.push(noData?'rgba(255,255,255,0.04)':chartPos?'rgba(0,210,100,0.9)':'rgba(220,30,30,0.9)');
+    values.push(noData?null:chartVal);
   });
 
   // Build gold star set
-  // Build gold star set - all TT entries with edge >= 50 (no date filter needed,
+  // Build gold star set - all TT entries with edge >= 45 (no date filter needed,
   // we only draw stars for dates that appear in the chart anyway)
-  var starDates = new Set();
-  (typeof ttEntries !== 'undefined' ? ttEntries : []).forEach(function(e) {
-    if (e.date && (e.edge || 0) >= 50) starDates.add(e.date);
+  var starDates = new Set();    // gold: 50+
+  var starDatesGreen = new Set(); // green: 45-49
+  var _ttForStars = typeof ttEntries !== 'undefined' ? ttEntries : [];
+  if (!_ttForStars.length) {
+    try { _ttForStars = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
+  }
+  _ttForStars.forEach(function(e) {
+    var edge = e.edge || 0;
+    if (e.date && edge >= 50) starDates.add(e.date);
+    else if (e.date && edge >= 45) starDatesGreen.add(e.date);
   });
 
-  var starPlugin = {
-    id: 'goldStars',
-    afterRender: function(chart) {
-      var ctx = chart.ctx;
-      var xScale = chart.scales.x;
-      if (!xScale) return;
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
-      ctx.beginPath();
-      ctx.rect(0, 0, chart.width, chart.height); // allow drawing anywhere on canvas
-      ctx.clip();
-      ctx.font = 'bold 15px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#f5c518';
-      ctx.shadowColor = '#f5c518';
-      ctx.shadowBlur = 5;
-      var starY = xScale.bottom + 2;
-      // Draw a star under EVERY date that has a high-edge TT entry
-      // iterate all dates (not just visible ticks) and find their pixel position
-      var _cd = chart._allDates || [];
-      _cd.forEach(function(d, i) {
-        if (d && starDates.has(d)) {
-          var x = xScale.getPixelForValue(i);
-          if (x >= chart.chartArea.left && x <= chart.chartArea.right) {
-            ctx.fillText('★', x, starY);
-          }
-        }
-      });
-      ctx.restore();
-    }
-  };
+  var starPlugin = { id: 'goldStars' }; // stars handled via HTML overlay
 
   if (kinfoChart) { kinfoChart.destroy(); kinfoChart = null; }
 
@@ -7413,15 +8299,16 @@ function kinfoRender() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       onClick: function(ev, els) {
         var i = els && els.length ? els[0].index : -1;
-        if (i >= 0) if (i >= 0) kinfoOpenDay(dates[i]);
+        var cd=chartDates[i];if(cd) kinfoOpenDay(cd);
       },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: function(items) { return dates[items[0].dataIndex]; },
+            title: function(items) { return chartDates[items[0].dataIndex]||''; },
             label: function(item) {
               var d = chartDates[item.dataIndex];
               if (!d) return '';
@@ -7448,13 +8335,44 @@ function kinfoRender() {
     plugins: [starPlugin]
   });
   kinfoChart._allDates = chartDates;
+  setTimeout(function(){
+    if(kinfoChart) kinfoChart.resize();
+  }, 50);
+  // Draw HTML star overlay
+  function _drawKinfoStars() {
+    var overlay = document.getElementById('kinfoStarOverlay');
+    if (!overlay || !kinfoChart) return;
+    overlay.innerHTML = '';
+    var xScale = kinfoChart.scales.x;
+    if (!xScale || !kinfoChart.chartArea) return;
+    chartDates.forEach(function(d, i) {
+      var isGold = d && starDates.has(d);
+      var isGreen = d && starDatesGreen.has(d);
+      if (!isGold && !isGreen) return;
+      var x = xScale.getPixelForValue(i);
+      if (x < kinfoChart.chartArea.left || x > kinfoChart.chartArea.right) return;
+      var star = document.createElement('span');
+      star.textContent = '★';
+      var col = isGold ? '#f5c518' : '#26a69a';
+      star.style.cssText = 'position:absolute;font-size:13px;color:'+col+';text-shadow:0 0 6px '+col+';transform:translateX(-50%);pointer-events:none;';
+      star.style.left = x + 'px';
+      star.style.top = (kinfoChart.chartArea.bottom + 6) + 'px';
+      overlay.appendChild(star);
+    });
+  }
+  setTimeout(_drawKinfoStars, 120);
 }
+function kinfoRunPareto(){}
 function kinfoGetAllDatesForNav(fromDate) {
   if (!fromDate) fromDate = kinfoGetDateRange();
   return kinfoGetAllDates(fromDate);
 }
 
-function kinfoCloseDay(){var p=document.getElementById('kinfoDayPanel');if(p)p.style.display='none';}
+function kinfoCloseDay(){
+  var p=document.getElementById('kinfoDayPanel');
+  if(p)p.style.display='none';
+  // Don't switch views — stay on whichever view (chart or errors) the user is on
+}
 
 function kinfoNavDay(dir) {
   if (!kinfoSelectedDate) return;
@@ -7499,6 +8417,171 @@ function kinfoOpenDay(date) {
     + '<button onclick="kinfoCloseDay()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;margin-left:4px;">×</button>';
   panel.appendChild(hdr);
 
+  // ── DEBRIEF: Selection + Execution errors (multi-entry with ticker) ──
+  var debriefKey = 'kinfo_debrief_' + date;
+  function _fixEntryColors(db) {
+    function colorForEntry(e) {
+      if (e.cat==='size'||e.label.indexOf('Sized')>=0) return '#4fc3f7';
+      if (e.cat==='exec'||e.label.indexOf('match')>=0||e.label.indexOf('Match')>=0) return '#ff9800';
+      if (e.label.indexOf('Missed')>=0||e.label.indexOf('missed')>=0) return '#ef5350';
+      if (e.label.indexOf("didn't")>=0||e.label.indexOf("Val didn")>=0) return '#9c6fde';
+      return e.color||'#ef5350';
+    }
+    ['sel','exec','size'].forEach(function(k){ (db[k]||[]).forEach(function(e){ e.color = colorForEntry(e); }); });
+    return db;
+  }
+  function _loadDebrief() { try { return _fixEntryColors(JSON.parse(localStorage.getItem(debriefKey)||'{"sel":[],"exec":[],"size":[]}')); } catch(e) { return {sel:[],exec:[],size:[]}; } }
+  function _saveDebrief(d) { localStorage.setItem(debriefKey, JSON.stringify(d)); }
+
+  function buildDebrief() {
+    var db = _loadDebrief();
+    var wrap = document.createElement('div');
+    wrap.className = 'kinfo-debrief';
+    wrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;';
+
+    function makeCol(title, color, typeKey, btnDefs) {
+      var col = document.createElement('div');
+      col.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;';
+      // Header
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';margin-bottom:10px;';
+      hdr.textContent = title;
+      col.appendChild(hdr);
+
+      // Existing entries
+      var entriesList = document.createElement('div');
+      entriesList.style.cssText = 'margin-bottom:10px;';
+      (db[typeKey]||[]).forEach(function(entry, ei) {
+        var tag = document.createElement('div');
+        var ec = entry.color||'#ef5350';
+        tag.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding:6px 8px;margin-bottom:4px;border-radius:4px;background:'+ec+'18;border:1px solid '+ec+'55;';
+        // Top row: icon + label + ticker + delete + edit
+        var topRow = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+          +'<span style="font-size:10px;color:'+ec+';">✗</span>'
+          +'<span style="font-size:11px;color:var(--text);">'+entry.label+'</span>'
+          +(entry.ticker?'<span style="font-size:12px;font-weight:bold;color:#f5c518;">'+entry.ticker+'</span>':'')
+          +'</div>';
+        // WHY line
+        var whyRow = entry.why
+          ? '<div style="display:flex;gap:5px;padding-left:18px;"><span style="font-size:9px;font-weight:bold;color:'+ec+';opacity:0.7;flex-shrink:0;min-width:26px;">WHY</span><span style="font-size:11px;color:rgba(255,255,255,0.7);font-style:italic;word-break:break-word;">'+entry.why+'</span></div>'
+          : '';
+        // FIX line
+        var fixRow = entry.fix
+          ? '<div style="display:flex;gap:5px;padding-left:18px;"><span style="font-size:9px;font-weight:bold;color:rgba(38,166,154,0.9);flex-shrink:0;min-width:26px;">FIX</span><span style="font-size:11px;color:rgba(38,166,154,0.85);font-style:italic;word-break:break-word;">'+entry.fix+'</span></div>'
+          : '';
+        tag.innerHTML = topRow + whyRow + fixRow
+          +'<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:2px;">'
+          +'<span style="cursor:pointer;color:rgba(200,169,110,0.5);font-size:11px;padding:0 2px;" class="edit-btn-placeholder">✎</span>'
+          +'<span style="cursor:pointer;color:rgba(255,255,255,0.3);font-size:14px;padding:0 2px;" data-del="'+ei+'" data-type="'+typeKey+'">×</span>'
+          +'</div>';
+        // Wire edit button to placeholder
+        var editBtn = tag.querySelector('.edit-btn-placeholder');
+        editBtn.title = 'Edit why / fix';
+        (function(ei2, typeKey2) {
+          editBtn.onclick = function(ev) {
+            ev.stopPropagation();
+            var existing = tag.nextSibling;
+            if (existing && existing.classList && existing.classList.contains('why-edit-row')) { existing.remove(); return; }
+            var editRow = document.createElement('div');
+            editRow.className = 'why-edit-row';
+            editRow.style.cssText = 'display:flex;gap:6px;padding:4px 0;margin-bottom:4px;';
+            var d3=_loadDebrief();
+            var wi = document.createElement('input');
+            wi.type='text'; wi.value=(d3[typeKey2][ei2]||{}).why||''; wi.placeholder='Why?';
+            wi.style.cssText='flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;outline:none;';
+            var fi = document.createElement('input');
+            fi.type='text'; fi.value=(d3[typeKey2][ei2]||{}).fix||''; fi.placeholder='Fix?';
+            fi.style.cssText='flex:1;background:var(--bg);border:1px solid rgba(38,166,154,0.4);color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;outline:none;';
+            var saveW = document.createElement('button');
+            saveW.textContent='SAVE';
+            saveW.style.cssText='font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--accent);color:var(--bg);border:none;font-weight:bold;';
+            saveW.onclick = function() {
+              var d4=_loadDebrief();
+              if(d4[typeKey2]&&d4[typeKey2][ei2]){ d4[typeKey2][ei2].why=wi.value.trim(); d4[typeKey2][ei2].fix=fi.value.trim(); }
+              _saveDebrief(d4);
+              var old=panel.querySelector('.kinfo-debrief'); panel.replaceChild(buildDebrief(),old);
+            };
+            fi.onkeydown=function(ev){if(ev.key==='Enter')saveW.click();};
+            wi.onkeydown=function(ev){if(ev.key==='Enter')fi.focus();};
+            editRow.appendChild(wi); editRow.appendChild(fi); editRow.appendChild(saveW);
+            tag.parentNode.insertBefore(editRow, tag.nextSibling);
+            wi.focus();
+          };
+        })(ei, typeKey);
+        tag.querySelector('[data-del]').onclick = function() {
+          var d2=_loadDebrief(); d2[typeKey].splice(parseInt(this.getAttribute('data-del')),1); _saveDebrief(d2);
+          var old=panel.querySelector('.kinfo-debrief'); panel.replaceChild(buildDebrief(),old);
+        };
+        entriesList.appendChild(tag);
+      });
+      col.appendChild(entriesList);
+
+      // Add buttons
+      btnDefs.forEach(function(def) {
+        var btn = document.createElement('button');
+        var bc = def.color || '#ef5350';
+        btn.style.cssText = 'display:block;width:100%;text-align:left;padding:6px 10px;margin-bottom:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:11px;border:1px solid '+bc+'66;background:'+bc+'14;color:'+bc+';';
+        btn.textContent = '+ ✗  ' + def.label;
+        btn.onclick = function() {
+          // Show ticker input inline
+          if (btn.nextSibling && btn.nextSibling.classList && btn.nextSibling.classList.contains('ticker-inp-row')) {
+            btn.nextSibling.remove(); return;
+          }
+          var row = document.createElement('div');
+          row.className = 'ticker-inp-row';
+          row.style.cssText = 'display:flex;flex-direction:column;gap:5px;margin-bottom:6px;margin-top:-2px;';
+          var topRow = document.createElement('div');
+          topRow.style.cssText = 'display:flex;gap:6px;';
+          var inp = document.createElement('input');
+          inp.type='text'; inp.placeholder='TICKER (optional)';
+          inp.style.cssText = 'width:100px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 8px;border-radius:4px;text-transform:uppercase;outline:none;';
+          var whyInp = document.createElement('input');
+          whyInp.type='text'; whyInp.placeholder='Why?';
+          whyInp.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 8px;border-radius:4px;outline:none;';
+          var fixInp = document.createElement('input');
+          fixInp.type='text'; fixInp.placeholder='Fix?';
+          fixInp.style.cssText = 'flex:1;background:var(--bg);border:1px solid rgba(38,166,154,0.4);color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 8px;border-radius:4px;outline:none;';
+          var add = document.createElement('button');
+          add.textContent='ADD';
+          add.style.cssText = 'font-family:var(--mono);font-size:10px;padding:5px 10px;border-radius:4px;cursor:pointer;background:var(--accent);color:var(--bg);border:none;font-weight:bold;white-space:nowrap;';
+          add.onclick = function() {
+            var d2=_loadDebrief();
+            if(!d2[typeKey]) d2[typeKey]=[];
+            d2[typeKey].push({label:def.label, color:def.color||'#ef5350', ticker:inp.value.trim().toUpperCase()||'', why:whyInp.value.trim()||'', fix:fixInp.value.trim()||''});
+            _saveDebrief(d2);
+            var old=panel.querySelector('.kinfo-debrief'); panel.replaceChild(buildDebrief(),old);
+          };
+          fixInp.onkeydown = function(ev) { if(ev.key==='Enter') add.click(); };
+          whyInp.onkeydown = function(ev) { if(ev.key==='Enter') fixInp.focus(); };
+          inp.onkeydown = function(ev) { if(ev.key==='Enter') whyInp.focus(); };
+          topRow.appendChild(inp); topRow.appendChild(whyInp); topRow.appendChild(fixInp); topRow.appendChild(add);
+          row.appendChild(topRow);
+          btn.parentNode.insertBefore(row, btn.nextSibling);
+          inp.focus();
+        };
+        col.appendChild(btn);
+      });
+      return col;
+    }
+
+    var selDefs = [
+      {label:"Missed something Val did", color:'#ef5350'},
+      {label:"Val didn't take", color:'#9c6fde'}
+    ];
+    var execDefs = [
+      {label:"Chart does not match his", color:'#ff9800'}
+    ];
+    var sizeDefs = [
+      {label:"Sized too big or too small", color:'#4fc3f7'}
+    ];
+    wrap.appendChild(makeCol('1. SELECTION ERROR', '#f5c518', 'sel', selDefs));
+    wrap.appendChild(makeCol('2. EXECUTION ERROR', '#ff9800', 'exec', execDefs));
+    wrap.appendChild(makeCol('3. SIZING ERROR', '#4fc3f7', 'size', sizeDefs));
+    return wrap;
+  }
+
+  panel.appendChild(buildDebrief());
+
   // 3-column grid
   var grid = document.createElement('div');
   grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;';
@@ -7524,9 +8607,15 @@ function kinfoOpenDay(date) {
     var pnlC = dayPnl >= 0 ? '#26a69a' : '#ef5350';
     var summary = document.createElement('div');
     summary.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;';
-    summary.innerHTML = '<span style="font-size:22px;font-weight:bold;color:' + pnlC + ';">' + (dayPnl >= 0 ? '+$' : '-$') + Math.abs(dayPnl).toFixed(2) + '</span>'
-      + (rVal ? '<span style="font-size:14px;color:' + pnlC + ';">' + (dayPnl/rVal >= 0 ? '+' : '') + (dayPnl/rVal).toFixed(2) + 'R</span>' : '')
-      + '<span style="font-size:11px;color:var(--muted);">' + wins + '/' + myTrades.length + ' WR</span>';
+    var useRMode = kinfoUnit === 'R';
+    if (useRMode && rVal) {
+      summary.innerHTML = '<span style="font-size:28px;font-weight:bold;color:'+pnlC+';letter-spacing:1px;">'+(dayPnl/rVal>=0?'+':'')+(dayPnl/rVal).toFixed(2)+'R</span>'
+        + '<span style="font-size:11px;color:var(--muted);">'+wins+'/'+myTrades.length+' WR</span>';
+    } else {
+      summary.innerHTML = '<span style="font-size:22px;font-weight:bold;color:'+pnlC+';">'+(dayPnl>=0?'+$':'-$')+Math.abs(dayPnl).toFixed(2)+'</span>'
+        + (rVal ? '<span style="font-size:14px;color:'+pnlC+';">'+(dayPnl/rVal>=0?'+':'')+(dayPnl/rVal).toFixed(2)+'R</span>' : '')
+        + '<span style="font-size:11px;color:var(--muted);">'+wins+'/'+myTrades.length+' WR</span>';
+    }
     myBody.appendChild(summary);
 
     // Group by symbol
@@ -7594,7 +8683,8 @@ function kinfoOpenDay(date) {
   if (!valItems.length) {
     valBody.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">No Val trades this day</div>';
   } else {
-    valItems.forEach(function(v) {
+    var _valImgRendered = false;
+  valItems.forEach(function(v) {
       var dc = v.dir === 'long' ? '#26a69a' : v.dir === 'short' ? '#ef5350' : 'var(--muted)';
       var wrap = document.createElement('div');
       wrap.style.cssText = 'margin-bottom:12px;cursor:pointer;';
@@ -7608,41 +8698,40 @@ function kinfoOpenDay(date) {
         + (v.edge ? '<span style="font-size:11px;color:var(--muted);margin-left:auto;">TT ' + v.edge + '</span>' : '');
       wrap.appendChild(infoRow);
 
-      // Val's chart image — full height, not cropped
-      var valImgUrl = null;
-      try {
-        var tk = v.ticker.toLowerCase();
-        var dk = v.dir || 'long';
-        // Try local saved images first (all variants)
-        if (typeof myTradeImages !== 'undefined') {
-          valImgUrl = myTradeImages['val_' + date + '_' + tk + '_' + dk]
-            || myTradeImages['val_' + date + '_' + v.ticker + '_' + dk]
-            || myTradeImages['val_' + date + '_' + tk + '_long']
-            || myTradeImages['val_' + date + '_' + v.ticker + '_long']
-            || myTradeImages['val_' + date + '_' + tk + '_short']
-            || myTradeImages['val_' + date + '_' + v.ticker + '_short']
-            || null;
-        }
-        // Then try discord URL from exec
-        if (!valImgUrl && valExecs.length) {
-          var matchExec = valExecs.find(function(e) {
-            var ek = typeof getExecKey === 'function' ? getExecKey(e) : '';
-            var m2 = typeof execMeta !== 'undefined' ? (execMeta[ek] || {}) : {};
-            return (m2.ticker || e.ticker || '').toUpperCase() === v.ticker.toUpperCase();
-          });
-          if (matchExec && matchExec.image_urls && matchExec.image_urls.length && typeof resolveDiscordImg === 'function') {
-            valImgUrl = resolveDiscordImg(matchExec.image_urls[0]);
+      // Images: only render on first item to avoid duplicates (Val uploads all in one post)
+      if (!_valImgRendered) {
+        var allValImgs = [];
+        // 1. Check local saved images for any val_ key for this date
+        try {
+          if (typeof myTradeImages !== 'undefined') {
+            Object.keys(myTradeImages).forEach(function(k) {
+              if (k.startsWith('val_' + date + '_')) {
+                if (allValImgs.indexOf(myTradeImages[k]) < 0) allValImgs.push(myTradeImages[k]);
+              }
+            });
           }
-        }
-      } catch(ex) {}
-
-      if (valImgUrl) {
-        var vi = document.createElement('img');
-        vi.src = valImgUrl;
-        vi.style.cssText = 'width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:4px;background:#080c14;display:block;cursor:zoom-in;border:1px solid rgba(255,255,255,0.06);';
-        vi.onclick = function(ev) { ev.stopPropagation(); if (typeof expandMyImg === 'function') expandMyImg(valImgUrl); };
-        vi.onerror = function() { vi.style.display = 'none'; };
-        wrap.appendChild(vi);
+        } catch(ex) {}
+        // 2. Collect ALL image_urls from ALL execs this day (Val posts everything in one Discord msg)
+        try {
+          if (typeof resolveDiscordImg === 'function') {
+            valExecs.forEach(function(e) {
+              if (e.image_urls && e.image_urls.length) {
+                e.image_urls.forEach(function(url) {
+                  var resolved = resolveDiscordImg(url);
+                  if (resolved && allValImgs.indexOf(resolved) < 0) allValImgs.push(resolved);
+                });
+              }
+            });
+          }
+        } catch(ex) {}
+        allValImgs.forEach(function(imgSrc) {
+          var vi = document.createElement('img');
+          vi.src = imgSrc;
+          vi.style.cssText = 'width:100%;height:auto;max-height:320px;object-fit:contain;border-radius:4px;background:#080c14;display:block;cursor:zoom-in;border:1px solid rgba(255,255,255,0.06);margin-bottom:8px;';
+          (function(src){ vi.onclick = function(ev) { ev.stopPropagation(); if (typeof expandMyImg === 'function') expandMyImg(src); }; })(imgSrc);
+          vi.onerror = function() { this.style.display='none'; };
+          wrap.appendChild(vi);
+        });
       }
 
       wrap.onclick = function() { if (typeof valgoOpenExecCard === 'function') valgoOpenExecCard(v.key); };
@@ -7830,357 +8919,28 @@ function _generateSetupPDF(sortedSetups, entrySignalsBySetup, stopLossBySetup, t
 }
 </script>
 <script>
-// ═══════════════════════════════════════════════════════════
-//  VALGO SUPABASE SYNC LAYER
-//  Strategy: localStorage = primary (instant), Supabase = cloud backup
-//  On load: pull from Supabase → update localStorage
-//  On write: localStorage first, Supabase async in background
-// ═══════════════════════════════════════════════════════════
+</script>
 
-var _SB_URL = 'https://ffykmqncabvvvlqznobn.supabase.co';
-var _SB_KEY = 'sb_publishable_nApad8VROoLPtePyj84I3A_j8XQwbnj';
-var _sbSyncQueue = [];
-var _sbSyncing = false;
-var _sbOnline = true;
-
-// ── Core fetch helper ──────────────────────────────────────
-function _sbFetch(path, method, body) {
-  return fetch(_SB_URL + '/rest/v1/' + path, {
-    method: method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': _SB_KEY,
-      'Authorization': 'Bearer ' + _SB_KEY,
-      'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : ''
-    },
-    body: body ? JSON.stringify(body) : undefined
-  }).then(function(r) {
-    _sbOnline = true;
-    _sbUpdateStatus('synced');
-    if (!r.ok) return r.text().then(function(t) { throw new Error(t.slice(0,200)); });
-    return r.json().catch(function() { return {}; });
-  }).catch(function(e) {
-    _sbOnline = false;
-    _sbUpdateStatus('offline');
-    throw e;
-  });
-}
-
-// Batch POST — splits large arrays into chunks to avoid request size limits
-function _sbFetchBatch(path, rows, chunkSize) {
-  chunkSize = chunkSize || 300;
-  if (!rows || !rows.length) return Promise.resolve();
-  var chunks = [];
-  for (var i = 0; i < rows.length; i += chunkSize) {
-    chunks.push(rows.slice(i, i + chunkSize));
-  }
-  return chunks.reduce(function(p, chunk) {
-    return p.then(function() { return _sbFetch(path, 'POST', chunk); });
-  }, Promise.resolve());
-}
-
-// ── Status indicator ───────────────────────────────────────
-function _sbUpdateStatus(state) {
-  var el = document.getElementById('sbSyncStatus');
-  if (!el) return;
-  var states = {
-    synced:  { color: '#00e676', text: '☁ SYNCED' },
-    syncing: { color: '#f5c518', text: '☁ SYNCING...' },
-    offline: { color: '#ef5350', text: '☁ OFFLINE' },
-    error:   { color: '#ef5350', text: '☁ SYNC ERROR' }
-  };
-  var s = states[state] || states.synced;
-  el.style.color = s.color;
-  el.textContent = s.text;
-}
-
-// ── Queue-based background sync ───────────────────────────
-function _sbQueue(fn) {
-  _sbSyncQueue.push(fn);
-  _sbDrainQueue();
-}
-
-function _sbDrainQueue() {
-  if (_sbSyncing || !_sbSyncQueue.length) return;
-  _sbSyncing = true;
-  _sbUpdateStatus('syncing');
-  var fn = _sbSyncQueue.shift();
-  fn().then(function() {
-    _sbSyncing = false;
-    if (_sbSyncQueue.length) {
-      setTimeout(_sbDrainQueue, 100);
-    } else {
-      _sbUpdateStatus('synced');
-    }
-  }).catch(function(e) {
-    console.warn('[Supabase sync error]', e.message);
-    _sbSyncing = false;
-    _sbUpdateStatus(_sbOnline ? 'error' : 'offline');
-    // Retry failed items after 10s
-    setTimeout(_sbDrainQueue, 10000);
-  });
-}
-
-// ── SYNC FUNCTIONS (localStorage → Supabase) ─────────────
-
-function sbSyncExecutions() {
-  _sbQueue(function() {
-    var execs = [];
-    try { execs = JSON.parse(localStorage.getItem('executions_cache') || '[]'); } catch(e) {}
-    if (!execs.length) return Promise.resolve();
-    var rows = execs.map(function(e) {
-      return {
-        id: (e.date||'') + '_' + (e.time||'') + '_' + (e.id||Math.random().toString(36).slice(2)),
-        date: e.date||'', time: e.time||'', content: e.content||'',
-        ticker: e.ticker||'', direction: e.direction||'',
-        image_urls: e.image_urls||[], raw: e
-      };
-    });
-    return _sbFetchBatch('executions', rows);
-  });
-}
-
-function sbSyncExecMeta() {
-  _sbQueue(function() {
-    var meta = {};
-    try { meta = JSON.parse(localStorage.getItem('execMeta') || '{}'); } catch(e) {}
-    var keys = Object.keys(meta);
-    if (!keys.length) return Promise.resolve();
-    var rows = keys.map(function(k) {
-      var m = meta[k];
-      return { key: k, ticker: m.ticker||'', direction: m.direction||'',
-        setups: m.setups||[], edge: m.edge||null, notes: m.notes||'',
-        tv_trade_meta: m.tvTradeMeta||{}, raw: m };
-    });
-    return _sbFetch('exec_meta', 'POST', rows);
-  });
-}
-
-function sbSyncTvTrades() {
-  _sbQueue(function() {
-    var trades = [];
-    try { trades = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
-    if (!trades.length) return Promise.resolve();
-    var rows = trades.map(function(t, i) {
-      return { id: (t.date||'') + '_' + (t.symbol||'') + '_' + i,
-        date: t.date||'', symbol: t.symbol||'', side: t.side||'',
-        pnl: t.pnl||0, shares: t.shares||0, entry: t.entry||0, exit: t.exit||0, raw: t };
-    });
-    return _sbFetchBatch('tv_trades', rows);
-  });
-}
-
-function sbSyncDayR() {
-  _sbQueue(function() {
-    var dayR = {};
-    try { dayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
-    var rows = Object.keys(dayR).map(function(d) { return { date: d, r_value: dayR[d] }; });
-    if (!rows.length) return Promise.resolve();
-    return _sbFetch('tv_day_r', 'POST', rows);
-  });
-}
-
-function sbSyncTtEntries() {
-  _sbQueue(function() {
-    var entries = [];
-    try { entries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
-    if (!entries.length) return Promise.resolve();
-    var rows = entries.map(function(e) {
-      return { id: e.id || ((e.date||'') + '_' + (e.ticker||'') + '_' + Math.random().toString(36).slice(2)),
-        date: e.date||'', ticker: e.ticker||'', edge: e.edge||null,
-        notes: e.notes||'', bt: e.bt||'', vt: e.vt||'', nt: e.nt||'' };
-    });
-    return _sbFetch('tt_entries', 'POST', rows);
-  });
-}
-
-function sbSyncAlgoList() {
-  _sbQueue(function() {
-    var algo = [];
-    try { algo = JSON.parse(localStorage.getItem('algoList') || '[]'); } catch(e) {}
-    if (!algo.length) return Promise.resolve();
-    var rows = algo.map(function(a, i) {
-      return { id: (a.ticker||'item') + '_' + i, ticker: a.ticker||'',
-        setups: a.setups||[], entry: a.entry||null, stop: a.stop||null,
-        target: a.target||null, notes: a.notes||'', sort_order: i };
-    });
-    return _sbFetch('algo_list', 'POST', rows);
-  });
-}
-
-function sbSyncManualTrades() {
-  _sbQueue(function() {
-    var trades = [];
-    try { trades = JSON.parse(localStorage.getItem('manualTrades') || '[]'); } catch(e) {}
-    if (!trades.length) return Promise.resolve();
-    var rows = trades.map(function(t, i) {
-      return { id: (t.date||'') + '_' + (t.ticker||'') + '_' + i,
-        date: t.date||'', ticker: t.ticker||'', direction: t.direction||'',
-        pnl: t.pnl||0, r_multiple: t.r||null, notes: t.notes||'', raw: t };
-    });
-    return _sbFetch('manual_trades', 'POST', rows);
-  });
-}
-
-function sbSyncKv(key) {
-  _sbQueue(function() {
-    var val = localStorage.getItem(key);
-    if (val === null) return Promise.resolve();
-    return _sbFetch('kv_store', 'POST', [{ key: key, value: val }]);
-  });
-}
-
-// ── PULL FROM SUPABASE → localStorage ────────────────────
-
-var _sbIsPulling = false;
-
-function sbPullAll() {
-  _sbUpdateStatus('syncing');
-  _sbIsPulling = true;
-  var pulls = [
-    _sbFetch('executions?select=*&limit=5000').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var merged = rows.map(function(r) { return r.raw || r; });
-      try { localStorage.setItem('executions_cache', JSON.stringify(merged)); } catch(e) {}
-      if (typeof executions !== 'undefined') try { executions = merged; } catch(e) {}
-      console.log('[Supabase] Pulled ' + merged.length + ' executions');
-    }),
-    _sbFetch('exec_meta?select=*&limit=10000').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var meta = {};
-      try { meta = JSON.parse(localStorage.getItem('execMeta') || '{}'); } catch(e) {}
-      rows.forEach(function(r) { if (r.key && r.raw) meta[r.key] = r.raw; });
-      localStorage.setItem('execMeta', JSON.stringify(meta));
-      console.log('[Supabase] Pulled ' + rows.length + ' exec meta');
-    }),
-    _sbFetch('tv_trades?select=*&order=date.desc&limit=10000').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var trades = rows.map(function(r) { return r.raw || r; });
-      try { localStorage.setItem('tvTrades', JSON.stringify(trades)); } catch(e) {}
-      window.tvTrades = trades;
-      console.log('[Supabase] Pulled ' + trades.length + ' tv trades, latest: ' + (trades[0]&&trades[0].date));
-    }),
-    _sbFetch('tv_day_r?select=*').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var dayR = {};
-      try { dayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
-      rows.forEach(function(r) { dayR[r.date] = r.r_value; });
-      localStorage.setItem('tvDayR', JSON.stringify(dayR));
-      try { if (typeof tvDayR !== 'undefined') { window.tvDayR = dayR; } } catch(e) {}
-    }),
-    _sbFetch('tt_entries?select=*&limit=10000').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var existing = [];
-      try { existing = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
-      if (rows.length >= existing.length) {
-        var entries = rows.map(function(r) {
-          return { id: r.id, date: r.date, ticker: r.ticker, edge: r.edge,
-            notes: r.notes, bt: r.bt, vt: r.vt, nt: r.nt };
-        });
-        localStorage.setItem('ttEntries', JSON.stringify(entries));
-        console.log('[Supabase] Pulled ' + rows.length + ' tt entries');
-      }
-    }),
-    _sbFetch('algo_list?select=*&order=sort_order').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var algo = rows.map(function(r) {
-        return { ticker: r.ticker, setups: r.setups||[], entry: r.entry,
-          stop: r.stop, target: r.target, notes: r.notes };
-      });
-      localStorage.setItem('algoList', JSON.stringify(algo));
-    }),
-    _sbFetch('manual_trades?select=*&limit=5000').then(function(rows) {
-      if (!rows || !rows.length) return;
-      var trades = rows.map(function(r) { return r.raw || r; });
-      localStorage.setItem('manualTrades', JSON.stringify(trades));
-    }),
-    _sbFetch('kv_store?select=*').then(function(rows) {
-      if (!rows || !rows.length) return;
-      rows.forEach(function(r) {
-        if (r.key && r.value !== null) {
-          if (!localStorage.getItem(r.key)) {
-            localStorage.setItem(r.key, r.value);
-          }
-        }
-      });
-    })
-  ];
-
-  return Promise.all(pulls.map(function(p) { return p.catch(function(e) { console.warn('[Supabase pull error]', e.message); }); }))
-    .then(function() {
-      _sbIsPulling = false;
-      _sbUpdateStatus('synced');
-      console.log('[Supabase] Pull complete');
-      // Re-render all panels with fresh data
-      if (typeof renderExecutions === 'function') try { renderExecutions(); } catch(e) {}
-      if (typeof renderTT === 'function') try { renderTT(); } catch(e) {}
-      if (typeof renderTvCal === 'function') try { renderTvCal(); } catch(e) {}
-      if (typeof kinfoRender === 'function') try { kinfoRender(); } catch(e) {}
-    });
-}
-
-// ── INTERCEPT KEY SAVE OPERATIONS ─────────────────────────
-// Wrap existing save functions to trigger Supabase sync after saving
-
-function _sbPatchSaves() {
-  // Patch execMeta saves
-  var origSaveExecMeta = window.saveExecMeta || window._saveExecMeta;
-  
-  // Watch localStorage writes for key data
-  var origSetItem = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function(key, value) {
-    origSetItem(key, value);
-    if (_sbIsPulling) return; // Don't push while pulling — prevents sync loop
-    // Trigger appropriate sync based on key
-    switch(key) {
-      case 'executions_cache': sbSyncExecutions(); break;
-      case 'execMeta':         sbSyncExecMeta(); break;
-      case 'tvTrades':         sbSyncTvTrades(); break;
-      case 'tvDayR':           sbSyncDayR(); break;
-      case 'ttEntries':        sbSyncTtEntries(); break;
-      case 'algoList':         sbSyncAlgoList(); break;
-      case 'manualTrades':     sbSyncManualTrades(); break;
-      case 'rollingNVBOverrides':
-      case 'setupPresets':
-      case 'entrySignalPresets':
-      case 'scaMatchWatchlist':
-      case 'ttBtNoColor':      sbSyncKv(key); break;
-    }
-  };
-  console.log('[Supabase] localStorage writes intercepted');
-}
-
-// ── PUSH ALL (force upload everything from localStorage → Supabase) ──
-function sbPushAll() {
-  _sbUpdateStatus('syncing');
-  sbSyncExecutions();
-  sbSyncExecMeta();
-  sbSyncTvTrades();
-  sbSyncDayR();
-  sbSyncTtEntries();
-  sbSyncAlgoList();
-  sbSyncManualTrades();
-  // Also push kv_store keys
-  var kvKeys = ['rollingNVBOverrides','discordImageCache','myTradeImages','tvTradeImages'];
-  kvKeys.forEach(function(k) { var v = localStorage.getItem(k); if (v) sbSyncKv(k); });
-  setTimeout(function() { _sbUpdateStatus('synced'); }, 3000);
-  console.log('[Supabase] Push all triggered');
-}
-
-// ── INIT ──────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  // Small delay so the rest of the app initializes first
+<script>
+// KINFO safety net — if Chart.js loads late, re-render once ready
+window.addEventListener('load', function() {
   setTimeout(function() {
-    _sbPatchSaves();
-    // Pull latest from Supabase in background
-    sbPullAll().catch(function(e) {
-      console.warn('[Supabase] Initial pull failed:', e.message);
-      _sbUpdateStatus('offline');
-    });
-  }, 1500);
+    var panel = document.getElementById('kinfoPanel');
+    if (panel && panel.style.display !== 'none' && typeof kinfoRender === 'function') {
+      kinfoRender();
+    }
+  }, 300);
 });
-
+</script>
+<script>
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    var panel = document.getElementById('kinfoPanel');
+    if (panel && panel.style.display !== 'none' && typeof kinfoRender === 'function') {
+      kinfoRender();
+    }
+  }, 400);
+});
 </script>
 </body>
-
 </html>
