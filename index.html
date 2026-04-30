@@ -671,7 +671,17 @@ async function sbImgDelete(store, imgKey) {
   } catch(e) {}
 }
 
-// Load all images for a store from Supabase into memory (paginated)
+// Fetch a Supabase storage URL and convert to a local blob URL (bypasses Brave blocking)
+async function _fetchAsBlobUrl(url) {
+  try {
+    var resp = await fetch(url);
+    if (!resp.ok) return url;
+    var blob = await resp.blob();
+    return URL.createObjectURL(blob);
+  } catch(e) { return url; }
+}
+
+// Load all images for a store from Supabase into memory (paginated, blob URLs)
 async function sbImgLoadAll(store) {
   try {
     var memObj = window[store] || {};
@@ -682,17 +692,18 @@ async function sbImgLoadAll(store) {
         .eq('store', store)
         .range(from, from + pageSize - 1);
       if (error || !data || data.length === 0) { done = true; break; }
-      data.forEach(function(row) {
+      // Fetch all images as blob URLs in parallel (bypasses Brave mixed content blocking)
+      await Promise.all(data.map(async function(row) {
         if (!row.data_url) return;
         var imgKey = row.img_key.replace(store + '::', '');
-        // Store under original key regardless of URL format
-        memObj[imgKey] = row.data_url;
+        var blobUrl = row.data_url.startsWith('http') ? await _fetchAsBlobUrl(row.data_url) : row.data_url;
+        memObj[imgKey] = blobUrl;
         // Also normalize _L/_S suffixes to _long/_short
         var normKey = imgKey
           .replace(/_L$/, '_long').replace(/_S$/, '_short')
           .replace(/_Long$/, '_long').replace(/_Short$/, '_short');
-        if (normKey !== imgKey) memObj[normKey] = row.data_url;
-      });
+        if (normKey !== imgKey) memObj[normKey] = blobUrl;
+      }));
       from += pageSize;
       if (data.length < pageSize) done = true;
     }
@@ -939,14 +950,54 @@ function _discordKey(url){ if(!url)return url; try{return url.split('?')[0];}cat
 
 function getDiscordImage(url, cb){
   if(!url) return cb&&cb(null);
-  // If already a local bridge URL, just return it directly — no caching needed
-  if(url.indexOf('localhost:7842/img/')>=0){return cb&&cb(url);}
+  // Skip localhost bridge URLs
+  if(url.indexOf('localhost:7842/img/')>=0){return cb&&cb(null);}
   var key=_discordKey(url);
+  // 1. Check in-memory cache first
   if(discordImageCache[key]) return cb&&cb(discordImageCache[key]);
-  imgDBGet('discord', key, function(cached){
-    if(cached){discordImageCache[key]=cached;return cb&&cb(cached);}
-    cb&&cb(null); // Bridge handles downloading; nothing to do client-side
-  });
+  // 2. Try Supabase — image may already be saved permanently
+  _supa.from('valgo_images').select('data_url').eq('img_key','discordImageCache::'+key).single()
+    .then(function(res){
+      if(!res.error && res.data && res.data.data_url && res.data.data_url.startsWith('http')){
+        // Fetch as blob URL so Brave doesn't block it
+        fetch(res.data.data_url).then(function(r){return r.blob();}).then(function(blob){
+          var blobUrl = URL.createObjectURL(blob);
+          discordImageCache[key] = blobUrl;
+          cb&&cb(blobUrl);
+        }).catch(function(){
+          discordImageCache[key] = res.data.data_url;
+          cb&&cb(res.data.data_url);
+        });
+        return;
+      }
+      // 3. Fetch directly from Discord CDN
+      fetch(url).then(function(r){
+        if(!r.ok) throw new Error('fetch failed');
+        return r.blob();
+      }).then(function(blob){
+        var blobUrl = URL.createObjectURL(blob);
+        discordImageCache[key] = blobUrl;
+        cb&&cb(blobUrl);
+        // Save to Supabase Storage permanently in background
+        var fileName = 'discordImageCache/' + key.replace(/[^a-zA-Z0-9_\-\.]/g,'_') + '.webp';
+        _supa.storage.from(SUPA_BUCKET).upload(fileName, blob, {upsert:true, contentType:blob.type})
+          .then(function(upRes){
+            if(!upRes.error){
+              var pubUrl = _supa.storage.from(SUPA_BUCKET).getPublicUrl(fileName).data.publicUrl;
+              _supa.from('valgo_images').upsert({
+                img_key: 'discordImageCache::'+key,
+                store: 'discordImageCache',
+                data_url: pubUrl,
+                updated_at: new Date().toISOString()
+              }).then(function(){}).catch(function(){});
+            }
+          }).catch(function(){});
+      }).catch(function(){
+        cb&&cb(null);
+      });
+    }).catch(function(){
+      cb&&cb(null);
+    });
 }
 
 function cacheAllDiscordImages(){
