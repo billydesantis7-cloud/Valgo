@@ -950,8 +950,15 @@ function _discordKey(url){ if(!url)return url; try{return url.split('?')[0];}cat
 
 function getDiscordImage(url, cb){
   if(!url) return cb&&cb(null);
-  // Skip localhost bridge URLs
-  if(url.indexOf('localhost:7842/img/')>=0){return cb&&cb(null);}
+  // Convert localhost bridge URLs to Supabase Storage URLs
+  if(url.indexOf('localhost:7842/img/')>=0){
+    var fname = url.split('/img/')[1];
+    if(fname){
+      var sbUrl = 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname;
+      return cb&&cb(sbUrl);
+    }
+    return cb&&cb(null);
+  }
   var key=_discordKey(url);
   // 1. Check in-memory cache first
   if(discordImageCache[key]) return cb&&cb(discordImageCache[key]);
@@ -1028,7 +1035,15 @@ function cacheAllDiscordImages(){
 
 function resolveDiscordImg(url){
   if(!url) return null;
-  if(url.indexOf('localhost:7842/img/')>=0) return url; // local — always valid
+  // Convert localhost bridge URLs to Supabase Storage URLs
+  if(url.indexOf('localhost:7842/img/')>=0){
+    var fname = url.split('/img/')[1];
+    if(fname){
+      var sbUrl = 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname;
+      return sbUrl;
+    }
+    return null;
+  }
   return discordImageCache[_discordKey(url)]||url;
 }
 var execView = 'grid', execDateFrom = '', execDateTo = '', execDateMode = '';
