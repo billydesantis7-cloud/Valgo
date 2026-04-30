@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 <title>Claude</title>
 <!-- fonts removed, using Times New Roman -->
 <style>
@@ -671,17 +672,7 @@ async function sbImgDelete(store, imgKey) {
   } catch(e) {}
 }
 
-// Fetch a Supabase storage URL and convert to a local blob URL (bypasses Brave blocking)
-async function _fetchAsBlobUrl(url) {
-  try {
-    var resp = await fetch(url);
-    if (!resp.ok) return url;
-    var blob = await resp.blob();
-    return URL.createObjectURL(blob);
-  } catch(e) { return url; }
-}
-
-// Load all images for a store from Supabase into memory (paginated, blob URLs)
+// Load all images for a store from Supabase into memory (paginated)
 async function sbImgLoadAll(store) {
   try {
     var memObj = window[store] || {};
@@ -692,18 +683,16 @@ async function sbImgLoadAll(store) {
         .eq('store', store)
         .range(from, from + pageSize - 1);
       if (error || !data || data.length === 0) { done = true; break; }
-      // Fetch all images as blob URLs in parallel (bypasses Brave mixed content blocking)
-      await Promise.all(data.map(async function(row) {
+      data.forEach(function(row) {
         if (!row.data_url) return;
         var imgKey = row.img_key.replace(store + '::', '');
-        var blobUrl = row.data_url.startsWith('http') ? await _fetchAsBlobUrl(row.data_url) : row.data_url;
-        memObj[imgKey] = blobUrl;
+        memObj[imgKey] = row.data_url;
         // Also normalize _L/_S suffixes to _long/_short
         var normKey = imgKey
           .replace(/_L$/, '_long').replace(/_S$/, '_short')
           .replace(/_Long$/, '_long').replace(/_Short$/, '_short');
-        if (normKey !== imgKey) memObj[normKey] = blobUrl;
-      }));
+        if (normKey !== imgKey) memObj[normKey] = row.data_url;
+      });
       from += pageSize;
       if (data.length < pageSize) done = true;
     }
