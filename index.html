@@ -1092,29 +1092,22 @@ function _saveExecMeta(){
   var data=JSON.stringify(execMeta);
   sbSave('execMeta', data);
 }
-// Load trade images from localStorage synchronously (immediate, no delay)
-try{myTradeImages=JSON.parse(localStorage.getItem('myTradeImages')||'{}');}catch(e){}
-// Also load any images that are only in IDB (localStorage quota overflow)
+// Images load from Supabase only — localStorage/IDB are not used for images
+// Clear stale base64 data to free memory
+try{localStorage.removeItem('myTradeImages');}catch(e){}
+try{localStorage.removeItem('tvTradeImages');}catch(e){}
+try{localStorage.removeItem('tvDayImages');}catch(e){}
+// Dummy timeout to maintain code structure
 setTimeout(function(){
   _openImgDB(function(db){
     if(!db) return;
+    // IDB images no longer used — Supabase is source of truth
+    return;
     var tx=db.transaction('images','readonly');
     var cursor=tx.objectStore('images').openCursor();
     cursor.onsuccess=function(ev){
       var c=ev.target.result; if(!c){
-        // Re-render to show loaded images
-        if(typeof renderTvCal==='function') renderTvCal();
-        if(typeof renderTvTrades==='function') renderTvTrades();
-        if(document.querySelector('.exec-panel')&&document.querySelector('.exec-panel').style.display!=='none') if(execView!=='ai') renderExecutions();
         return;
-      }
-      var k=c.key, v=c.value;
-      if(k.startsWith('myTradeImages::')){
-        var imgKey=k.slice('myTradeImages::'.length);
-        if(!myTradeImages[imgKey]) myTradeImages[imgKey]=v;
-      } else if(k.startsWith('tvTradeImages::')&&typeof tvTradeImages!=='undefined'){
-        var imgKey2=k.slice('tvTradeImages::'.length);
-        if(!tvTradeImages[imgKey2]) tvTradeImages[imgKey2]=v;
       }
       c.continue();
     };
