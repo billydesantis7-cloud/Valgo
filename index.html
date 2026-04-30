@@ -793,6 +793,18 @@ async function _sbInitLoad() {
 }
 // Fire after page loads
 window.addEventListener('load', function() { setTimeout(_sbInitLoad, 800); });
+
+// Re-run image load after everything else settles (fixes Brave timing issue)
+window.addEventListener('load', function() {
+  setTimeout(async function() {
+    await sbImgLoadAll('myTradeImages');
+    await sbImgLoadAll('tvTradeImages');
+    await sbImgLoadAll('tvDayImages');
+    if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
+    if (typeof renderTvTrades === 'function') renderTvTrades();
+    if (typeof renderTvCal === 'function') renderTvCal();
+  }, 4000);
+});
 </script>
 <script>
 // ═══════════════════════════════════════════════════════════
