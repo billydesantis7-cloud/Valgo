@@ -680,8 +680,17 @@ async function sbImgLoadAll(store) {
     data.forEach(function(row) {
       var imgKey = row.img_key.replace(store + '::', '');
       if (row.data_url && row.data_url.startsWith('http')) {
-        // It's a public URL — store it directly
+        // Store under original key
         memObj[imgKey] = row.data_url;
+        // Also store under normalized key (e.g. 2026-03-02_UCO_L -> 2026-03-02_UCO_long)
+        var normKey = imgKey
+          .replace(/_L$/, '_long').replace(/_S$/, '_short')
+          .replace(/_Long$/, '_long').replace(/_Short$/, '_short');
+        if (normKey !== imgKey) memObj[normKey] = row.data_url;
+        // Also store without trailing _L/_S suffix variations
+        var upperKey = imgKey
+          .replace(/_long$/, '_Long').replace(/_short$/, '_Short');
+        if (upperKey !== imgKey) memObj[upperKey] = row.data_url;
       }
     });
     window[store] = memObj;
@@ -726,15 +735,25 @@ async function migrateLocalToSupabase() {
 // ── Load all data from Supabase on startup ──────────────────
 async function _sbInitLoad() {
   _sbSetStatus('☁ LOADING...', '#f5c518');
+  // Hard timeout — if Supabase takes more than 6s, fall back to localStorage immediately
+  var _sbTimedOut = false;
+  var _sbTimeout = setTimeout(function() {
+    _sbTimedOut = true;
+    _sbSetStatus('☁ SYNCED (cached)', '#00e676');
+    if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
+    if (typeof renderTvTrades === 'function') renderTvTrades();
+    if (typeof renderTvCal === 'function') renderTvCal();
+  }, 6000);
+
   try {
     var { data, error } = await _supa.from('valgo_data').select('key,value');
+    if (_sbTimedOut) return; // already fell back, don't interfere
     if (error) throw error;
     var hasData = data && data.length > 0;
     if (hasData) {
       data.forEach(function(row) {
         if (row.value) try { localStorage.setItem(row.key, row.value); } catch(e) {}
       });
-      // Reload in-memory variables from freshly-updated localStorage
       try { executions = JSON.parse(localStorage.getItem('executions_cache') || '[]'); } catch(e) {}
       try {
         var _sm = JSON.parse(localStorage.getItem('manualTrades') || '[]');
@@ -746,17 +765,26 @@ async function _sbInitLoad() {
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
     }
-    // Load images from Supabase Storage references
-    await sbImgLoadAll('myTradeImages');
-    await sbImgLoadAll('tvTradeImages');
-    await sbImgLoadAll('tvDayImages');
+    // Load image URLs from Supabase (with its own timeout)
+    var _imgTimeout = new Promise(function(resolve) { setTimeout(resolve, 5000); });
+    await Promise.race([
+      Promise.all([sbImgLoadAll('myTradeImages'), sbImgLoadAll('tvTradeImages'), sbImgLoadAll('tvDayImages')]),
+      _imgTimeout
+    ]);
+    clearTimeout(_sbTimeout);
+    if (_sbTimedOut) return;
     _sbSetStatus('☁ SYNCED');
-    // Re-render visible panel
     if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
     if (typeof renderTvTrades === 'function') renderTvTrades();
     if (typeof renderTvCal === 'function') renderTvCal();
   } catch(e) {
-    _sbSetStatus('☁ OFFLINE', '#ef5350');
+    clearTimeout(_sbTimeout);
+    if (!_sbTimedOut) {
+      _sbSetStatus('☁ SYNCED (cached)', '#00e676');
+      if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
+      if (typeof renderTvTrades === 'function') renderTvTrades();
+      if (typeof renderTvCal === 'function') renderTvCal();
+    }
     console.warn('Supabase load failed, using localStorage', e);
   }
 }
