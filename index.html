@@ -2419,7 +2419,7 @@ function renderExecCalendar(items, container) {
           var rm=t._rCnt>0?parseFloat(t._rSum.toFixed(2)):null;
           if(rm===null&&rV&&t.pnl)rm=parseFloat((t.pnl/rV).toFixed(2));
           var rs=rm!=null?((rm>=0?'+':'')+rm.toFixed(2)+'R'):'';
-          var pc=t.pnl>=0?'#26a69a':'#ef5350';
+          var pc=(t.pnl||0)>=0?'#26a69a':'#ef5350';
           return '<div onclick="event.stopPropagation();valgoMyTradeClick(\''+ik+'\',\''+t.symbol+'\',\''+sw+'\')" style="display:flex;align-items:center;gap:0;margin-bottom:3px;background:rgba(0,0,0,0.2);border-radius:4px;overflow:hidden;cursor:pointer;">'
             +'<span style="font-size:'+myTickSize+';font-weight:bold;color:'+tc+';padding:3px 6px;white-space:nowrap;">'+t.symbol+'</span>'
             +'<span style="width:1px;background:var(--border2);align-self:stretch;"></span>'
@@ -2565,7 +2565,7 @@ function expandExecCalDay(ds) {
       card.innerHTML='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(66,165,245,0.07);">'
         +'<span style="font-size:16px;font-weight:bold;color:#fff;">'+t.symbol+'</span>'
         +'<span style="font-size:9px;font-weight:bold;color:'+sc+';background:'+sc+'22;padding:2px 6px;border-radius:3px;">'+usedSide.toUpperCase()+'</span>'
-        +(rStr?'<span style="font-size:12px;font-weight:bold;color:'+(t.pnl>=0?'#26a69a':'#ef5350')+';">'+rStr+'</span>':'')
+        +(rStr?'<span style="font-size:12px;font-weight:bold;color:'+((t.pnl||0)>=0?'#26a69a':'#ef5350')+';">'+rStr+'</span>':'')
         +'</div>'
         +'<img src="'+img+'" style="width:100%;max-height:280px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;">';
       (function(u){card.querySelector('img').addEventListener('click',function(){expandMyImg(u);});})(img);
@@ -4155,7 +4155,7 @@ function _renderDayPanel(date, overrideEl){
     var rm=t.rMultiple||(rVal?parseFloat((t.pnl/rVal).toFixed(2)):null);
     var rs=rm!=null?(rm>=0?'+':'')+rm.toFixed(2)+'R':'—';
     var sc2=t.side==='long'?'#26a69a':'#ef5350';
-    var pc2=t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350');
+    var pc2=t.isOpen?'#f5c518':((t.pnl||0)>=0?'#26a69a':'#ef5350');
     var tmk=_tvMetaKey(date,t.symbol,t.side);var tm=tvTradeMeta[tmk]||{};
     var hasMyTags=!!(tm.setup||(tm.entrySignals&&tm.entrySignals.length)||(tm.stopLoss&&tm.stopLoss.length)||(tm.profitTargets&&tm.profitTargets.length));
     var tagBadge=hasMyTags?' <span style="font-size:8px;color:#c8a96e;border:1px solid rgba(200,169,110,0.5);padding:1px 5px;border-radius:3px;">TAGGED</span>':' <span style="font-size:8px;color:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;">TAG+</span>';
@@ -4167,7 +4167,7 @@ function _renderDayPanel(date, overrideEl){
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+t.volume+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.entryPrice+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+(t.isOpen?'<span style="color:#f5c518;">OPEN</span>':'$'+t.exitPrice)+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.isOpen?'<span style="color:#f5c518;">—</span>':'+(t.pnl!=null?(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2):''))+'</td>'
+      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.isOpen?'<span style="color:#f5c518;">—</span>':'+(t.pnl!=null?((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2):''))+'</td>'
       +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>'
       +'</tr>';
   });
@@ -4418,12 +4418,12 @@ function renderTvTrades(){
     var rVal=tvDayR[t.date];
     var rMult=t.rMultiple||(rVal?parseFloat((t.pnl/rVal).toFixed(2)):null);
     var rStr=rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—';
-    var dispPnl=t.isOpen?'<span style="color:#f5c518;font-size:10px;">OPEN</span>':(tvUnit==='R'?(rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—'):(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2));
+    var dispPnl=tvUnit==='R'?(rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—'):((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2);
     var lenMin=tLen(t);
     var lenStr=lenMin<=0?'—':lenMin<60?Math.round(lenMin)+'m':(Math.floor(lenMin/60)+'h'+(Math.round(lenMin%60)?Math.round(lenMin%60)+'m':''));
     var pnlPct=t.entryPrice>0&&t.volume>0?((t.pnl/(t.entryPrice*t.volume))*100):0;
     var pnlPctStr=(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%';
-    var pnlDolStr=(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2); // always $ regardless of unit
+    var pnlDolStr=((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2); // always $ regardless of unit
     return '<div class="tv-trade-row" style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px;align-items:center;gap:0;padding:7px 14px;border-bottom:1px solid var(--border);">'
       +'<span style="font-size:10px;color:var(--text);">'+t.date.slice(5)+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">'+t.openTime.slice(0,5)+'</span>'
@@ -4432,11 +4432,11 @@ function renderTvTrades(){
       +'<span style="font-size:9px;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';background:'+(t.side==='long'?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)')+';padding:2px 6px;border-radius:3px;">'+(t.side==='long'?'LONG':'SHORT')+'</span>'
       +'<span style="font-size:10px;color:var(--muted);padding-left:6px;">'+t.volume+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">$'+t.entryPrice+'</span>'
-      +'<span style="font-size:10px;color:var(--muted);">'+(t.isOpen?'<span style="color:#f5c518;">OPEN</span>':'$'+t.exitPrice)+'</span>'
+      +'<span style="font-size:10px;color:var(--muted);">$'+(t.exitPrice||'—')+'</span>'
       +'<span style="font-size:10px;color:var(--muted2);">'+lenStr+'</span>'
-      +'<span style="font-size:11px;color:'+(t.isOpen?'#f5c518':(pnlPct>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'—':pnlPctStr)+'</span>'
-      +'<span style="font-size:14px;font-weight:bold;color:'+(t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'<span style="font-size:11px;">OPEN</span>':pnlDolStr)+'</span>'
-      +'<span style="font-size:12px;font-weight:bold;color:'+(t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'—':rStr)+'</span>'
+      +'<span style="font-size:11px;color:'+(pnlPct>=0?'#26a69a':'#ef5350')+';text-align:right;">'+pnlPctStr+'</span>'
+      +'<span style="font-size:14px;font-weight:bold;color:'+((t.pnl||0)>=0?'#26a69a':'#ef5350')+';text-align:right;">'+pnlDolStr+'</span>'
+      +'<span style="font-size:12px;font-weight:bold;color:'+((t.pnl||0)>=0?'#26a69a':'#ef5350')+';text-align:right;">'+rStr+'</span>'
       +(function(){
         var ik2=t.date+'_'+t.symbol+'_'+t.side;
         var img2=(typeof tvTradeImages!=='undefined'?tvTradeImages[ik2]:null)||myTradeImages[ik2]||null;
@@ -4447,9 +4447,8 @@ function renderTvTrades(){
       +'<span class="tv-trade-edit-btn" style="font-size:12px;cursor:pointer;text-align:center;opacity:0.35;transition:opacity 0.15s;" title="Edit trade" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.35">✏️</span>'
       +'</div>';
   }).join('');
-  var closedTrades=filtered.filter(function(t){return !t.isOpen;});
-  var totalPnl=closedTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-  var wins=closedTrades.filter(function(t){return t.pnl>0;}).length;
+  var totalPnl=filtered.reduce(function(s,t){return s+(t.pnl||0);},0);
+  var wins=filtered.filter(function(t){return (t.pnl||0)>0;}).length;
   var rT=filtered.filter(function(t){return t.rMultiple||(tvDayR[t.date]&&t.pnl);});
   var totalR=rT.reduce(function(s,t){return s+(t.rMultiple||(tvDayR[t.date]?t.pnl/tvDayR[t.date]:0));},0);
   // Wire image btn clicks
@@ -5417,7 +5416,7 @@ function renderTT(){
         if(myTrades.length){
           dataRow+='<div style="border-top:3px solid #ef5350;margin-top:5px;padding:2px 5px 1px;"><span style="font-family:var(--display);font-size:9px;font-weight:bold;color:#ef5350;letter-spacing:1px;">ME</span></div>';
           myTrades.forEach(function(t){
-            var pc=t.pnl>=0?'#26a69a':'#ef5350';
+            var pc=(t.pnl||0)>=0?'#26a69a':'#ef5350';
             var sc=t.side==='L'?'#26a69a':'#ef5350';
             var rV=typeof tvDayR!=='undefined'?tvDayR[t.date]:null;
             var rM=t.rMultiple!=null?t.rMultiple:(rV?t.pnl/rV:null);
