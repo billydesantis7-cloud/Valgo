@@ -3886,7 +3886,9 @@ function tvHandleTradervueImport(event){
       var volume=parseInt(hi('Volume'))||0,entryP=parseFloat(hi('Entry Price'))||0,exitP=parseFloat(hi('Exit Price'))||0,pnl=parseFloat(hi('Gross P&L'))||0;
       if(!symbol||!openDt) continue;
       var date=openDt.slice(0,10);
-      parsed.push({id:'tvtv_'+date+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:hi('Close Datetime').slice(11,19)||'00:00:00',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:parseFloat(exitP.toFixed(4)),pnl:parseFloat(pnl.toFixed(2)),rMultiple:null});
+      var closeDt=hi('Close Datetime');
+      var isOpen = !closeDt || closeDt.trim()==='' || exitP===0;
+      parsed.push({id:'tvtv_'+date+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:closeDt?closeDt.slice(11,19):'--:--:--',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:isOpen?null:parseFloat(exitP.toFixed(4)),pnl:isOpen?null:parseFloat(pnl.toFixed(2)),rMultiple:null,isOpen:isOpen});
     }
     if(!parsed.length){alert('No trades found');return;}
     var dates=[...new Set(parsed.map(function(t){return t.date;}))];
@@ -4153,18 +4155,19 @@ function _renderDayPanel(date, overrideEl){
     var rm=t.rMultiple||(rVal?parseFloat((t.pnl/rVal).toFixed(2)):null);
     var rs=rm!=null?(rm>=0?'+':'')+rm.toFixed(2)+'R':'—';
     var sc2=t.side==='long'?'#26a69a':'#ef5350';
-    var pc2=t.pnl>=0?'#26a69a':'#ef5350';
+    var pc2=t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350');
     var tmk=_tvMetaKey(date,t.symbol,t.side);var tm=tvTradeMeta[tmk]||{};
     var hasMyTags=!!(tm.setup||(tm.entrySignals&&tm.entrySignals.length)||(tm.stopLoss&&tm.stopLoss.length)||(tm.profitTargets&&tm.profitTargets.length));
     var tagBadge=hasMyTags?' <span style="font-size:8px;color:#c8a96e;border:1px solid rgba(200,169,110,0.5);padding:1px 5px;border-radius:3px;">TAGGED</span>':' <span style="font-size:8px;color:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;">TAG+</span>';
+    var openBadge=t.isOpen?' <span style="font-size:8px;color:#f5c518;background:rgba(245,197,24,0.15);border:1px solid rgba(245,197,24,0.4);padding:1px 5px;border-radius:3px;">OPEN</span>':'';
     html+='<tr class="tvtr" data-d="'+date+'" data-s="'+t.symbol+'" data-sd="'+t.side+'" style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(200,169,110,0.05)\'" onmouseout="this.style.background=\'transparent\'">'
       +'<td style="padding:8px 14px;color:var(--muted);font-size:10px;">'+t.openTime.slice(0,5)+'</td>'
-      +'<td style="padding:8px 14px;font-size:14px;font-weight:bold;color:#fff;">'+t.symbol+tagBadge+'</td>'
+      +'<td style="padding:8px 14px;font-size:14px;font-weight:bold;color:#fff;">'+t.symbol+tagBadge+openBadge+'</td>'
       +'<td style="padding:8px 14px;text-align:center;"><span style="font-size:9px;font-weight:bold;color:'+sc2+';background:'+sc2+'22;padding:2px 8px;border-radius:3px;">'+t.side.toUpperCase()+'</span></td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+t.volume+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.entryPrice+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.exitPrice+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2)+'</td>'
+      +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+(t.isOpen?'<span style="color:#f5c518;">OPEN</span>':'$'+t.exitPrice)+'</td>'
+      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.isOpen?'<span style="color:#f5c518;">—</span>':'+(t.pnl!=null?(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2):''))+'</td>'
       +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>'
       +'</tr>';
   });
@@ -4415,7 +4418,7 @@ function renderTvTrades(){
     var rVal=tvDayR[t.date];
     var rMult=t.rMultiple||(rVal?parseFloat((t.pnl/rVal).toFixed(2)):null);
     var rStr=rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—';
-    var dispPnl=tvUnit==='R'?(rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—'):(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2);
+    var dispPnl=t.isOpen?'<span style="color:#f5c518;font-size:10px;">OPEN</span>':(tvUnit==='R'?(rMult!=null?(rMult>=0?'+':'')+rMult+'R':'—'):(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2));
     var lenMin=tLen(t);
     var lenStr=lenMin<=0?'—':lenMin<60?Math.round(lenMin)+'m':(Math.floor(lenMin/60)+'h'+(Math.round(lenMin%60)?Math.round(lenMin%60)+'m':''));
     var pnlPct=t.entryPrice>0&&t.volume>0?((t.pnl/(t.entryPrice*t.volume))*100):0;
@@ -4429,11 +4432,11 @@ function renderTvTrades(){
       +'<span style="font-size:9px;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';background:'+(t.side==='long'?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)')+';padding:2px 6px;border-radius:3px;">'+(t.side==='long'?'LONG':'SHORT')+'</span>'
       +'<span style="font-size:10px;color:var(--muted);padding-left:6px;">'+t.volume+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">$'+t.entryPrice+'</span>'
-      +'<span style="font-size:10px;color:var(--muted);">$'+t.exitPrice+'</span>'
+      +'<span style="font-size:10px;color:var(--muted);">'+(t.isOpen?'<span style="color:#f5c518;">OPEN</span>':'$'+t.exitPrice)+'</span>'
       +'<span style="font-size:10px;color:var(--muted2);">'+lenStr+'</span>'
-      +'<span style="font-size:11px;color:'+(pnlPct>=0?'#26a69a':'#ef5350')+';text-align:right;">'+pnlPctStr+'</span>'
-      +'<span style="font-size:14px;font-weight:bold;color:'+(t.pnl>=0?'#26a69a':'#ef5350')+';text-align:right;">'+pnlDolStr+'</span>'
-      +'<span style="font-size:12px;font-weight:bold;color:'+(t.pnl>=0?'#26a69a':'#ef5350')+';text-align:right;">'+rStr+'</span>'
+      +'<span style="font-size:11px;color:'+(t.isOpen?'#f5c518':(pnlPct>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'—':pnlPctStr)+'</span>'
+      +'<span style="font-size:14px;font-weight:bold;color:'+(t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'<span style="font-size:11px;">OPEN</span>':pnlDolStr)+'</span>'
+      +'<span style="font-size:12px;font-weight:bold;color:'+(t.isOpen?'#f5c518':(t.pnl>=0?'#26a69a':'#ef5350'))+';text-align:right;">'+(t.isOpen?'—':rStr)+'</span>'
       +(function(){
         var ik2=t.date+'_'+t.symbol+'_'+t.side;
         var img2=(typeof tvTradeImages!=='undefined'?tvTradeImages[ik2]:null)||myTradeImages[ik2]||null;
@@ -4444,8 +4447,9 @@ function renderTvTrades(){
       +'<span class="tv-trade-edit-btn" style="font-size:12px;cursor:pointer;text-align:center;opacity:0.35;transition:opacity 0.15s;" title="Edit trade" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.35">✏️</span>'
       +'</div>';
   }).join('');
-  var totalPnl=filtered.reduce(function(s,t){return s+t.pnl;},0);
-  var wins=filtered.filter(function(t){return t.pnl>0;}).length;
+  var closedTrades=filtered.filter(function(t){return !t.isOpen;});
+  var totalPnl=closedTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+  var wins=closedTrades.filter(function(t){return t.pnl>0;}).length;
   var rT=filtered.filter(function(t){return t.rMultiple||(tvDayR[t.date]&&t.pnl);});
   var totalR=rT.reduce(function(s,t){return s+(t.rMultiple||(tvDayR[t.date]?t.pnl/tvDayR[t.date]:0));},0);
   // Wire image btn clicks
