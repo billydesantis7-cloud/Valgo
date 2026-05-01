@@ -1872,7 +1872,7 @@ function renderExecGrid(items, container) {
       var sw=dir==='long'?'long':'short';
       var match=tvTrades.filter(function(t){return t.date===eDate&&tickerMatchesTrade(ticker,t)&&t.side===sw;});
       var rV=tvDayR[e.date];
-      if(match.length&&rV){var rm=parseFloat((match.reduce(function(s,t){return s+t.pnl;},0)/rV).toFixed(2));rStr=(rm>=0?'+':'')+rm+'R';}
+      if(match.length&&rV){var rm=parseFloat((match.reduce(function(s,t){return s+(t.pnl||0);},0)/rV).toFixed(2));rStr=(rm>=0?'+':'')+rm+'R';}
     }
     var tvMatchGrid=typeof tvTrades!=='undefined'?tvTrades.filter(function(t){return t.date===eDate&&tickerMatchesTrade(ticker,t);}):[];
     var tvMatchDirGrid=tvMatchGrid.length?tvMatchGrid[0].side:'';
@@ -2676,7 +2676,7 @@ function valgoOpenExecCard(eKey) {
     var sw=dir==='long'?'long':'short';
     var match=tvTrades.filter(function(t){return t.date===e.date&&tickerMatchesTrade(ticker,t)&&t.side===sw;});
     var rV=tvDayR[e.date];
-    if(match.length&&rV){var rm=parseFloat((match.reduce(function(s,t){return s+t.pnl;},0)/rV).toFixed(2));rStr=(rm>=0?'+':'')+rm+'R';}
+    if(match.length&&rV){var rm=parseFloat((match.reduce(function(s,t){return s+(t.pnl||0);},0)/rV).toFixed(2));rStr=(rm>=0?'+':'')+rm+'R';}
   }
 
   var ex=document.getElementById('execCardModal');if(ex)ex.remove();
@@ -3861,7 +3861,7 @@ function tvHandleImport(event){
     tvTrades=tvTrades.filter(function(t){return t.date!==date;}).concat(parsed);
     tvTrades.sort(function(a,b){return a.date.localeCompare(b.date)||a.openTime.localeCompare(b.openTime);});
     tvSave(); refreshMyTradesFromTv();
-    var dayPnl=parsed.reduce(function(s,t){return s+t.pnl;},0);
+    var dayPnl=parsed.reduce(function(s,t){return s+(t.pnl||0);},0);
     var res=document.getElementById('tvImportResult'); res.style.display='block';
     res.innerHTML='<div style="font-size:16px;color:var(--bull);">✓ '+parsed.length+' trades imported</div><div style="font-size:11px;color:var(--muted);margin-top:6px;">'+date+' | '+(dayPnl>=0?'+$':'-$')+Math.abs(dayPnl).toFixed(2)+(rVal?' | '+(dayPnl/rVal>=0?'+':'')+(dayPnl/rVal).toFixed(2)+'R':'')+'</div>';
     renderTvRecentImports();
@@ -3888,7 +3888,7 @@ function tvHandleTradervueImport(event){
       var date=openDt.slice(0,10);
       var closeDt=hi('Close Datetime');
       var isOpen = !closeDt || closeDt.trim()==='' || exitP===0;
-      parsed.push({id:'tvtv_'+date+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:closeDt?closeDt.slice(11,19):'--:--:--',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:isOpen?null:parseFloat(exitP.toFixed(4)),pnl:isOpen?null:parseFloat(pnl.toFixed(2)),rMultiple:null,isOpen:isOpen});
+      parsed.push({id:'tvtv_'+date+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:closeDt?closeDt.slice(11,19):'--:--:--',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:isOpen?0:parseFloat(exitP.toFixed(4)),pnl:isOpen?0:parseFloat(pnl.toFixed(2)),rMultiple:null,isOpen:isOpen});
     }
     if(!parsed.length){alert('No trades found');return;}
     var dates=[...new Set(parsed.map(function(t){return t.date;}))];
@@ -3906,7 +3906,7 @@ function renderTvRecentImports(){
   var el=document.getElementById('tvRecentImports'); if(!el) return;
   if(!dates.length){el.innerHTML='<div style="font-size:11px;color:var(--muted);padding:16px;">No trades yet</div>';return;}
   el.innerHTML=dates.map(function(date){
-    var dt=tvTrades.filter(function(t){return t.date===date;}),pnl=dt.reduce(function(s,t){return s+t.pnl;},0),rVal=tvDayR[date],wins=dt.filter(function(t){return t.pnl>0;}).length;
+    var dt=tvTrades.filter(function(t){return t.date===date;}),pnl=dt.reduce(function(s,t){return s+(t.pnl||0);},0),rVal=tvDayR[date],wins=dt.filter(function(t){return t.pnl>0;}).length;
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;flex-wrap:wrap;">'
       +'<span style="font-size:12px;color:var(--text);min-width:96px;">'+date+'</span>'
       +'<span style="font-size:11px;color:var(--muted);">'+dt.length+'t</span>'
@@ -3962,7 +3962,7 @@ function renderTvCal(){
     var dow=new Date(ds+'T12:00:00').getDay();
     var weekNum=Math.floor((firstDay+d-1)/7);
     var dayTrades=byDay[ds]||[];
-    var pnl=dayTrades.reduce(function(s,t){return s+t.pnl;},0);
+    var pnl=dayTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
     var rVal=tvDayR[ds];
     var isToday=ds===todayStr;
     if(!weeks[weekNum]) weeks[weekNum]={pnl:0,r:0,trades:0};
@@ -3970,7 +3970,7 @@ function renderTvCal(){
     if(rVal&&dayTrades.length) weeks[weekNum].r+=pnl/rVal;
     var dayTotalStr=tvUnit==='R'&&rVal?((pnl/rVal>=0?'+':'')+((pnl/rVal).toFixed(2))+'R'):(dayTrades.length?(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(2):'');
     var pnlBySymbol={};
-    dayTrades.forEach(function(t){if(!pnlBySymbol[t.symbol])pnlBySymbol[t.symbol]={pnl:0,side:t.side};pnlBySymbol[t.symbol].pnl+=t.pnl;});
+    dayTrades.forEach(function(t){if(!pnlBySymbol[t.symbol])pnlBySymbol[t.symbol]={pnl:0,side:t.side};pnlBySymbol[t.symbol].pnl+=(t.pnl||0);});
     var dayWins=dayTrades.filter(function(t){return t.pnl>0;}).length;
     var dayWinRate=dayTrades.length?Math.round(dayWins/dayTrades.length*100):0;
     var wrStr=dayTrades.length?'('+dayWins+'/'+dayTrades.length+' · '+dayWinRate+'%)':'';
@@ -4017,7 +4017,7 @@ function tvCalNavDay(dir){
 function _renderDayPanel(date, overrideEl){
   var rawTrades=tvTrades.filter(function(t){return t.date===date;});
   var rVal=tvDayR[date];
-  var dayPnl=rawTrades.reduce(function(s,t){return s+t.pnl;},0);
+  var dayPnl=rawTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
   var dayR=rVal?(dayPnl/rVal):null;
   var el=overrideEl||document.getElementById('tvCalDayContent'); if(!el) return;
   var titleEl=overrideEl?null:document.getElementById('tvCalDayTitle');
@@ -4167,7 +4167,7 @@ function _renderDayPanel(date, overrideEl){
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+t.volume+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.entryPrice+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+(t.isOpen?'<span style="color:#f5c518;">OPEN</span>':'$'+t.exitPrice)+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.isOpen?'<span style="color:#f5c518;">—</span>':'+(t.pnl!=null?((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2):''))+'</td>'
+      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+(t.isOpen?'<span style="color:#f5c518;font-size:11px;">OPEN</span>':'+(t.pnl!=null?((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2):''))+'</td>'
       +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>'
       +'</tr>';
   });
@@ -4584,10 +4584,10 @@ function renderTvReports(){
   var el=document.getElementById('tvStatsGrid'); if(!el) return;
   if(!trades.length){el.innerHTML='<div style="padding:20px;font-size:11px;color:var(--muted);">Import trades first</div>';return;}
   var wins=trades.filter(function(t){return t.pnl>0;}),losses=trades.filter(function(t){return t.pnl<0;});
-  var totalPnl=trades.reduce(function(s,t){return s+t.pnl;},0);
+  var totalPnl=trades.reduce(function(s,t){return s+(t.pnl||0);},0);
   var wr=wins.length/trades.length*100;
-  var avgW=wins.length?wins.reduce(function(s,t){return s+t.pnl;},0)/wins.length:0;
-  var avgL=losses.length?losses.reduce(function(s,t){return s+t.pnl;},0)/losses.length:0;
+  var avgW=wins.length?wins.reduce(function(s,t){return s+(t.pnl||0);},0)/wins.length:0;
+  var avgL=losses.length?losses.reduce(function(s,t){return s+(t.pnl||0);},0)/losses.length:0;
   var rR=function(t){var rv=tvDayR[t.date];return t.rMultiple||(rv?t.pnl/rv:null);};
   var rTrades=trades.filter(function(t){return rR(t)!=null;});
   var totalR=rTrades.reduce(function(s,t){return s+rR(t);},0);
@@ -4622,7 +4622,7 @@ function renderTvReports(){
     +soloBox('TRADES',String(trades.length),'var(--text)')
     +soloBox('WINS',String(wins.length),'#26a69a')
     +soloBox('LOSSES',String(losses.length),'#ef5350')
-    +soloBox(isR?'AVG R/TRADE':'AVG DAY P&L',isR?(rTrades.length?(totalR/rTrades.length>=0?'+':'')+((totalR/rTrades.length).toFixed(2))+'R':'—'):(function(){var days=[...new Set(trades.map(function(t){return t.date;}))];var dp=trades.reduce(function(s,t){return s+t.pnl;},0);return fmtPnl(dp/days.length);})(),totalPnl>=0?'#26a69a':'#ef5350');
+    +soloBox(isR?'AVG R/TRADE':'AVG DAY P&L',isR?(rTrades.length?(totalR/rTrades.length>=0?'+':'')+((totalR/rTrades.length).toFixed(2))+'R':'—'):(function(){var days=[...new Set(trades.map(function(t){return t.date;}))];var dp=trades.reduce(function(s,t){return s+(t.pnl||0);},0);return fmtPnl(dp/days.length);})(),totalPnl>=0?'#26a69a':'#ef5350');
 
   // Destroy old charts
   ['tvDailyChart','tvCumChart','tvDowPnlChart','tvDowCountChart','tvWinLossChart','tvHourChart','tvDrawdownChart','tvRRCurveChart'].forEach(function(id){if(tvCharts[id]){tvCharts[id].destroy();delete tvCharts[id];}});
@@ -4632,8 +4632,8 @@ function renderTvReports(){
   // R or $ values per day
   var dayVals=days.map(function(d){
     var dt=trades.filter(function(t){return t.date===d;});
-    if(isR){var rv=tvDayR[d];return rv?dt.reduce(function(s,t){return s+t.pnl;},0)/rv:dt.reduce(function(s,t){return s+(rOf2(t)||0);},0);}
-    return dt.reduce(function(s,t){return s+t.pnl;},0);
+    if(isR){var rv=tvDayR[d];return rv?dt.reduce(function(s,t){return s+(t.pnl||0);},0)/rv:dt.reduce(function(s,t){return s+(rOf2(t)||0);},0);}
+    return dt.reduce(function(s,t){return s+(t.pnl||0);},0);
   });
   var cumVals=dayVals.reduce(function(acc,v,i){acc.push(parseFloat(((acc[i-1]||0)+v).toFixed(3)));return acc;},[]);
 
@@ -4881,10 +4881,10 @@ function renderTvWrr(){
     var p=e[0],pts=e[1];
     var ws=pts.filter(function(t){return t.pnl>0;}),ls=pts.filter(function(t){return t.pnl<0;});
     var wr=pts.length?ws.length/pts.length*100:0;
-    var avgW=ws.length?ws.reduce(function(s,t){return s+t.pnl;},0)/ws.length:0;
-    var avgL=ls.length?ls.reduce(function(s,t){return s+t.pnl;},0)/ls.length:0;
+    var avgW=ws.length?ws.reduce(function(s,t){return s+(t.pnl||0);},0)/ws.length:0;
+    var avgL=ls.length?ls.reduce(function(s,t){return s+(t.pnl||0);},0)/ls.length:0;
     var rr=ls.length&&avgL!==0?Math.abs(avgW/avgL):null;
-    var totalPnl=pts.reduce(function(s,t){return s+t.pnl;},0);
+    var totalPnl=pts.reduce(function(s,t){return s+(t.pnl||0);},0);
     var rT=pts.filter(function(t){return rOf(t)!=null;});
     var totalR=rT.reduce(function(s,t){return s+rOf(t);},0);
     return{period:p,pts:pts,ws:ws,ls:ls,wr:wr,avgW:avgW,avgL:avgL,rr:rr,totalPnl:totalPnl,totalR:totalR,rT:rT};
@@ -4919,8 +4919,8 @@ function renderTvWrr(){
       lgWStr=lgW!=null?('+$'+Math.abs(lgW).toFixed(0)):'—';
       lgLStr=lgL!=null?('-$'+Math.abs(lgL).toFixed(0)):'—';
     }
-    var grossW=r.ws.reduce(function(s,t){return s+t.pnl;},0);
-    var grossL=Math.abs(r.ls.reduce(function(s,t){return s+t.pnl;},0));
+    var grossW=r.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var grossL=Math.abs(r.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
     var pf=grossL>0?(grossW/grossL).toFixed(2):'—';
     var pfC=parseFloat(pf)>=1?'#26a69a':'#ef5350';
     var pnlStr=tvUnit==='R'?(r.rT.length?(r.totalR>=0?'+':'')+r.totalR.toFixed(2)+'R':'—'):(r.totalPnl>=0?'+$':'-$')+Math.abs(r.totalPnl).toFixed(0);
@@ -5018,17 +5018,17 @@ function renderJeppez(){
   function ms(prefix){
     var mt=tvTrades.filter(function(t){return t.date&&t.date.startsWith(prefix);});
     if(!mt.length)return null;
-    var pnl=mt.reduce(function(s,t){return s+t.pnl;},0);
+    var pnl=mt.reduce(function(s,t){return s+(t.pnl||0);},0);
     var ws=mt.filter(function(t){return t.pnl>0;}),ls=mt.filter(function(t){return t.pnl<0;});
     var wr=mt.length?ws.length/mt.length*100:0;
-    var avgW=ws.length?ws.reduce(function(s,t){return s+t.pnl;},0)/ws.length:0;
-    var avgL=ls.length?ls.reduce(function(s,t){return s+t.pnl;},0)/ls.length:0;
+    var avgW=ws.length?ws.reduce(function(s,t){return s+(t.pnl||0);},0)/ws.length:0;
+    var avgL=ls.length?ls.reduce(function(s,t){return s+(t.pnl||0);},0)/ls.length:0;
     var lgW=ws.length?Math.max.apply(null,ws.map(function(t){return t.pnl;})):null;
     var lgL=ls.length?Math.min.apply(null,ls.map(function(t){return t.pnl;})):null;
     var wlRel=(avgW&&avgL&&avgL!==0)?Math.abs(avgW/avgL):null;
     var lgWL=(lgW&&lgL&&lgL!==0)?Math.abs(lgW/lgL):null;
-    var grossW=ws.reduce(function(s,t){return s+t.pnl;},0);
-    var grossL=Math.abs(ls.reduce(function(s,t){return s+t.pnl;},0));
+    var grossW=ws.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var grossL=Math.abs(ls.reduce(function(s,t){return s+(t.pnl||0);},0));
     var pf=grossL>0?grossW/grossL:null;
     var rf=function(t){var rv=tvDayR[t.date];return t.rMultiple||(rv?t.pnl/rv:null);};
     var rT=mt.filter(function(t){return rf(t)!=null;});
@@ -7654,9 +7654,9 @@ function kinfoGetAllDates(fromDate) {
 
 function kinfoDayPnl(date) {
   if (typeof tvTrades === 'undefined') return null;
-  var trades = tvTrades.filter(function(t) { return t.date === date; });
+  var trades = tvTrades.filter(function(t) { return t.date === date && !t.isOpen; });
   if (!trades.length) return null;
-  return trades.reduce(function(s, t) { return s + t.pnl; }, 0);
+  return trades.reduce(function(s, t) { return s + (t.pnl||0); }, 0);
 }
 
 var _kinfoView = 'chart';
@@ -8346,7 +8346,7 @@ function kinfoRender() {
     var trades = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function(t){return t.date===d;});
     var rVal = typeof tvDayR !== 'undefined' ? tvDayR[d] : null;
     if (!rVal || !trades.length) return null;
-    return trades.reduce(function(s,t){return s+t.pnl;},0) / rVal;
+    return trades.reduce(function(s,t){return s+(t.pnl||0);},0) / rVal;
   }
   var totalR = tradedDates.reduce(function(s,d){ var r=dayR(d); return r!==null?s+r:s; }, 0);
   var useR = kinfoUnit === 'R';
@@ -8729,7 +8729,7 @@ function kinfoOpenDay(date) {
   if (!myTrades.length) {
     myBody.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">No trades imported</div>';
   } else {
-    var dayPnl = myTrades.reduce(function(s, t) { return s + t.pnl; }, 0);
+    var dayPnl = myTrades.reduce(function(s, t) { return s + (t.pnl||0); }, 0);
     var wins = myTrades.filter(function(t) { return t.pnl > 0; }).length;
     var pnlC = dayPnl >= 0 ? '#26a69a' : '#ef5350';
     var summary = document.createElement('div');
