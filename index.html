@@ -415,7 +415,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       </div>
     </div>
     <div id="tvRptJeppez" style="display:none;">
-      <div style="font-family:var(--display);font-size:22px;letter-spacing:4px;color:var(--accent);margin-bottom:18px;">JEPPEZ</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
+        <div style="font-family:var(--display);font-size:22px;letter-spacing:4px;color:var(--accent);">JEPPEZ</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;">FILTER:</span>
+          <select id="jepMonthFilter" onchange="renderJeppez()" style="font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;cursor:pointer;">
+            <option value="all">All Months</option>
+            <option value="January">January</option>
+            <option value="February">February</option>
+            <option value="March">March</option>
+            <option value="April">April</option>
+            <option value="May">May</option>
+            <option value="June">June</option>
+            <option value="July">July</option>
+            <option value="August">August</option>
+            <option value="September">September</option>
+            <option value="October">October</option>
+            <option value="November">November</option>
+            <option value="December">December</option>
+          </select>
+        </div>
+      </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;overflow-x:auto;">
         <div style="display:grid;grid-template-columns:110px 80px 80px 90px 80px 70px 70px 70px 90px 80px 90px 80px 80px 80px 90px 80px 90px 90px 90px;gap:0;padding:8px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">
           <span style="font-family:var(--mono);font-size:10px;font-weight:bold;color:var(--muted);letter-spacing:1px;">MONTH</span>
@@ -505,13 +525,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
     <div style="padding:14px 20px;">
       <input type="hidden" id="ttModalId">
       <div style="overflow-x:auto;">
-        <div style="display:grid;grid-template-columns:130px 60px 1fr 56px 56px 56px 28px;gap:1px;margin-bottom:1px;">
+        <div style="display:grid;grid-template-columns:130px 60px 1fr 56px 56px 56px 56px 28px;gap:1px;margin-bottom:1px;">
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);">TICKER</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);text-align:center;">EDGE</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);">NOTES</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);text-align:center;">BT?</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);text-align:center;">VT?</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:4px 8px;background:rgba(0,0,0,0.4);text-align:center;">NT?</div>
+          <div style="font-family:var(--mono);font-size:9px;color:#f5c518;letter-spacing:1px;padding:4px 8px;background:rgba(245,197,24,0.08);text-align:center;">R POT</div>
           <div style="background:rgba(0,0,0,0.4);"></div>
         </div>
         <div id="ttGridRows"></div>
@@ -5083,7 +5104,10 @@ function renderJeppez(){
     }
   }
   var allRows=patchedStatic.concat(liveRows);
-  el.innerHTML=JEPPEZ_MONTHS.map(function(mon){
+  var jepFilter=document.getElementById('jepMonthFilter');
+  var jepFilterVal=jepFilter?jepFilter.value:'all';
+  var filteredMonths=jepFilterVal==='all'?JEPPEZ_MONTHS:[jepFilterVal];
+  el.innerHTML=filteredMonths.map(function(mon){
     var row=allRows.find(function(r){return r.month===mon;});
     if(!row)return '<div style="display:grid;grid-template-columns:'+COLS+';gap:0;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="font-size:12px;color:var(--muted);">'+mon+'</span></div>';
     var isR=(typeof tvUnit!=='undefined'&&tvUnit==='R');
@@ -5119,8 +5143,8 @@ function renderJeppez(){
       +'<span style="font-size:13px;font-weight:bold;color:'+wrC+';text-align:center;">'+(row.wr!=null?row.wr.toFixed(1)+'%':'—')+'</span>'
       +'<span style="font-size:11px;color:'+(wlRel!=null&&wlRel>=1?'#26a69a':'#ef5350')+';text-align:right;">'+(wlRel!=null?wlRel.toFixed(2):'—')+'</span>'
       +'<span style="font-size:11px;color:'+(pf!=null?(pf>=1?'#26a69a':'#ef5350'):'var(--muted)')+';text-align:right;font-weight:bold;">'+(pf!=null?pf.toFixed(2):'—')+'</span>'
-      +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+(row.totalWon!=null?'+$'+row.totalWon.toFixed(0):'—')+'</span>'
-      +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+(row.totalLost!=null?'-$'+row.totalLost.toFixed(0):'—')+'</span>'
+      +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+(row.totalWon!=null?(isR?'+'+(row.totalWon/rpt).toFixed(2)+'R':'+$'+row.totalWon.toFixed(0)):'—')+'</span>'
+      +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+(row.totalLost!=null?(isR?'-'+(row.totalLost/rpt).toFixed(2)+'R':'-$'+row.totalLost.toFixed(0)):'—')+'</span>'
       +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+fmtW(avgW)+'</span>'
       +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+fmtL(avgL)+'</span>'
       +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+fmtW(lgW)+'</span>'
@@ -5527,22 +5551,6 @@ function renderTT(){
     var id=row.getAttribute('data-id');
     row.addEventListener('click',function(){ttEditEntry(id);});
   });
-  // R potential click handler
-  layout.querySelectorAll('.tt-rpot-cell').forEach(function(cell){
-    cell.addEventListener('click',function(ev){
-      ev.stopPropagation();
-      var eid=cell.getAttribute('data-id');
-      var entry=ttEntries.find(function(e){return e.id===eid;});
-      if(!entry) return;
-      var cur=entry.rPotential!=null?entry.rPotential:'';
-      var val=prompt('R potential for '+entry.ticker+' (e.g. 7):',cur);
-      if(val===null) return;
-      var num=parseFloat(val);
-      entry.rPotential=isNaN(num)?null:num;
-      ttSaveLS();
-      ttRender();
-    });
-  });
 }
 </script>
 <script>
@@ -5550,8 +5558,8 @@ function renderTT(){
 var ttGridData=[];
 
 function ttMakeRow(data,idx){
-  var d=data||{ticker:'',edge:'',notes:'',bt:null,vt:null,nt:null};
-  var html='<div class="tt-grid-row" data-idx="'+idx+'" style="display:grid;grid-template-columns:130px 60px 1fr 56px 56px 56px 28px;gap:1px;margin-bottom:1px;">';
+  var d=data||{ticker:'',edge:'',notes:'',bt:null,vt:null,nt:null,rPotential:null};
+  var html='<div class="tt-grid-row" data-idx="'+idx+'" style="display:grid;grid-template-columns:130px 60px 1fr 56px 56px 56px 56px 28px;gap:1px;margin-bottom:1px;">';
   html+='<input class="tt-cell" data-field="ticker" value="'+((d.ticker||'').replace(/"/g,'&quot;'))+'" placeholder="AAOI" style="font-family:var(--display);font-size:11px;text-transform:uppercase;padding:5px 7px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--text);outline:none;width:100%;box-sizing:border-box;" oninput="ttCellChanged(this,'+idx+')" onkeydown="ttCellKey(event,'+idx+',0)">';
   html+='<input class="tt-cell" data-field="edge" type="number" min="0" max="100" value="'+(d.edge!=null?d.edge:'')+'" placeholder="55" style="font-family:var(--display);font-size:13px;font-weight:bold;text-align:center;padding:5px 4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--accent);outline:none;width:100%;box-sizing:border-box;" oninput="ttCellChanged(this,'+idx+')" onkeydown="ttCellKey(event,'+idx+',1)">';
   html+='<input class="tt-cell" data-field="notes" value="'+((d.notes||'').replace(/"/g,'&quot;'))+'" placeholder="notes..." style="font-family:var(--mono);font-size:10px;padding:5px 7px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--muted);outline:none;width:100%;box-sizing:border-box;" oninput="ttCellChanged(this,'+idx+')" onkeydown="ttCellKey(event,'+idx+',2)">';
@@ -5583,6 +5591,7 @@ function ttMakeRow(data,idx){
     +'</div>';
   html+='<select class="tt-cell" data-field="vt" style="font-family:var(--mono);font-size:10px;text-align:center;padding:4px 2px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:'+(d.vt==='yes'?'#26a69a':d.vt==='no'?'#555':'var(--muted)')+';outline:none;width:100%;box-sizing:border-box;cursor:pointer;" onchange="ttSelectChanged(this,'+idx+')" onkeydown="ttCellKey(event,'+idx+',4)"><option value="">—</option><option value="yes"'+(d.vt==='yes'?' selected':'')+'>yes</option><option value="no"'+(d.vt==='no'?' selected':'')+'>no</option></select>';
   html+='<select class="tt-cell" data-field="nt" style="font-family:var(--mono);font-size:10px;text-align:center;padding:4px 2px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:'+(d.nt==='yes'?'#26a69a':d.nt==='no'?'#555':'var(--muted)')+';outline:none;width:100%;box-sizing:border-box;cursor:pointer;" onchange="ttSelectChanged(this,'+idx+')" onkeydown="ttCellKey(event,'+idx+',5)"><option value="">—</option><option value="yes"'+(d.nt==='yes'?' selected':'')+'>yes</option><option value="no"'+(d.nt==='no'?' selected':'')+'>no</option></select>';
+  html+='<input class="tt-cell" data-field="rPotential" type="number" min="0" step="0.5" value="'+(d.rPotential!=null?d.rPotential:'')+'" placeholder="R" title="R potential" style="font-family:var(--mono);font-size:10px;text-align:center;padding:4px 2px;background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.2);color:#f5c518;outline:none;width:100%;box-sizing:border-box;" oninput="ttRPotChanged(this,'+idx+')">';
   html+='<button onclick="ttRemoveRow('+idx+')" style="background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:0;text-align:center;width:100%;" title="Remove row">✕</button>';
   html+='</div>';
   return html;
@@ -5590,9 +5599,13 @@ function ttMakeRow(data,idx){
 
 function ttCellChanged(el,idx){
   var field=el.getAttribute('data-field');
-  if(!ttGridData[idx]) ttGridData[idx]={ticker:'',edge:null,notes:'',bt:null,vt:null,nt:null};
+  if(!ttGridData[idx]) ttGridData[idx]={ticker:'',edge:null,notes:'',bt:null,vt:null,nt:null,rPotential:null};
   if(field==='edge'){ttGridData[idx].edge=el.value!==''?parseInt(el.value):null;var pair=ttEdgeColorBg(ttGridData[idx].edge);el.style.color=pair[0];}
   else{ttGridData[idx][field]=el.value;if(field==='ticker') el.value=el.value.toUpperCase();}
+}
+function ttRPotChanged(el,idx){
+  if(!ttGridData[idx]) ttGridData[idx]={ticker:'',edge:null,notes:'',bt:null,vt:null,nt:null,rPotential:null};
+  ttGridData[idx].rPotential=el.value!==''?parseFloat(el.value):null;
 }
 function ttBtChanged(el,idx){
   var val=el.value;
@@ -5685,7 +5698,7 @@ function ttAddEntry(date){
 }
 function ttEditEntry(id){
   var e=ttEntries.find(function(x){return x.id===id;});if(!e) return;
-  ttEditId=id; ttGridData=[{ticker:e.ticker,edge:e.edge,notes:e.notes||'',bt:e.bt,vt:e.vt,nt:e.nt}];
+  ttEditId=id; ttGridData=[{ticker:e.ticker,edge:e.edge,notes:e.notes||'',bt:e.bt,vt:e.vt,nt:e.nt,rPotential:e.rPotential!=null?e.rPotential:null}];
   document.getElementById('ttModalId').value=id;
   document.getElementById('ttModalTitle').textContent='EDIT';
   document.getElementById('ttModalDate').value=e.date;
@@ -5716,6 +5729,7 @@ function ttSave(){try{
       }
       else if(f==='vt') r.vt=el.value||null;
       else if(f==='nt') r.nt=el.value||null;
+      else if(f==='rPotential') r.rPotential=el.value!==''?parseFloat(el.value):null;
     });
     domRows.push(r);
   });
@@ -5727,7 +5741,7 @@ function ttSave(){try{
   if(ttEditId){
     var r=validRows[0];
     var idx=ttEntries.findIndex(function(e){return e.id===ttEditId;});
-    var entry={id:ttEditId,date:date,ticker:r.ticker.trim().toUpperCase(),edge:r.edge,bt:r.bt,vt:r.vt,nt:r.nt,notes:(r.notes||'').trim()};
+    var entry={id:ttEditId,date:date,ticker:r.ticker.trim().toUpperCase(),edge:r.edge,bt:r.bt,vt:r.vt,nt:r.nt,notes:(r.notes||'').trim(),rPotential:r.rPotential!=null?r.rPotential:null};
     if(idx>=0) ttEntries[idx]=entry; else ttEntries.push(entry);
   } else {
     validRows.forEach(function(r,ri){
@@ -5736,7 +5750,8 @@ function ttSave(){try{
         date:date,
         ticker:r.ticker.trim().toUpperCase(),
         edge:r.edge,bt:r.bt,vt:r.vt,nt:r.nt,
-        notes:(r.notes||'').trim()
+        notes:(r.notes||'').trim(),
+        rPotential:r.rPotential!=null?r.rPotential:null
       });
     });
   }
