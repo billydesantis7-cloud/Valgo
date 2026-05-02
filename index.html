@@ -4943,8 +4943,18 @@ function renderTvWrr(){
     var grossL=Math.abs(r.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
     var pf=grossL>0?(grossW/grossL).toFixed(2):'—';
     var pfC=parseFloat(pf)>=1?'#26a69a':'#ef5350';
-    var grossWStr=tvUnit==='R'?(r.totalR>0?'+'+r.totalR.toFixed(2)+'R':'—'):'+$'+grossW.toFixed(0);
-    var grossLStr=tvUnit==='R'?'—':'-$'+grossL.toFixed(0);
+    var grossWStr,grossLStr;
+    if(tvUnit==='R'){
+      var wRsAll=r.ws.map(function(t){return rOf(t);}).filter(function(v){return v!=null;});
+      var lRsAll=r.ls.map(function(t){return rOf(t);}).filter(function(v){return v!=null;});
+      var totalWonR=wRsAll.reduce(function(s,v){return s+v;},0);
+      var totalLostR=lRsAll.reduce(function(s,v){return s+v;},0);
+      grossWStr=wRsAll.length?'+'+totalWonR.toFixed(2)+'R':'—';
+      grossLStr=lRsAll.length?totalLostR.toFixed(2)+'R':'—';
+    } else {
+      grossWStr='+$'+grossW.toFixed(0);
+      grossLStr='-$'+grossL.toFixed(0);
+    }
     var pnlStr=tvUnit==='R'?(r.rT.length?(r.totalR>=0?'+':'')+r.totalR.toFixed(2)+'R':'—'):(r.totalPnl>=0?'+$':'-$')+Math.abs(r.totalPnl).toFixed(0);
     var pnlC=r.totalPnl>=0?'#26a69a':'#ef5350';
     // New column order: PERIOD T W L AVG WIN AVG LOSS P&L PROFIT FACTOR WIN RATE RR LG WIN LG LOSS LG W/LG L
