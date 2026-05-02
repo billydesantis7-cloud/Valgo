@@ -404,6 +404,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;overflow-x:auto;">
         <div id="tvWrrTableHdr" style="display:grid;grid-template-columns:160px 64px 56px 56px 88px 88px 90px 110px 80px 72px 84px 84px 80px;gap:0;padding:8px 16px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border);"></div>
         <div id="tvWrrTable"></div>
+        <!-- Period drill-down panel -->
+        <div id="tvWrrDrillPanel" style="display:none;margin-top:12px;border:1px solid var(--accent);border-radius:8px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(0,230,118,0.07);border-bottom:1px solid var(--border);">
+            <span id="tvWrrDrillTitle" style="font-family:var(--display);font-size:13px;letter-spacing:2px;color:var(--accent);"></span>
+            <button onclick="tvWrrCloseDrill()" style="font-family:var(--mono);font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+            <div style="border-right:1px solid var(--border);">
+              <div style="padding:8px 16px;background:rgba(38,166,154,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#26a69a;letter-spacing:2px;">✓ WINS</div>
+              <div id="tvWrrDrillWins" style="padding:12px;display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+            <div>
+              <div style="padding:8px 16px;background:rgba(239,83,80,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#ef5350;letter-spacing:2px;">✗ LOSSES</div>
+              <div id="tvWrrDrillLosses" style="padding:12px;display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- RR scatter chart below table -->
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:14px;">
@@ -4890,6 +4907,43 @@ function tvRptSubTab(tab){
 var tvWrrMode='weekly',tvWrrSortField='period',tvWrrSortDir=-1;
 function tvWrrPeriod(mode){tvWrrMode=mode;document.getElementById('tvWrrWeekly').style.background=mode==='weekly'?'var(--accent)':'transparent';document.getElementById('tvWrrWeekly').style.color=mode==='weekly'?'var(--bg)':'var(--muted)';document.getElementById('tvWrrMonthly').style.background=mode==='monthly'?'var(--accent)':'transparent';document.getElementById('tvWrrMonthly').style.color=mode==='monthly'?'var(--bg)':'var(--muted)';renderTvWrr();}
 function tvWrrSort(field){if(tvWrrSortField===field)tvWrrSortDir*=-1;else{tvWrrSortField=field;tvWrrSortDir=-1;}renderTvWrr();}
+function tvWrrCloseDrill(){var p=document.getElementById('tvWrrDrillPanel');if(p)p.style.display='none';}
+function tvWrrDrill(period){
+  var trades=tvGetFilteredTrades();
+  var pk=function(date){if(tvWrrMode==='monthly')return date.slice(0,7);var d=new Date(date+'T12:00:00'),day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);mon.setDate(d.getDate()+diff);var sun=new Date(mon);sun.setDate(mon.getDate()+6);return mon.toISOString().slice(0,10)+' - '+sun.toISOString().slice(0,10);};
+  var pts=trades.filter(function(t){return pk(t.date)===period;});
+  var ws=pts.filter(function(t){return t.pnl>0;});
+  var ls=pts.filter(function(t){return t.pnl<0;});
+  function tradeCard(t,isWin){
+    var imgKey=t.date+'_'+t.symbol+'_'+(t.side||'');
+    var img=(typeof tvTradeImages!=='undefined'&&tvTradeImages[imgKey])||myTradeImages[imgKey]||null;
+    var pnlStr=(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0);
+    var pnlC=isWin?'#26a69a':'#ef5350';
+    var html='<div style="background:var(--surface);border:1px solid '+(isWin?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)')+';border-radius:6px;overflow:hidden;">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);">';
+    html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>';
+    html+='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>';
+    html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:'+pnlC+';">'+pnlStr+'</span>';
+    html+='</div>';
+    if(img){
+      html+='<img src="'+img+'" style="width:100%;max-height:200px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;" onclick="expandMyImg(\''+img+'\')">';
+    } else {
+      html+='<div style="height:60px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--muted);">NO CHART</div>';
+    }
+    html+='</div>';
+    return html;
+  }
+  var winsEl=document.getElementById('tvWrrDrillWins');
+  var lossesEl=document.getElementById('tvWrrDrillLosses');
+  var titleEl=document.getElementById('tvWrrDrillTitle');
+  var panel=document.getElementById('tvWrrDrillPanel');
+  if(!winsEl||!lossesEl||!panel) return;
+  titleEl.textContent=period+' — '+ws.length+' WINS / '+ls.length+' LOSSES';
+  winsEl.innerHTML=ws.length?ws.map(function(t){return tradeCard(t,true);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No wins this period.</div>';
+  lossesEl.innerHTML=ls.length?ls.map(function(t){return tradeCard(t,false);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No losses this period.</div>';
+  panel.style.display='block';
+  setTimeout(function(){panel.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
+}
 function renderTvWrr(){
   var el=document.getElementById('tvWrrTable'); if(!el) return;
   var trades=tvGetFilteredTrades();
@@ -4958,8 +5012,9 @@ function renderTvWrr(){
     var pnlStr=tvUnit==='R'?(r.rT.length?(r.totalR>=0?'+':'')+r.totalR.toFixed(2)+'R':'—'):(r.totalPnl>=0?'+$':'-$')+Math.abs(r.totalPnl).toFixed(0);
     var pnlC=r.totalPnl>=0?'#26a69a':'#ef5350';
     // New column order: PERIOD T W L AVG WIN AVG LOSS P&L PROFIT FACTOR WIN RATE RR LG WIN LG LOSS LG W/LG L
-    return '<div style="display:grid;grid-template-columns:'+COLS+';align-items:center;gap:0;padding:10px 16px;border-bottom:1px solid var(--border);">'
-      +'<span style="font-size:12px;font-weight:bold;color:var(--text);">'+r.period+'</span>'
+    var safeP=r.period.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div onclick="tvWrrDrill(\''+safeP+'\')" style="display:grid;grid-template-columns:'+COLS+';align-items:center;gap:0;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'rgba(0,230,118,0.05)\'" onmouseout="this.style.background=\'\'">'
+      +'<span style="font-size:12px;font-weight:bold;color:var(--accent);text-decoration:underline;text-decoration-color:rgba(0,230,118,0.3);">'+r.period+'</span>'
       +'<span style="font-size:13px;color:var(--text);text-align:center;">'+r.pts.length+'</span>'
       +'<span style="font-size:13px;color:#26a69a;text-align:center;font-weight:bold;">'+r.ws.length+'</span>'
       +'<span style="font-size:13px;color:#ef5350;text-align:center;font-weight:bold;">'+r.ls.length+'</span>'
