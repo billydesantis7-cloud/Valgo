@@ -8333,8 +8333,8 @@ function kinfoRenderGrades() {
     var allTvTrades = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function(t){ return t.date && t.symbol; });
     // Build grade key for tvTrades entries
     function tvTradeKey(t) { return t.date+'_'+t.symbol+'_'+(t.side||''); }
-    var gradedTrades = trades.filter(function(t){ var g=allGrades[t.key]||{}; return g.disc!=null||g.exec!=null; });
-    var ungraded = trades.length - gradedTrades.length;
+    var gradedTrades = allTvTrades.map(function(t){ var key=t.date+"_"+t.symbol+"_"+(t.side||""); var g=allGrades[key]||{}; return Object.assign({},t,{key:key,g:g}); }).filter(function(x){ return x.g.disc!=null||x.g.exec!=null; });
+    var ungraded = allTvTrades.length - gradedTrades.length;
 
     // Helper: bar fill element
     function fillBar(pct, col) {
