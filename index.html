@@ -8327,56 +8327,250 @@ function kinfoRenderGrades() {
   }
 
   if (_tab === 'stats') {
-    // ── STATS VIEW ──
-    var gradedTrades = trades.filter(function(t){ var g=grades[t.key]||{}; return g.disc!=null||g.exec!=null; });
+    // ── STATS VIEW — CLEAN COACH REDESIGN ──
+    var allGrades = kinfoLoadGrades();
+    // Use ALL tvTrades for monthly comparison, not just filtered
+    var allTvTrades = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function(t){ return t.date && t.symbol; });
+    // Build grade key for tvTrades entries
+    function tvTradeKey(t) { return t.date+'_'+t.symbol+'_'+(t.side||''); }
+    var gradedTrades = trades.filter(function(t){ var g=allGrades[t.key]||{}; return g.disc!=null||g.exec!=null; });
+    var ungraded = trades.length - gradedTrades.length;
 
-    function statBlock(title, color, field) {
-      var relevant = gradedTrades.filter(function(t){ return (grades[t.key]||{})[field] != null; });
+    // Helper: bar fill element
+    function fillBar(pct, col) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;margin-top:4px;';
+      var fill = document.createElement('div');
+      fill.style.cssText = 'height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:3px;transition:width 0.3s;';
+      wrap.appendChild(fill);
+      return wrap;
+    }
+
+    // ── SECTION 1: KEY INSIGHT CARDS ──
+    var insightDiv = document.createElement('div');
+    insightDiv.style.cssText = 'margin-bottom:20px;';
+    insightDiv.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">⚡ KEY INSIGHTS — WHAT THE DATA IS TELLING YOU</div>';
+
+    function getInsightStats(field, tradeSet) {
+      var relevant = tradeSet.filter(function(t){ return (allGrades[t.key]||{})[field]!=null; });
+      var losses = relevant.filter(function(t){ return t.pnl<=0; });
+      var wins = relevant.filter(function(t){ return t.pnl>0; });
+      var lossZero = losses.filter(function(t){ return (allGrades[t.key]||{})[field]===0; });
+      var allZero = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===0; });
+      return {
+        relevant: relevant.length,
+        lossZeroPct: losses.length ? Math.round(lossZero.length/losses.length*100) : 0,
+        lossZeroCount: lossZero.length,
+        lossCount: losses.length,
+        allZeroPct: relevant.length ? Math.round(allZero.length/relevant.length*100) : 0,
+        allZeroCount: allZero.length,
+        winCount: wins.length,
+        winZero: wins.filter(function(t){ return (allGrades[t.key]||{})[field]===0; }).length
+      };
+    }
+
+    var discI = getInsightStats('disc', gradedTrades);
+    var execI = getInsightStats('exec', gradedTrades);
+
+    var insightGrid = document.createElement('div');
+    insightGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;';
+
+    function insightCard(label, color, mainPct, mainLabel, sub1, sub2, warning) {
+      var c = document.createElement('div');
+      var borderCol = mainPct >= 50 ? '#ef5350' : mainPct >= 25 ? '#ff9800' : '#26a69a';
+      c.style.cssText = 'background:var(--surface);border:1px solid '+borderCol+'44;border-left:3px solid '+borderCol+';border-radius:8px;padding:14px;';
+      c.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:'+color+';letter-spacing:1px;margin-bottom:8px;">'+label+'</div>'
+        +'<div style="font-family:var(--display);font-size:32px;font-weight:bold;color:'+borderCol+';">'+mainPct+'%</div>'
+        +'<div style="font-family:var(--mono);font-size:10px;color:var(--text);margin-bottom:2px;">'+mainLabel+'</div>';
+      c.appendChild(fillBar(mainPct, borderCol));
+      c.innerHTML += '<div style="height:8px;"></div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sub1+'</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sub2+'</div>';
+      if (warning) {
+        c.innerHTML += '<div style="margin-top:8px;font-family:var(--mono);font-size:9px;color:'+borderCol+';background:'+borderCol+'15;padding:4px 8px;border-radius:4px;">'+warning+'</div>';
+      }
+      return c;
+    }
+
+    insightGrid.appendChild(insightCard(
+      'DISCRETION SELECTION', '#f5c518',
+      discI.lossZeroPct,
+      'of losses had score 0',
+      discI.lossZeroCount+' / '+discI.lossCount+' losses were graded 0',
+      discI.winZero+' / '+discI.winCount+' wins were graded 0',
+      discI.lossZeroPct >= 40 ? '⚠ Bad selections are costing you money' : discI.lossZeroPct <= 15 ? '✓ Solid selection on most losses' : null
+    ));
+    insightGrid.appendChild(insightCard(
+      'SYSTEM / ALGO EXECUTION', '#90caf9',
+      execI.lossZeroPct,
+      'of losses had score 0',
+      execI.lossZeroCount+' / '+execI.lossCount+' losses were graded 0',
+      execI.winZero+' / '+execI.winCount+' wins were graded 0',
+      execI.lossZeroPct >= 40 ? '⚠ Poor execution is hurting your P&L' : execI.lossZeroPct <= 15 ? '✓ Execution is mostly clean' : null
+    ));
+    insightDiv.appendChild(insightGrid);
+
+    var notice = document.createElement('div');
+    notice.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:4px;';
+    notice.textContent = gradedTrades.length+' graded · '+ungraded+' ungraded · '+trades.length+' total in view';
+    insightDiv.appendChild(notice);
+    el.appendChild(insightDiv);
+
+    // ── SECTION 2: BREAKDOWN PANELS ──
+    function buildBreakdown(title, color, field) {
+      var relevant = gradedTrades.filter(function(t){ return (allGrades[t.key]||{})[field]!=null; });
       var wins = relevant.filter(function(t){ return t.pnl>0; });
       var losses = relevant.filter(function(t){ return t.pnl<=0; });
 
       var wrap = document.createElement('div');
-      wrap.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;';
-      wrap.innerHTML = '<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';margin-bottom:12px;">'+title+'</div>';
+      wrap.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
+      wrap.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+        +'<div style="width:3px;height:18px;background:'+color+';border-radius:2px;"></div>'
+        +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';">'+title+'</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">'+relevant.length+' graded</div>'
+        +'</div>';
 
-      function pct(arr, v) { var sub=arr.filter(function(t){return (grades[t.key]||{})[field]===v;}); return arr.length?Math.round(sub.length/arr.length*100):0; }
-      function avgR(arr) { var rs=arr.filter(function(t){return t.r!=null;}).map(function(t){return t.r;}); return rs.length?rs.reduce(function(a,b){return a+b;},0)/rs.length:null; }
+      // Score distribution table: rows = score value, cols = all/wins/losses
+      var tableDiv = document.createElement('div');
+      tableDiv.style.cssText = 'display:grid;grid-template-columns:40px 1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
 
-      [
-        {label:'WINS', trades:wins, color:'var(--bull)'},
-        {label:'LOSSES', trades:losses, color:'var(--bear)'}
-      ].forEach(function(grp) {
-        if (!grp.trades.length) return;
-        var sec = document.createElement('div');
-        sec.style.cssText = 'margin-bottom:12px;';
-        sec.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:'+grp.color+';letter-spacing:1px;margin-bottom:6px;">'+grp.label+' ('+grp.trades.length+')</div>';
-        var row = document.createElement('div');
-        row.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
-        [{v:0,label:'0',col:'#ef5350'},{v:0.5,label:'0.5',col:'#9e9e9e'},{v:1,label:'1',col:'#4caf50'}].forEach(function(gv) {
-          var sub = grp.trades.filter(function(t){return (grades[t.key]||{})[field]===gv.v;});
-          var p = grp.trades.length ? Math.round(sub.length/grp.trades.length*100) : 0;
-          var ar = avgR(sub);
-          var card = document.createElement('div');
-          card.style.cssText = 'background:'+gv.col+'14;border:1px solid '+gv.col+'33;border-radius:6px;padding:8px;text-align:center;';
-          card.innerHTML = '<div style="font-size:14px;font-weight:bold;color:'+gv.col+';">'+gv.label+'</div>'
-            +'<div style="font-family:var(--mono);font-size:18px;font-weight:bold;color:var(--text);">'+p+'%</div>'
-            +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sub.length+' trades</div>'
-            +(ar!=null?'<div style="font-family:var(--mono);font-size:9px;color:'+(ar>0?'var(--bull)':'var(--bear)')+';">avg '+(ar>0?'+':'')+ar.toFixed(2)+'R</div>':'');
-          row.appendChild(card);
-        });
-        sec.appendChild(row);
-        wrap.appendChild(sec);
+      // Header row
+      ['SCORE','ALL TRADES','WINS ONLY','LOSSES ONLY'].forEach(function(h, hi) {
+        var hcell = document.createElement('div');
+        hcell.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:6px 10px;background:rgba(0,0,0,0.3);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hcell.textContent = h;
+        tableDiv.appendChild(hcell);
       });
+
+      [{v:0,col:'#ef5350'},{v:0.5,col:'#ff9800'},{v:1,col:'#4caf50'}].forEach(function(gv) {
+        var subAll = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
+        var subWin = wins.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
+        var subLos = losses.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
+        var pAll = relevant.length ? Math.round(subAll.length/relevant.length*100) : 0;
+        var pWin = wins.length ? Math.round(subWin.length/wins.length*100) : 0;
+        var pLos = losses.length ? Math.round(subLos.length/losses.length*100) : 0;
+
+        var scoreCell = document.createElement('div');
+        scoreCell.style.cssText = 'font-family:var(--mono);font-size:13px;font-weight:bold;color:'+gv.col+';padding:10px;background:'+gv.col+'0d;border-top:1px solid var(--border);text-align:center;';
+        scoreCell.textContent = gv.v===0.5?'.5':gv.v.toString();
+        tableDiv.appendChild(scoreCell);
+
+        [[subAll,pAll,relevant.length],[subWin,pWin,wins.length],[subLos,pLos,losses.length]].forEach(function(trio, ci) {
+          var cell = document.createElement('div');
+          cell.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+gv.col+'08;';
+          var pctEl = document.createElement('div');
+          pctEl.style.cssText = 'font-family:var(--display);font-size:18px;font-weight:bold;color:'+(trio[2]>0?gv.col:'var(--muted)')+';';
+          pctEl.textContent = trio[2]>0 ? trio[1]+'%' : '—';
+          var countEl = document.createElement('div');
+          countEl.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);';
+          countEl.textContent = trio[2]>0 ? trio[0].length+' of '+trio[2] : '';
+          cell.appendChild(pctEl);
+          cell.appendChild(countEl);
+          cell.appendChild(fillBar(trio[1], gv.col));
+          tableDiv.appendChild(cell);
+        });
+      });
+      wrap.appendChild(tableDiv);
       return wrap;
     }
 
-    var ungraded = trades.length - gradedTrades.length;
-    var notice = document.createElement('div');
-    notice.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px;';
-    notice.textContent = gradedTrades.length+' graded trades · '+ungraded+' ungraded';
-    el.appendChild(notice);
-    el.appendChild(statBlock('DISCRETION SELECTION', '#f5c518', 'disc'));
-    el.appendChild(statBlock('SYSTEM / ALGO EXECUTION', '#90caf9', 'exec'));
+    el.appendChild(buildBreakdown('DISCRETION SELECTION', '#f5c518', 'disc'));
+    el.appendChild(buildBreakdown('SYSTEM / ALGO EXECUTION', '#90caf9', 'exec'));
+
+    // ── SECTION 3: MONTHLY COMPARISON ──
+    var monthDiv = document.createElement('div');
+    monthDiv.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
+    monthDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+      +'<div style="width:3px;height:18px;background:#c8a96e;border-radius:2px;"></div>'
+      +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#c8a96e;">MONTH-OVER-MONTH COMPARISON</div>'
+      +'</div>';
+
+    // Group ALL tvTrades by month, with grades
+    var monthGroups = {};
+    allTvTrades.forEach(function(t) {
+      if (!t.date) return;
+      var mk = t.date.slice(0,7); // YYYY-MM
+      var key = tvTradeKey(t);
+      var g = allGrades[key] || {};
+      if (g.disc == null && g.exec == null) return; // only graded
+      if (!monthGroups[mk]) monthGroups[mk] = [];
+      monthGroups[mk].push({t:t, g:g, key:key});
+    });
+
+    var months = Object.keys(monthGroups).sort();
+    if (!months.length) {
+      monthDiv.innerHTML += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;">No graded trades found across months yet.</div>';
+    } else {
+      // Table: rows = month, cols = total / disc0 / disc0% / exec0 / exec0%
+      var mTable = document.createElement('div');
+      mTable.style.cssText = 'overflow-x:auto;';
+      var mGrid = document.createElement('div');
+      mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(2, 1fr) repeat(2, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:420px;';
+
+      // Header
+      var mHdrs = ['MONTH','DISC = 0','% OF TRADES','EXEC = 0','% OF TRADES'];
+      var mHdrColors = ['var(--muted)','#f5c518','#f5c518','#90caf9','#90caf9'];
+      mHdrs.forEach(function(h, hi) {
+        var hc = document.createElement('div');
+        hc.style.cssText = 'font-family:var(--mono);font-size:8px;color:'+mHdrColors[hi]+';letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hc.textContent = h;
+        mGrid.appendChild(hc);
+      });
+
+      // Sub-header: total graded
+      var subHdrs = ['', 'count', 'of graded', 'count', 'of graded'];
+      subHdrs.forEach(function(h, hi) {
+        var hc = document.createElement('div');
+        hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hc.textContent = h;
+        mGrid.appendChild(hc);
+      });
+
+      months.forEach(function(mk, mi) {
+        var mTrades = monthGroups[mk];
+        var total = mTrades.length;
+        var disc0 = mTrades.filter(function(x){ return x.g.disc===0; }).length;
+        var exec0 = mTrades.filter(function(x){ return x.g.exec===0; }).length;
+        var disc0Pct = total ? Math.round(disc0/total*100) : 0;
+        var exec0Pct = total ? Math.round(exec0/total*100) : 0;
+        var monthLabel = new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
+        var isEven = mi%2===0;
+        var rowBg = isEven ? 'rgba(255,255,255,0.02)' : 'transparent';
+
+        function mCell(txt, col, bg, isFirst) {
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:10px;border-top:1px solid var(--border);background:'+bg+';'+(isFirst?'':'border-left:1px solid var(--border);');
+          c.innerHTML = '<div style="font-family:var(--mono);font-size:'+(isFirst?'9px':'14px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+col+';">'+txt+'</div>';
+          return c;
+        }
+        function mCellWithBar(count, pct, col, total) {
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+col+';">'+count+'</div>'
+            +'<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">of '+total+' graded</div>';
+          c.appendChild(fillBar(pct, col));
+          return c;
+        }
+        function mCellPct(pct, col) {
+          var pctCol = pct >= 40 ? '#ef5350' : pct >= 20 ? '#ff9800' : '#4caf50';
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+pctCol+';">'+pct+'%</div>';
+          c.appendChild(fillBar(pct, pctCol));
+          return c;
+        }
+
+        mGrid.appendChild(mCell(monthLabel, 'var(--text)', rowBg, true));
+        mGrid.appendChild(mCellWithBar(disc0, disc0Pct, '#f5c518', total));
+        mGrid.appendChild(mCellPct(disc0Pct, '#f5c518'));
+        mGrid.appendChild(mCellWithBar(exec0, exec0Pct, '#90caf9', total));
+        mGrid.appendChild(mCellPct(exec0Pct, '#90caf9'));
+      });
+      mTable.appendChild(mGrid);
+      monthDiv.appendChild(mTable);
+    }
+
+    el.appendChild(monthDiv);
     return;
   }
 
