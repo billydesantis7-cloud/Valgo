@@ -1085,7 +1085,12 @@ function resolveDiscordImg(url){
     }
     return null;
   }
-  return discordImageCache[_discordKey(url)]||url;
+  var key = _discordKey(url);
+  if(discordImageCache[key]) return discordImageCache[key];
+  // Construct Supabase Storage URL directly - images were uploaded there permanently
+  // This works after page reload without a DB round-trip, avoids expired Discord URLs
+  var fname2 = key.replace(/[^a-zA-Z0-9_\-\.]/g,'_') + '.webp';
+  return 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname2;
 }
 var execView = 'grid', execDateFrom = '', execDateTo = '', execDateMode = '';
 var _execCalOffset = 0; // month offset for calendar nav (0 = current month)
