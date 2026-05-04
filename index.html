@@ -992,6 +992,9 @@ function _discordKey(url){ if(!url)return url; try{return url.split('?')[0];}cat
 
 function getDiscordImage(url, cb){
   if(!url) return cb&&cb(null);
+  // Already a Supabase URL — return directly
+  if(url.indexOf('supabase.co') >= 0) return cb&&cb(url);
+  if(!url) return cb&&cb(null);
   // Convert localhost bridge URLs to Supabase Storage URLs
   if(url.indexOf('localhost:7842/img/')>=0){
     var fname = url.split('/img/')[1];
@@ -1077,19 +1080,17 @@ function cacheAllDiscordImages(){
 
 function resolveDiscordImg(url){
   if(!url) return null;
-  // Convert localhost bridge URLs to Supabase Storage URLs
-  if(url.indexOf('localhost:7842/img/')>=0){
+  // Already a Supabase URL — return directly, no processing needed
+  if(url.indexOf('supabase.co') >= 0) return url;
+  // localhost bridge → Supabase
+  if(url.indexOf('localhost:7842/img/') >= 0){
     var fname = url.split('/img/')[1];
-    if(fname){
-      var sbUrl = 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname;
-      return sbUrl;
-    }
+    if(fname) return 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname;
     return null;
   }
+  // Real Discord URL — check in-memory cache, then construct Supabase path
   var key = _discordKey(url);
   if(discordImageCache[key]) return discordImageCache[key];
-  // Construct Supabase Storage URL directly - images were uploaded there permanently
-  // This works after page reload without a DB round-trip, avoids expired Discord URLs
   var fname2 = key.replace(/[^a-zA-Z0-9_\-\.]/g,'_') + '.webp';
   return 'https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/public/Valgo-images/discordImageCache/' + fname2;
 }
