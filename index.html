@@ -1677,9 +1677,43 @@ setInterval(updateClock,1000);updateClock();
 
 // ── Bridge (disabled — using Supabase cloud) ──────────────
 function connectToBridge(){
-  // Bridge is not used in cloud mode — data comes from Supabase
-  var dot=document.getElementById('statusDot');if(dot)dot.className='status-dot connected';
-  var txt=document.getElementById('statusText');if(txt)txt.textContent='CLOUD \u2014 SUPABASE CONNECTED';
+  var dot=document.getElementById('statusDot');
+  var txt=document.getElementById('statusText');
+
+  function setStatus(state){
+    if(state==='bridge'){ if(dot)dot.className='status-dot connected'; if(txt)txt.textContent='LIVE — BRIDGE + CLOUD'; }
+    else if(state==='cloud'){ if(dot)dot.className='status-dot connected'; if(txt)txt.textContent='CLOUD — SUPABASE CONNECTED'; }
+    else { if(dot)dot.className='status-dot'; if(txt)txt.textContent='CLOUD — BRIDGE OFFLINE'; }
+  }
+
+  var _bridgeOk = false;
+
+  function pollBridge(){
+    fetch('http://localhost:7842/executions',{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+      .then(function(fresh){
+        if(!_bridgeOk){ _bridgeOk=true; setStatus('bridge'); }
+        if(!fresh||!fresh.length) return;
+        var changed = false;
+        fresh.forEach(function(e){
+          var exists = executions.some(function(x){ return x.id===e.id; });
+          if(!exists){ executions.unshift(e); changed=true; }
+        });
+        if(changed){
+          localStorage.setItem('executions_cache', JSON.stringify(executions));
+          sbSave('executions_cache', JSON.stringify(executions));
+          if(execView!=='ai') renderExecutions();
+          setTimeout(cacheAllDiscordImages, 500);
+        }
+      })
+      .catch(function(){
+        if(_bridgeOk){ _bridgeOk=false; setStatus('cloud'); }
+      });
+  }
+
+  pollBridge();
+  setInterval(pollBridge, 5000);
+  setStatus('cloud');
 }
 
 // ── Init ──────────────────────────────────────────────────
