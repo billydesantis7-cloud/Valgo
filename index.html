@@ -7441,7 +7441,7 @@ function videoShowSetup(){
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="position:relative;height:290px;width:100%;"><canvas id="kinfoChart" style="display:block;"></canvas><div id="kinfoStarOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></div></div>
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div id="kinfoEquityCurveWrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">EQUITY CURVE</div>
         <div style="position:relative;height:160px;width:100%;"><canvas id="kinfoEquityCurve" style="display:block;"></canvas></div>
       </div>
@@ -8913,6 +8913,21 @@ function kinfoRender() {
         var i = els && els.length ? els[0].index : -1;
         var cd=chartDates[i];if(cd) kinfoOpenDay(cd);
       },
+      onHover: function(ev, els) {
+        if(!window._kinfoEqChart || !els || !els.length) return;
+        var barIdx = els[0].index;
+        if(chartDates[barIdx]===null || chartDates[barIdx]===undefined) return;
+        // Count non-null dates up to barIdx to find equity curve index
+        var ecIdx=-1;
+        for(var ci=0;ci<=barIdx;ci++){
+          if(chartDates[ci]!==null && chartDates[ci]!==undefined) ecIdx++;
+        }
+        var ecLen = window._kinfoEqChart.data.labels.length;
+        if(ecIdx>=0 && ecIdx<ecLen){
+          window._kinfoEqChart.tooltip.setActiveElements([{datasetIndex:0,index:ecIdx}],{x:0,y:0});
+          window._kinfoEqChart.update('none');
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -8969,18 +8984,15 @@ function kinfoRender() {
         datasets: [{
           data: ecValues,
           borderColor: ecColor,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          pointHoverBackgroundColor: ecColor,
-          tension: 0.3,
-          fill: true,
-          backgroundColor: function(ctx){
-            var g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height||160);
-            g.addColorStop(0, ecColor.replace(')',',0.18)').replace('rgb','rgba'));
-            g.addColorStop(1, ecColor.replace(')',',0)').replace('rgb','rgba'));
-            return g;
-          }
+          borderWidth: 1.5,
+          pointRadius: 2,
+          pointBackgroundColor: ecColor,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: ecColor,
+          pointHoverBorderWidth: 2,
+          tension: 0.2,
+          fill: false
         }]
       },
       options: {
@@ -9047,6 +9059,9 @@ function kinfoGetAllDatesForNav(fromDate) {
 function kinfoCloseDay(){
   var p=document.getElementById('kinfoDayPanel');
   if(p)p.style.display='none';
+  // Show equity curve again
+  var ec=document.getElementById('kinfoEquityCurveWrap');
+  if(ec)ec.style.display='block';
   // Don't switch views — stay on whichever view (chart or errors) the user is on
 }
 
@@ -9062,6 +9077,9 @@ function kinfoNavDay(dir) {
 
 function kinfoOpenDay(date) {
   kinfoSelectedDate = date;
+  // Hide equity curve while day panel is open
+  var ec=document.getElementById('kinfoEquityCurveWrap');
+  if(ec)ec.style.display='none';
   // Highlight selected bar
   if (kinfoChart && kinfoChart._allDates) {
     var allD = kinfoChart._allDates;
