@@ -3896,6 +3896,19 @@ var tvCalMonth = new Date().getMonth();
 var tvCharts = {};
 
 try{tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(e){}
+// One-time patch: fix any trades that lost their open/openedOnly flag (exitPrice null but not flagged)
+(function(){
+  var changed=false;
+  tvTrades.forEach(function(t){
+    if(t.exitPrice===null&&!t.open&&!t.openedOnly){
+      // Check if a later date has a matching closed trade for same symbol
+      var hasClosed=tvTrades.some(function(t2){return t2.symbol===t.symbol&&t2.date>t.date&&!t2.open&&!t2.openedOnly&&t2.exitPrice!==null;});
+      if(hasClosed){t.openedOnly=true;changed=true;}
+      else{t.open=true;changed=true;}
+    }
+  });
+  if(changed){try{localStorage.setItem('tvTrades',JSON.stringify(tvTrades));}catch(e){}}
+})();
 try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
