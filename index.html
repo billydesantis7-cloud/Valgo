@@ -3938,19 +3938,7 @@ var tvCalMonth = new Date().getMonth();
 var tvCharts = {};
 
 try{tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(e){}
-// One-time patch: fix any trades that lost their open/openedOnly flag (exitPrice null but not flagged)
-(function(){
-  var changed=false;
-  tvTrades.forEach(function(t){
-    if(t.exitPrice===null&&!t.open&&!t.openedOnly){
-      // Check if a later date has a matching closed trade for same symbol
-      var hasClosed=tvTrades.some(function(t2){return t2.symbol===t.symbol&&t2.date>t.date&&!t2.open&&!t2.openedOnly&&t2.exitPrice!==null;});
-      if(hasClosed){t.openedOnly=true;changed=true;}
-      else{t.open=true;changed=true;}
-    }
-  });
-  if(changed){try{localStorage.setItem('tvTrades',JSON.stringify(tvTrades));}catch(e){}}
-})();
+
 try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
@@ -5108,19 +5096,7 @@ function tvRptSubTab(tab){
   if(tab==='wrr') renderTvWrr();
   if(tab==='jeppez') renderJeppez();
   if(tab==='rolling') renderRollingStats();
-  if(tab==='compound'){
-    // Pre-fill start value from actual account start value in Jeppez
-    var jStart = document.getElementById('cmpStartVal');
-    if(jStart && (!jStart._userSet)){
-      var allT = tvTrades.filter(function(t){return !t.open&&!t.openedOnly;});
-      if(allT.length){
-        // Find earliest date's starting account value from rolling stats
-        var rr = typeof rollingRows !== 'undefined' ? rollingRows : [];
-        if(rr.length){ jStart.value = Math.round(rr[0].start||8713); }
-      }
-    }
-    renderCompounding();
-  }
+  if(tab==='compound') renderCompounding();
 }
 
 // WR/RR stats (simplified)
@@ -6201,7 +6177,7 @@ function renderCompounding(){
       {label:'END OF YEAR 2', idx:23},
       {label:'END OF YEAR 3', idx:35},
     ];
-    cards.innerHTML = yrs.map(function(y){
+    var cardsHtml = yrs.map(function(y){
       var r2 = rows[y.idx];
       var mult = (r2.endVal/startVal).toFixed(2);
       return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">'
@@ -6209,12 +6185,13 @@ function renderCompounding(){
         +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">$'+Math.round(r2.endVal).toLocaleString()+'</div>'
         +'<div style="font-family:var(--mono);font-size:11px;color:#4caf50;margin-top:3px;">+'+r2.totalPct.toFixed(1)+'% · '+mult+'x</div>'
         +'</div>';
-    }).join('')
-    +'<div style="background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.3);border-radius:8px;padding:14px 16px;">'
+    }).join('');
+    cardsHtml += '<div style="background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.3);border-radius:8px;padding:14px 16px;">'
       +'<div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">TOTAL GAIN</div>'
       +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">+$'+Math.round(rows[35].totalGain).toLocaleString()+'</div>'
       +'<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;">'+rows[35].totalPct.toFixed(1)+'% · '+(rows[35].endVal/startVal).toFixed(1)+'x starting capital</div>'
       +'</div>';
+    cards.innerHTML = cardsHtml;
   }
 
   // Table
