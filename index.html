@@ -4006,11 +4006,14 @@ function tvHandleImport(event){
 
     var parsed=applyRToTrades(splitIntoTrades(execs,date),date,rVal);
 
-    // Remove the now-closed open positions from their original dates
+    // Mark the original open trade as "opened here, closed later" — keep it on the calendar
     prevOpenTrades.forEach(function(op){
       var wasMatched = parsed.some(function(t){ return t.symbol===op.symbol && !t.open; });
       if(wasMatched){
-        tvTrades = tvTrades.filter(function(t){ return t.id !== op.id; });
+        tvTrades = tvTrades.map(function(t){
+          if(t.id === op.id) return Object.assign({}, t, {open: false, openedOnly: true, closedDate: date});
+          return t;
+        });
       }
     });
     if(rVal) tvDayR[date]=rVal;
@@ -4124,8 +4127,8 @@ function renderTvCal(){
     if(rVal&&dayTrades.length) weeks[weekNum].r+=pnl/rVal;
     var dayTotalStr=tvUnit==='R'&&rVal?((pnl/rVal>=0?'+':'')+((pnl/rVal).toFixed(2))+'R'):(dayTrades.length?(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(2):'');
     var pnlBySymbol={};
-    var closedDayTrades=dayTrades.filter(function(t){return !t.open;});
-    var openDayTrades=dayTrades.filter(function(t){return t.open;});
+    var closedDayTrades=dayTrades.filter(function(t){return !t.open&&!t.openedOnly;});
+    var openDayTrades=dayTrades.filter(function(t){return t.open||t.openedOnly;});
     closedDayTrades.forEach(function(t){if(!pnlBySymbol[t.symbol])pnlBySymbol[t.symbol]={pnl:0,side:t.side};pnlBySymbol[t.symbol].pnl+=(t.pnl||0);});
     var dayWins=closedDayTrades.filter(function(t){return t.pnl>0;}).length;
     var dayLosses=closedDayTrades.filter(function(t){return t.pnl<0;}).length;
@@ -4139,11 +4142,14 @@ function renderTvCal(){
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:'+(sd.pnl>=0?'#26a69a':'#ef5350')+';">'+symV+'</span>'
         +'</div>';
     }).join('');
-    // Append open positions below closed ones with a distinct OPEN badge
+    // Append open/openedOnly positions below closed ones with a badge
     symStack+=openDayTrades.map(function(t){
+      var badge = t.openedOnly
+        ? '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPENED</span>'
+        : '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPEN</span>';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;">'
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';">'+t.symbol+'</span>'
-        +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPEN</span>'
+        +badge
         +'</div>';
     }).join('');
     cells+='<div onclick="tvExpandDay(\''+ds+'\')" style="min-height:90px;background:var(--surface);border:1px solid '+(isToday?'var(--accent)':'var(--border2)')+';border-radius:6px;padding:7px 8px;cursor:pointer;opacity:'+(dayTrades.length?1:0.45)+'" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\''+(isToday?'var(--accent)':'var(--border2)')+'\'"><div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:var(--muted);margin-bottom:4px;">'+d+'</div>'+(dayTrades.length?'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:'+(pnl>=0?'#26a69a':'#ef5350')+';text-align:center;line-height:1.1;">'+dayTotalStr+'</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:var(--muted);text-align:center;margin-bottom:5px;">'+wrStr+'</div>'+symStack:'')+'</div>';
@@ -4182,8 +4188,8 @@ function _renderDayPanel(date, overrideEl){
   var rawTrades=tvTrades.filter(function(t){return t.date===date;});
   var rVal=tvDayR[date];
   // Exclude open positions from P&L / win rate — they have no exit yet
-  var closedTrades=rawTrades.filter(function(t){return !t.open;});
-  var openTrades=rawTrades.filter(function(t){return t.open;});
+  var closedTrades=rawTrades.filter(function(t){return !t.open&&!t.openedOnly;});
+  var openTrades=rawTrades.filter(function(t){return t.open||t.openedOnly;});
   var dayPnl=closedTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
   var dayR=rVal?(dayPnl/rVal):null;
   var el=overrideEl||document.getElementById('tvCalDayContent'); if(!el) return;
@@ -4336,6 +4342,10 @@ function _renderDayPanel(date, overrideEl){
         ?'<td style="padding:8px 14px;text-align:right;color:var(--muted);">—</td>'
          +'<td style="padding:8px 14px;text-align:right;"><span style="font-size:10px;background:#ff9800;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;letter-spacing:0.5px;">OPEN</span></td>'
          +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">—</td>'
+        :t.openedOnly
+        ?'<td style="padding:8px 14px;text-align:right;color:var(--muted);">—</td>'
+         +'<td style="padding:8px 14px;text-align:right;"><span style="font-size:10px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:2px 8px;border-radius:4px;font-weight:bold;letter-spacing:0.5px;">OPENED</span></td>'
+         +'<td style="padding:8px 14px;text-align:right;font-size:10px;color:#ff9800;">closed '+t.closedDate+'</td>'
         :'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.exitPrice+'</td>'
          +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2)+'</td>'
          +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>')
