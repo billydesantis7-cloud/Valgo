@@ -4057,8 +4057,17 @@ function tvHandleTradervueImport(event){
       var openDt=hi('Open Datetime'),symbol=hi('Symbol'),side=hi('Side');
       var volume=parseInt(hi('Volume'))||0,entryP=parseFloat(hi('Entry Price'))||0,exitP=parseFloat(hi('Exit Price'))||0,pnl=parseFloat(hi('Gross P&L'))||0;
       if(!symbol||!openDt) continue;
-      var date=openDt.slice(0,10);
-      parsed.push({id:'tvtv_'+date+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:hi('Close Datetime').slice(11,19)||'00:00:00',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:parseFloat(exitP.toFixed(4)),pnl:parseFloat(pnl.toFixed(2)),rMultiple:null});
+      var openDate=openDt.slice(0,10);
+      var closeDt=hi('Close Datetime');
+      var closeDate=closeDt?closeDt.slice(0,10):openDate;
+      var isSwing = closeDate !== openDate;
+      var tradeId='tvtv_'+closeDate+'_'+symbol+'_'+Math.random().toString(36).slice(2,6);
+      // P&L trade goes on close date
+      parsed.push({id:tradeId,date:closeDate,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:closeDt.slice(11,19)||'00:00:00',volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:parseFloat(exitP.toFixed(4)),pnl:parseFloat(pnl.toFixed(2)),rMultiple:null});
+      // Swing: also add an openedOnly marker on the open date
+      if(isSwing){
+        parsed.push({id:'tvtv_open_'+openDate+'_'+symbol+'_'+Math.random().toString(36).slice(2,6),date:openDate,symbol,side:(side==='L'||side==='long')?'long':'short',openTime:openDt.slice(11,19)||'00:00:00',closeTime:null,volume,entryPrice:parseFloat(entryP.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,openedOnly:true,closedDate:closeDate});
+      }
     }
     if(!parsed.length){alert('No trades found');return;}
     var dates=[...new Set(parsed.map(function(t){return t.date;}))];
