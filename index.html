@@ -3951,7 +3951,14 @@ function splitIntoTrades(execRows,date){
       var buyQty=0,buyCost=0,sellQty=0,sellRev=0;
       tradeExecs.forEach(function(ex){var qty=parseInt(ex.qty),price=parseFloat(ex.price),s=ex.side.toUpperCase();if(s==='B'){buyQty+=qty;buyCost+=qty*price;}else{sellQty+=qty;sellRev+=qty*price;}});
       var isShort=sellQty>buyQty||(sellQty===buyQty&&tradeExecs[0].side.toUpperCase()!=='B');
-      var closedQty=Math.min(buyQty,sellQty);if(!closedQty){tradeExecs=[];return;}
+      var closedQty=Math.min(buyQty,sellQty);
+      if(!closedQty){
+        // No offsetting side — fully open position, show on calendar with OPEN badge
+        var openQty=isShort?sellQty:buyQty;
+        var avgEntryOpen=isShort?(sellRev/sellQty):(buyCost/buyQty);
+        trades.push({id:'tv_'+date+'_'+symbol+'_'+openTime+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:isShort?'short':'long',openTime,closeTime:null,volume:openQty,entryPrice:parseFloat(avgEntryOpen.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
+        tradeExecs=[];return;
+      }
       var avgEntry=isShort?(sellRev/sellQty):(buyCost/buyQty);
       var avgExit=isShort?(buyCost/buyQty):(sellRev/sellQty);
       var pnl=isShort?(avgEntry-avgExit)*closedQty:(avgExit-avgEntry)*closedQty;
@@ -4088,16 +4095,26 @@ function renderTvCal(){
     if(rVal&&dayTrades.length) weeks[weekNum].r+=pnl/rVal;
     var dayTotalStr=tvUnit==='R'&&rVal?((pnl/rVal>=0?'+':'')+((pnl/rVal).toFixed(2))+'R'):(dayTrades.length?(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(2):'');
     var pnlBySymbol={};
-    dayTrades.forEach(function(t){if(!pnlBySymbol[t.symbol])pnlBySymbol[t.symbol]={pnl:0,side:t.side};pnlBySymbol[t.symbol].pnl+=(t.pnl||0);});
-    var dayWins=dayTrades.filter(function(t){return t.pnl>0;}).length;
-    var dayWinRate=dayTrades.length?Math.round(dayWins/dayTrades.length*100):0;
-    var wrStr=dayTrades.length?'('+dayWins+'/'+dayTrades.length+' · '+dayWinRate+'%)':'';
+    var closedDayTrades=dayTrades.filter(function(t){return !t.open;});
+    var openDayTrades=dayTrades.filter(function(t){return t.open;});
+    closedDayTrades.forEach(function(t){if(!pnlBySymbol[t.symbol])pnlBySymbol[t.symbol]={pnl:0,side:t.side};pnlBySymbol[t.symbol].pnl+=(t.pnl||0);});
+    var dayWins=closedDayTrades.filter(function(t){return t.pnl>0;}).length;
+    var dayLosses=closedDayTrades.filter(function(t){return t.pnl<0;}).length;
+    var dayWinRate=closedDayTrades.length?Math.round(dayWins/closedDayTrades.length*100):0;
+    var wrStr=closedDayTrades.length?'('+dayWins+'/'+closedDayTrades.length+' · '+dayWinRate+'%)':'';
     var symStack=Object.keys(pnlBySymbol).map(function(sym){
       var sd=pnlBySymbol[sym];
       var symV=tvUnit==='R'&&rVal?((sd.pnl/rVal>=0?'+':'')+((sd.pnl/rVal).toFixed(2))+'R'):(sd.pnl>=0?'+$':'-$')+Math.abs(sd.pnl).toFixed(2);
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;">'
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:'+(sd.side==='long'?'#26a69a':'#ef5350')+';">'+sym+'</span>'
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:'+(sd.pnl>=0?'#26a69a':'#ef5350')+';">'+symV+'</span>'
+        +'</div>';
+    }).join('');
+    // Append open positions below closed ones with a distinct OPEN badge
+    symStack+=openDayTrades.map(function(t){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;">'
+        +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';">'+t.symbol+'</span>'
+        +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPEN</span>'
         +'</div>';
     }).join('');
     cells+='<div onclick="tvExpandDay(\''+ds+'\')" style="min-height:90px;background:var(--surface);border:1px solid '+(isToday?'var(--accent)':'var(--border2)')+';border-radius:6px;padding:7px 8px;cursor:pointer;opacity:'+(dayTrades.length?1:0.45)+'" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\''+(isToday?'var(--accent)':'var(--border2)')+'\'"><div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:var(--muted);margin-bottom:4px;">'+d+'</div>'+(dayTrades.length?'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:'+(pnl>=0?'#26a69a':'#ef5350')+';text-align:center;line-height:1.1;">'+dayTotalStr+'</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:var(--muted);text-align:center;margin-bottom:5px;">'+wrStr+'</div>'+symStack:'')+'</div>';
@@ -4135,7 +4152,10 @@ function tvCalNavDay(dir){
 function _renderDayPanel(date, overrideEl){
   var rawTrades=tvTrades.filter(function(t){return t.date===date;});
   var rVal=tvDayR[date];
-  var dayPnl=rawTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+  // Exclude open positions from P&L / win rate — they have no exit yet
+  var closedTrades=rawTrades.filter(function(t){return !t.open;});
+  var openTrades=rawTrades.filter(function(t){return t.open;});
+  var dayPnl=closedTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
   var dayR=rVal?(dayPnl/rVal):null;
   var el=overrideEl||document.getElementById('tvCalDayContent'); if(!el) return;
   var titleEl=overrideEl?null:document.getElementById('tvCalDayTitle');
@@ -4150,9 +4170,9 @@ function _renderDayPanel(date, overrideEl){
     seenSymbols[key].totalPnl+=t.pnl;
   });
 
-  var dayWins=rawTrades.filter(function(t){return t.pnl>0;}).length;
-  var dayWrPct=rawTrades.length?Math.round(dayWins/rawTrades.length*100):0;
-  var dayWrStr='('+dayWins+'/'+rawTrades.length+' · '+dayWrPct+'%)';
+  var dayWins=closedTrades.filter(function(t){return t.pnl>0;}).length;
+  var dayWrPct=closedTrades.length?Math.round(dayWins/closedTrades.length*100):0;
+  var dayWrStr='('+dayWins+'/'+closedTrades.length+' · '+dayWrPct+'%)';
   var dayWrColor=dayWrPct>=33?'#26a69a':'#ef5350';
 
   var html='';
@@ -4173,7 +4193,7 @@ function _renderDayPanel(date, overrideEl){
   } else {
     html+='<button onclick="tvEditDayR(\''+date+'\')" style="font-size:11px;color:var(--accent);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;">+ SET R</button>';
   }
-  html+='<span style="font-size:11px;color:var(--muted2);margin-left:auto;">'+rawTrades.length+' executions</span>';
+  html+='<span style="font-size:11px;color:var(--muted2);margin-left:auto;">'+closedTrades.length+' executions'+(openTrades.length?' · <span style="color:#ff9800;font-weight:bold;">'+openTrades.length+' OPEN</span>':'')+'</span>';
   html+='</div>';
 
   // ── TICKER BREAKDOWN — net R per symbol, individual executions in parens colored ──
@@ -4283,9 +4303,13 @@ function _renderDayPanel(date, overrideEl){
       +'<td style="padding:8px 14px;text-align:center;"><span style="font-size:9px;font-weight:bold;color:'+sc2+';background:'+sc2+'22;padding:2px 8px;border-radius:3px;">'+t.side.toUpperCase()+'</span></td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">'+t.volume+'</td>'
       +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.entryPrice+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.exitPrice+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2)+'</td>'
-      +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>'
+      +(t.open
+        ?'<td style="padding:8px 14px;text-align:right;color:var(--muted);">—</td>'
+         +'<td style="padding:8px 14px;text-align:right;"><span style="font-size:10px;background:#ff9800;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;letter-spacing:0.5px;">OPEN</span></td>'
+         +'<td style="padding:8px 14px;text-align:right;color:var(--muted);">—</td>'
+        :'<td style="padding:8px 14px;text-align:right;color:var(--muted);">$'+t.exitPrice+'</td>'
+         +'<td style="padding:8px 14px;text-align:right;font-size:14px;font-weight:bold;color:'+pc2+';">'+((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2)+'</td>'
+         +'<td style="padding:8px 14px;text-align:right;font-size:12px;font-weight:bold;color:'+pc2+';">'+rs+'</td>')
       +'</tr>';
   });
   html+='</tbody></table></div>';
