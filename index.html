@@ -3983,7 +3983,36 @@ function tvHandleImport(event){
   var reader=new FileReader();
   reader.onload=function(e){
     var execs=parseExecCSV(e.target.result);
+
+    // ── Carry-over open positions from previous days ──
+    // Find any open trades (no exit) from before today and inject synthetic
+    // entry executions so today's closes get matched against the right entry price.
+    var prevOpenTrades = tvTrades.filter(function(t){ return t.open && t.date < date; });
+    prevOpenTrades.forEach(function(op){
+      // Check if today's CSV has any executions for this symbol
+      var hasToday = execs.some(function(ex){ return ex.symbol === op.symbol; });
+      if(!hasToday) return;
+      // Inject a synthetic exec representing the carry-over position
+      // Use opposite side logic: if original was long (bought), inject a Buy
+      var synthSide = op.side === 'long' ? 'B' : 'SS';
+      execs.unshift({
+        time: '00:00:00',  // midnight — sorts before real execs
+        symbol: op.symbol,
+        price: op.entryPrice,
+        qty: op.volume,
+        side: synthSide
+      });
+    });
+
     var parsed=applyRToTrades(splitIntoTrades(execs,date),date,rVal);
+
+    // Remove the now-closed open positions from their original dates
+    prevOpenTrades.forEach(function(op){
+      var wasMatched = parsed.some(function(t){ return t.symbol===op.symbol && !t.open; });
+      if(wasMatched){
+        tvTrades = tvTrades.filter(function(t){ return t.id !== op.id; });
+      }
+    });
     if(rVal) tvDayR[date]=rVal;
     tvTrades=tvTrades.filter(function(t){return t.date!==date;}).concat(parsed);
     tvTrades.sort(function(a,b){return a.date.localeCompare(b.date)||a.openTime.localeCompare(b.openTime);});
