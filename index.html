@@ -65,6 +65,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
     <button onclick="document.getElementById('restoreInput').click()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⬆ RESTORE</button>
     <input type="file" id="restoreInput" accept=".json,.html" style="display:none;" onchange="importBackup(event)">
     <button onclick="imgDebug()" style="font-family:var(--mono);font-size:9px;color:#ff9800;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px;">IMG DEBUG</button>
+    <button onclick="fixTradeFlags()" style="font-family:var(--mono);font-size:9px;color:#ef5350;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px;">FIX DATA</button>
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">LIVE — CONNECTED TO BRIDGE</span>
     <span class="time" id="clock"></span>
@@ -6233,6 +6234,34 @@ function renderCompounding(){
     html += '</div>';
   });
   tbl.innerHTML = html;
+}
+
+// ── DATA RECOVERY: strip bad openedOnly flags ──
+function fixTradeFlags(){
+  var fixed=0;
+  tvTrades = tvTrades.map(function(t){
+    // openedOnly should ONLY be set on trades that explicitly have exitPrice===null AND were set by swing logic
+    // If a trade has a real exitPrice, it should never be openedOnly
+    if(t.openedOnly && t.exitPrice !== null && t.exitPrice !== undefined){
+      var clean = Object.assign({}, t);
+      delete clean.openedOnly;
+      delete clean.open;
+      fixed++;
+      return clean;
+    }
+    // If open=true but has exitPrice, also clean it
+    if(t.open && t.exitPrice !== null && t.exitPrice !== undefined){
+      var clean2 = Object.assign({}, t);
+      delete clean2.open;
+      fixed++;
+      return clean2;
+    }
+    return t;
+  });
+  localStorage.setItem('tvTrades', JSON.stringify(tvTrades));
+  sbSave('tvTrades', JSON.stringify(tvTrades));
+  alert('Fixed '+fixed+' trades. Page will reload.');
+  location.reload();
 }
 
 function renderRollingStats(){
