@@ -494,7 +494,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
             <input id="cmpStartVal" type="number" value="8713" style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--accent);background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:6px;width:140px;" oninput="renderCompounding()">
           </div>
           <div>
-            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">R PER MONTH</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">PERIOD</div>
+            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:10px;">
+              <button onclick="cmpSetPeriod('month')" id="cmpPeriodMonth" style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;padding:5px 14px;border:none;background:var(--accent);color:var(--bg);cursor:pointer;">MONTHLY</button>
+              <button onclick="cmpSetPeriod('week')" id="cmpPeriodWeek" style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;padding:5px 14px;border:none;background:transparent;color:var(--muted);cursor:pointer;">WEEKLY</button>
+            </div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;" id="cmpRLabel">R PER MONTH</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;" id="cmpRBtns">
               <button onclick="cmpSetR(2)" class="cmp-r-btn" id="cmpR2">2R</button>
               <button onclick="cmpSetR(3)" class="cmp-r-btn" id="cmpR3">3R</button>
@@ -6142,7 +6147,32 @@ function _nvbClick(key,field){
 }
 
 // ── COMPOUNDING CALCULATOR ──
-var _cmpR = 5; // default 5R/month
+var _cmpR = 5;
+var _cmpPeriod = 'month'; // 'month' or 'week'
+
+function cmpSetPeriod(p){
+  _cmpPeriod = p;
+  var mBtn = document.getElementById('cmpPeriodMonth');
+  var wBtn = document.getElementById('cmpPeriodWeek');
+  var lbl = document.getElementById('cmpRLabel');
+  if(mBtn){ mBtn.style.background = p==='month'?'var(--accent)':'transparent'; mBtn.style.color = p==='month'?'var(--bg)':'var(--muted)'; }
+  if(wBtn){ wBtn.style.background = p==='week'?'var(--accent)':'transparent'; wBtn.style.color = p==='week'?'var(--bg)':'var(--muted)'; }
+  if(lbl) lbl.textContent = p==='week' ? 'R PER WEEK' : 'R PER MONTH';
+  // Swap R button set
+  var btns = document.getElementById('cmpRBtns');
+  if(btns){
+    if(p==='week'){
+      btns.innerHTML = [1,2,3,4,5,7,10].map(function(r){
+        return '<button onclick="cmpSetR('+r+')" class="cmp-r-btn'+(r===_cmpR?' cmp-r-active':'')+'" id="cmpR'+r+'">'+r+'R</button>';
+      }).join('');
+    } else {
+      btns.innerHTML = [2,3,5,7,10,12,15].map(function(r){
+        return '<button onclick="cmpSetR('+r+')" class="cmp-r-btn'+(r===_cmpR?' cmp-r-active':'')+'" id="cmpR'+r+'">'+r+'R</button>';
+      }).join('');
+    }
+  }
+  renderCompounding();
+}
 
 function cmpSetR(r){
   _cmpR = r;
@@ -6163,42 +6193,76 @@ function cmpSetCustomR(){
 
 function renderCompounding(){
   var startVal = parseFloat(document.getElementById('cmpStartVal').value)||8713;
-  var rPerMonth = _cmpR;
-  var pctPerMonth = rPerMonth * 2 / 100; // R = 2% of account
-  var monthlyPct = pctPerMonth * 100;
+  var rPerPeriod = _cmpR;
+  var pctPerPeriod = rPerPeriod * 2 / 100; // R = 2% of account
+  var periodPct = pctPerPeriod * 100;
+  var isWeekly = _cmpPeriod === 'week';
 
   // Update label
   var lbl = document.getElementById('cmpPctLabel');
-  if(lbl) lbl.textContent = monthlyPct.toFixed(2)+'%';
+  var subLbl = lbl ? lbl.nextElementSibling : null;
+  if(lbl) lbl.textContent = periodPct.toFixed(2)+'%';
+  if(subLbl) subLbl.textContent = 'per ' + (isWeekly?'week':'month') + ' (R = 2%)';
 
-  // Build 36 months starting from current month
   var now = new Date();
   var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var shortM = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var rows = [];
   var val = startVal;
-  for(var i=0;i<36;i++){
-    var d = new Date(now.getFullYear(), now.getMonth()+i, 1);
-    var gain = val * pctPerMonth;
-    var endVal = val + gain;
-    rows.push({
-      label: months[d.getMonth()] + ' ' + d.getFullYear(),
-      short: shortM[d.getMonth()] + " '" + String(d.getFullYear()).slice(2),
-      startVal: val,
-      gain: gain,
-      endVal: endVal,
-      totalGain: endVal - startVal,
-      totalPct: (endVal/startVal - 1)*100,
-      yr: d.getFullYear(),
-      mo: d.getMonth()
-    });
-    val = endVal;
+
+  if(isWeekly){
+    // Build 156 weeks (3 years) — group by year for dividers
+    // Start from current Monday
+    var startD = new Date(now);
+    var dow = startD.getDay();
+    startD.setDate(startD.getDate() - (dow===0?6:dow-1)); // back to Monday
+    for(var i=0;i<156;i++){
+      var wStart = new Date(startD);
+      wStart.setDate(startD.getDate() + i*7);
+      var wEnd = new Date(wStart);
+      wEnd.setDate(wStart.getDate() + 4); // Friday
+      var wLabel = (wStart.getMonth()+1)+'/'+wStart.getDate()+' – '+(wEnd.getMonth()+1)+'/'+wEnd.getDate()+'/'+String(wStart.getFullYear()).slice(2);
+      var gain = val * pctPerPeriod;
+      var endVal = val + gain;
+      rows.push({
+        label: wLabel,
+        startVal: val,
+        gain: gain,
+        endVal: endVal,
+        totalGain: endVal - startVal,
+        totalPct: (endVal/startVal - 1)*100,
+        yr: wStart.getFullYear(),
+        wkNum: i
+      });
+      val = endVal;
+    }
+  } else {
+    // 36 months
+    for(var i=0;i<36;i++){
+      var d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+      var gain = val * pctPerPeriod;
+      var endVal = val + gain;
+      rows.push({
+        label: months[d.getMonth()] + ' ' + d.getFullYear(),
+        startVal: val,
+        gain: gain,
+        endVal: endVal,
+        totalGain: endVal - startVal,
+        totalPct: (endVal/startVal - 1)*100,
+        yr: d.getFullYear(),
+        mo: d.getMonth()
+      });
+      val = endVal;
+    }
   }
 
   // Summary cards: 1yr, 2yr, 3yr, end
   var cards = document.getElementById('cmpSummaryCards');
   if(cards){
-    var yrs = [
+    var yrs = isWeekly ? [
+      {label:'END OF YEAR 1', idx:51},
+      {label:'END OF YEAR 2', idx:103},
+      {label:'END OF YEAR 3', idx:155},
+    ] : [
       {label:'END OF YEAR 1', idx:11},
       {label:'END OF YEAR 2', idx:23},
       {label:'END OF YEAR 3', idx:35},
@@ -6212,10 +6276,11 @@ function renderCompounding(){
         +'<div style="font-family:var(--mono);font-size:11px;color:#4caf50;margin-top:3px;">+'+r2.totalPct.toFixed(1)+'% · '+mult+'x</div>'
         +'</div>';
     }).join('');
+    var lastRow = rows[rows.length-1];
     cardsHtml += '<div style="background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.3);border-radius:8px;padding:14px 16px;">'
-      +'<div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">TOTAL GAIN</div>'
-      +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">+$'+Math.round(rows[35].totalGain).toLocaleString()+'</div>'
-      +'<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;">'+rows[35].totalPct.toFixed(1)+'% · '+(rows[35].endVal/startVal).toFixed(1)+'x starting capital</div>'
+      +'<div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">TOTAL GAIN (3 YRS)</div>'
+      +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">+$'+Math.round(lastRow.totalGain).toLocaleString()+'</div>'
+      +'<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;">'+lastRow.totalPct.toFixed(1)+'% · '+(lastRow.endVal/startVal).toFixed(1)+'x starting capital</div>'
       +'</div>';
     cards.innerHTML = cardsHtml;
   }
@@ -6227,11 +6292,12 @@ function renderCompounding(){
   // Group by year
   var byYear = {};
   rows.forEach(function(r){ if(!byYear[r.yr]) byYear[r.yr]=[]; byYear[r.yr].push(r); });
+  var periodLabel = isWeekly ? 'week' : 'month';
 
   var html = '';
   // Header
   html += '<div style="display:grid;grid-template-columns:140px 120px 110px 110px 110px 120px 100px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">';
-  ['MONTH','START','MONTHLY GAIN','END VALUE','TOTAL GAIN','TOTAL %','MULTIPLIER'].forEach(function(h){
+  [isWeekly?'WEEK':'MONTH','START',isWeekly?'WEEKLY GAIN':'MONTHLY GAIN','END VALUE','TOTAL GAIN','TOTAL %','MULTIPLIER'].forEach(function(h){
     html += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:8px 12px;">'+h+'</div>';
   });
   html += '</div>';
