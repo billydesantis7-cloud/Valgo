@@ -486,12 +486,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       </div>
     </div>
     <div id="tvRptCompound" style="display:none;padding:24px 0;">
-      <div style="max-width:900px;">
+      <div style="display:grid;grid-template-columns:1fr 420px;gap:24px;align-items:start;">
+      <div>
         <!-- Controls -->
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
           <div>
             <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">START VALUE ($)</div>
-            <input id="cmpStartVal" type="number" value="8713" style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--accent);background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:6px;width:140px;" oninput="renderCompounding()">
+            <input id="cmpStartVal" type="number" value="8713" style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--accent);background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:6px;width:140px;" oninput="this._manuallySet=true;renderCompounding()">
           </div>
           <div>
             <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">PERIOD</div>
@@ -526,6 +527,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
           <div id="cmpTable"></div>
         </div>
+      </div>
+      <!-- Right column: equity curve -->
+      <div style="position:sticky;top:80px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:4px;">PROJECTED EQUITY CURVE</div>
+          <div id="cmpCurveInfo" style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-bottom:12px;"></div>
+          <div style="position:relative;height:320px;"><canvas id="cmpEquityCurve" style="display:block;"></canvas></div>
+        </div>
+      </div>
       </div>
     </div>
     <div id="tvRptRolling" style="display:none;">
@@ -5127,7 +5137,24 @@ function tvRptSubTab(tab){
   if(tab==='wrr') renderTvWrr();
   if(tab==='jeppez') renderJeppez();
   if(tab==='rolling') renderRollingStats();
-  if(tab==='compound') renderCompounding();
+  if(tab==='compound'){
+    // Auto-fill start value from latest Jeppez end value
+    var inp = document.getElementById('cmpStartVal');
+    if(inp && !inp._manuallySet){
+      // Rebuild liveRows logic to get latest end
+      var _now2=new Date(), _cy=_now2.getFullYear(), _cmi=_now2.getMonth();
+      var _prevE = JEPPEZ_STATIC.length ? JEPPEZ_STATIC[JEPPEZ_STATIC.length-1].end : null;
+      if(_prevE==null) _prevE = 7500;
+      for(var _mi2=2;_mi2<=_cmi;_mi2++){
+        var _mp=String(_mi2+1).padStart(2,'0');
+        var _pf=_cy+'-'+_mp;
+        var _mt=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_pf)&&!t.openedOnly;});
+        if(_mt.length) _prevE = _prevE + _mt.reduce(function(s,t){return s+(t.pnl||0);},0);
+      }
+      inp.value = Math.round(_prevE);
+    }
+    renderCompounding();
+  }
 }
 
 // WR/RR stats (simplified)
@@ -6325,6 +6352,81 @@ function renderCompounding(){
     html += '</div>';
   });
   tbl.innerHTML = html;
+
+  // ── EQUITY CURVE ──
+  var ecCanvas = document.getElementById('cmpEquityCurve');
+  if(ecCanvas && typeof Chart !== 'undefined'){
+    if(window._cmpEqChart){ window._cmpEqChart.destroy(); window._cmpEqChart=null; }
+    var ecLabels=[], ecValues=[], ecColors=[];
+    // Sample every Nth row so chart isn't too dense
+    var step = isWeekly ? 4 : 1; // every 4 weeks or every month
+    rows.forEach(function(r,i){
+      if(i % step !== 0 && i !== rows.length-1) return;
+      ecLabels.push(isWeekly ? r.label.split(' – ')[0] : r.label.replace(' 20'," '"));
+      ecValues.push(Math.round(r.endVal));
+    });
+    var finalVal = rows[rows.length-1].endVal;
+    var gradient;
+    try {
+      var ctx = ecCanvas.getContext('2d');
+      gradient = ctx.createLinearGradient(0, 0, 0, 320);
+      gradient.addColorStop(0, 'rgba(0,230,118,0.25)');
+      gradient.addColorStop(1, 'rgba(0,230,118,0)');
+    } catch(e){ gradient = 'rgba(0,230,118,0.1)'; }
+
+    window._cmpEqChart = new Chart(ecCanvas, {
+      type: 'line',
+      data: {
+        labels: ecLabels,
+        datasets: [{
+          data: ecValues,
+          borderColor: '#00e676',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#00e676',
+          tension: 0.3,
+          fill: true,
+          backgroundColor: gradient
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(item){
+                return '$'+item.raw.toLocaleString()+' · +'+(((item.raw-startVal)/startVal)*100).toFixed(1)+'%';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color:'rgba(255,255,255,0.3)', font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:12 },
+            grid: { color:'rgba(255,255,255,0.03)' }
+          },
+          y: {
+            ticks: {
+              color:'rgba(255,255,255,0.4)', font:{size:9},
+              callback: function(v){ return '$'+Math.round(v/1000)+'k'; }
+            },
+            grid: { color:'rgba(255,255,255,0.05)' }
+          }
+        }
+      }
+    });
+
+    // Update info line
+    var info = document.getElementById('cmpCurveInfo');
+    if(info){
+      var mult = (finalVal/startVal).toFixed(1);
+      info.textContent = '$'+Math.round(startVal).toLocaleString()+' → $'+Math.round(finalVal).toLocaleString()+' · '+mult+'x in 3 years';
+    }
+  }
 }
 
 // ── DATA RECOVERY: strip bad openedOnly flags ──
