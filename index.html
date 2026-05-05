@@ -34,6 +34,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 .exec-filter-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
 .exec-search{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:4px;width:160px;}
 .exec-search:focus{outline:none;border-color:var(--accent);}
+.cmp-r-btn{font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:1px;padding:6px 14px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all 0.15s;}
+.cmp-r-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cmp-r-active{background:var(--accent)!important;color:var(--bg)!important;border-color:var(--accent)!important;}
 .tv-tab-btn{font-family:var(--display);font-size:11px;letter-spacing:1px;padding:7px 16px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
 .tv-tab-active{background:var(--accent)!important;color:var(--bg)!important;}
 .tv-sort-hdr{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
@@ -320,6 +323,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
         <button onclick="tvRptSubTab('wrr')" id="tvRptTabWrr" class="tv-tab-btn">📈 WR/RR STATS</button>
         <button onclick="tvRptSubTab('jeppez')" id="tvRptTabJeppez" class="tv-tab-btn">📋 JEPPEZ</button>
         <button onclick="tvRptSubTab('rolling')" id="tvRptTabRolling" class="tv-tab-btn">📈 ROLLING STATS</button>
+        <button onclick="tvRptSubTab('compound')" id="tvRptTabCompound" class="tv-tab-btn">📈 COMPOUNDING</button>
       </div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
         <button onclick="tvSetDateFilter('week')" id="tvRQWeek" style="font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--muted);">WEEK</button>
@@ -477,6 +481,44 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
           <span style="font-family:var(--mono);font-size:10px;font-weight:bold;color:#f5c518;text-align:right;">LG W/LG L</span>
         </div>
         <div id="tvJeppezTable"></div>
+      </div>
+    </div>
+    <div id="tvRptCompound" style="display:none;padding:24px 0;">
+      <div style="max-width:900px;">
+        <!-- Controls -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+          <div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">START VALUE ($)</div>
+            <input id="cmpStartVal" type="number" value="8713" style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--accent);background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:6px;width:140px;" oninput="renderCompounding()">
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">R PER MONTH</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;" id="cmpRBtns">
+              <button onclick="cmpSetR(2)" class="cmp-r-btn" id="cmpR2">2R</button>
+              <button onclick="cmpSetR(3)" class="cmp-r-btn" id="cmpR3">3R</button>
+              <button onclick="cmpSetR(5)" class="cmp-r-btn cmp-r-active" id="cmpR5">5R</button>
+              <button onclick="cmpSetR(7)" class="cmp-r-btn" id="cmpR7">7R</button>
+              <button onclick="cmpSetR(10)" class="cmp-r-btn" id="cmpR10">10R</button>
+              <button onclick="cmpSetR(12)" class="cmp-r-btn" id="cmpR12">12R</button>
+              <button onclick="cmpSetR(15)" class="cmp-r-btn" id="cmpR15">15R</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">CUSTOM R</div>
+            <input id="cmpCustomR" type="number" placeholder="e.g. 8" min="0.5" max="50" step="0.5" style="font-family:var(--display);font-size:16px;color:var(--text);background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:6px;width:100px;" oninput="cmpSetCustomR()">
+          </div>
+          <div style="margin-left:auto;text-align:right;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">MONTHLY RETURN</div>
+            <div id="cmpPctLabel" style="font-family:var(--display);font-size:28px;font-weight:bold;color:var(--accent);">10.00%</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);">per month (R = 2%)</div>
+          </div>
+        </div>
+        <!-- Summary cards -->
+        <div id="cmpSummaryCards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;"></div>
+        <!-- Table -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <div id="cmpTable"></div>
+        </div>
       </div>
     </div>
     <div id="tvRptRolling" style="display:none;">
@@ -5058,14 +5100,27 @@ function tvRptRefresh(){
 
 function tvRptSubTab(tab){
   ['main','wrr','jeppez','rolling'].forEach(function(t){
-    var pm={main:'tvRptMain',wrr:'tvRptWrr',jeppez:'tvRptJeppez',rolling:'tvRptRolling'};
-    var bm={main:'tvRptTabMain',wrr:'tvRptTabWrr',jeppez:'tvRptTabJeppez',rolling:'tvRptTabRolling'};
+    var pm={main:'tvRptMain',wrr:'tvRptWrr',jeppez:'tvRptJeppez',rolling:'tvRptRolling',compound:'tvRptCompound'};
+    var bm={main:'tvRptTabMain',wrr:'tvRptTabWrr',jeppez:'tvRptTabJeppez',rolling:'tvRptTabRolling',compound:'tvRptTabCompound'};
     var el2=document.getElementById(pm[t]); if(el2) el2.style.display=t===tab?'block':'none';
     var btn2=document.getElementById(bm[t]); if(btn2){btn2.style.background=t===tab?'var(--accent)':'transparent';btn2.style.color=t===tab?'var(--bg)':'var(--muted)';}
   });
   if(tab==='wrr') renderTvWrr();
   if(tab==='jeppez') renderJeppez();
   if(tab==='rolling') renderRollingStats();
+  if(tab==='compound'){
+    // Pre-fill start value from actual account start value in Jeppez
+    var jStart = document.getElementById('cmpStartVal');
+    if(jStart && (!jStart._userSet)){
+      var allT = tvTrades.filter(function(t){return !t.open&&!t.openedOnly;});
+      if(allT.length){
+        // Find earliest date's starting account value from rolling stats
+        var rr = typeof rollingRows !== 'undefined' ? rollingRows : [];
+        if(rr.length){ jStart.value = Math.round(rr[0].start||8713); }
+      }
+    }
+    renderCompounding();
+  }
 }
 
 // WR/RR stats (simplified)
@@ -6082,6 +6137,125 @@ function _nvbClick(key,field){
   _nvbOverrides[key][field]=_nvbCycle(_nvbOverrides[key][field]);
   _nvbSave();
   renderRollingStats();
+}
+
+// ── COMPOUNDING CALCULATOR ──
+var _cmpR = 5; // default 5R/month
+
+function cmpSetR(r){
+  _cmpR = r;
+  document.getElementById('cmpCustomR').value = '';
+  document.querySelectorAll('.cmp-r-btn').forEach(function(b){ b.classList.remove('cmp-r-active'); });
+  var btn = document.getElementById('cmpR'+r);
+  if(btn) btn.classList.add('cmp-r-active');
+  renderCompounding();
+}
+
+function cmpSetCustomR(){
+  var v = parseFloat(document.getElementById('cmpCustomR').value);
+  if(isNaN(v)||v<=0) return;
+  _cmpR = v;
+  document.querySelectorAll('.cmp-r-btn').forEach(function(b){ b.classList.remove('cmp-r-active'); });
+  renderCompounding();
+}
+
+function renderCompounding(){
+  var startVal = parseFloat(document.getElementById('cmpStartVal').value)||8713;
+  var rPerMonth = _cmpR;
+  var pctPerMonth = rPerMonth * 2 / 100; // R = 2% of account
+  var monthlyPct = pctPerMonth * 100;
+
+  // Update label
+  var lbl = document.getElementById('cmpPctLabel');
+  if(lbl) lbl.textContent = monthlyPct.toFixed(2)+'%';
+
+  // Build 36 months starting from current month
+  var now = new Date();
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var shortM = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var rows = [];
+  var val = startVal;
+  for(var i=0;i<36;i++){
+    var d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    var gain = val * pctPerMonth;
+    var endVal = val + gain;
+    rows.push({
+      label: months[d.getMonth()] + ' ' + d.getFullYear(),
+      short: shortM[d.getMonth()] + " '" + String(d.getFullYear()).slice(2),
+      startVal: val,
+      gain: gain,
+      endVal: endVal,
+      totalGain: endVal - startVal,
+      totalPct: (endVal/startVal - 1)*100,
+      yr: d.getFullYear(),
+      mo: d.getMonth()
+    });
+    val = endVal;
+  }
+
+  // Summary cards: 1yr, 2yr, 3yr, end
+  var cards = document.getElementById('cmpSummaryCards');
+  if(cards){
+    var yrs = [
+      {label:'END OF YEAR 1', idx:11},
+      {label:'END OF YEAR 2', idx:23},
+      {label:'END OF YEAR 3', idx:35},
+    ];
+    cards.innerHTML = yrs.map(function(y){
+      var r2 = rows[y.idx];
+      var mult = (r2.endVal/startVal).toFixed(2);
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">'+y.label+'</div>'
+        +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">$'+Math.round(r2.endVal).toLocaleString()+'</div>'
+        +'<div style="font-family:var(--mono);font-size:11px;color:#4caf50;margin-top:3px;">+'+r2.totalPct.toFixed(1)+'% · '+mult+'x</div>'
+        +'</div>';
+    }).join('')
+    +'<div style="background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.3);border-radius:8px;padding:14px 16px;">'
+      +'<div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:6px;">TOTAL GAIN</div>'
+      +'<div style="font-family:var(--display);font-size:22px;font-weight:bold;color:var(--accent);">+$'+Math.round(rows[35].totalGain).toLocaleString()+'</div>'
+      +'<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;">'+rows[35].totalPct.toFixed(1)+'% · '+(rows[35].endVal/startVal).toFixed(1)+'x starting capital</div>'
+      +'</div>';
+  }
+
+  // Table
+  var tbl = document.getElementById('cmpTable');
+  if(!tbl) return;
+
+  // Group by year
+  var byYear = {};
+  rows.forEach(function(r){ if(!byYear[r.yr]) byYear[r.yr]=[]; byYear[r.yr].push(r); });
+
+  var html = '';
+  // Header
+  html += '<div style="display:grid;grid-template-columns:140px 120px 110px 110px 110px 120px 100px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">';
+  ['MONTH','START','MONTHLY GAIN','END VALUE','TOTAL GAIN','TOTAL %','MULTIPLIER'].forEach(function(h){
+    html += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:8px 12px;">'+h+'</div>';
+  });
+  html += '</div>';
+
+  var prevYr = null;
+  rows.forEach(function(r, i){
+    // Year divider
+    if(r.yr !== prevYr){
+      prevYr = r.yr;
+      var yrEnd = byYear[r.yr][byYear[r.yr].length-1];
+      html += '<div style="grid-column:1/-1;display:grid;grid-template-columns:140px 1fr;align-items:center;padding:6px 12px;background:rgba(200,169,110,0.06);border-top:'+(i>0?'2px solid rgba(200,169,110,0.2)':'none')+';border-bottom:1px solid rgba(200,169,110,0.15);">'
+        +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;color:#c8a96e;letter-spacing:2px;">'+r.yr+'</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">ends at $'+Math.round(yrEnd.endVal).toLocaleString()+' · +'+(((yrEnd.endVal/startVal)-1)*100).toFixed(1)+'%</div>'
+        +'</div>';
+    }
+    var isEven = i%2===0;
+    html += '<div style="display:grid;grid-template-columns:140px 120px 110px 110px 110px 120px 100px;border-bottom:1px solid rgba(255,255,255,0.04);background:'+(isEven?'rgba(255,255,255,0.02)':'transparent')+';">';
+    html += '<div style="font-family:var(--mono);font-size:11px;color:var(--text);padding:9px 12px;">'+r.label+'</div>';
+    html += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:9px 12px;">$'+Math.round(r.startVal).toLocaleString()+'</div>';
+    html += '<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:#4caf50;padding:9px 12px;">+$'+Math.round(r.gain).toLocaleString()+'</div>';
+    html += '<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:var(--accent);padding:9px 12px;">$'+Math.round(r.endVal).toLocaleString()+'</div>';
+    html += '<div style="font-family:var(--mono);font-size:11px;color:#4caf50;padding:9px 12px;">+$'+Math.round(r.totalGain).toLocaleString()+'</div>';
+    html += '<div style="font-family:var(--mono);font-size:11px;color:#4caf50;padding:9px 12px;">+'+r.totalPct.toFixed(1)+'%</div>';
+    html += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:9px 12px;">'+(r.endVal/startVal).toFixed(2)+'x</div>';
+    html += '</div>';
+  });
+  tbl.innerHTML = html;
 }
 
 function renderRollingStats(){
