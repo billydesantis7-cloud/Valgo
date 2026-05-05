@@ -66,6 +66,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
     <input type="file" id="restoreInput" accept=".json,.html" style="display:none;" onchange="importBackup(event)">
     <button onclick="imgDebug()" style="font-family:var(--mono);font-size:9px;color:#ff9800;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px;">IMG DEBUG</button>
     <button onclick="fixTradeFlags()" style="font-family:var(--mono);font-size:9px;color:#ef5350;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px;">FIX DATA</button>
+    <button onclick="forceReloadFromSupa()" style="font-family:var(--mono);font-size:9px;color:#90caf9;background:rgba(144,202,249,0.1);border:1px solid rgba(144,202,249,0.3);padding:3px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px;">↓ RELOAD CLOUD</button>
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">LIVE — CONNECTED TO BRIDGE</span>
     <span class="time" id="clock"></span>
@@ -791,6 +792,30 @@ function _dataUrlToBlob(dataUrl) {
   return new Blob([u8arr], { type: mime });
 }
 
+// ── Force reload all data from Supabase ──
+async function forceReloadFromSupa(){
+  _sbSetStatus('☁ RELOADING...', '#f5c518');
+  try {
+    var { data, error } = await _supa.from('valgo_data').select('key,value');
+    if(error) throw error;
+    if(!data||!data.length){ alert('No data found in Supabase.'); return; }
+    data.forEach(function(row){
+      if(row.value) try{ localStorage.setItem(row.key, row.value); }catch(e){}
+    });
+    try{ executions=JSON.parse(localStorage.getItem('executions_cache')||'[]'); }catch(e){}
+    try{ tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]'); }catch(e){}
+    try{ tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}'); }catch(e){}
+    try{ tvTradeMeta=JSON.parse(localStorage.getItem('tvTradeMeta')||'{}'); }catch(e){}
+    try{ ttEntries=JSON.parse(localStorage.getItem('ttEntries')||'[]'); }catch(e){}
+    _sbSetStatus('☁ SYNCED');
+    alert('Loaded '+tvTrades.length+' trades from Supabase. Refreshing...');
+    location.reload();
+  } catch(e) {
+    alert('Supabase load failed: '+e.message);
+    _sbSetStatus('☁ ERROR', '#ef5350');
+  }
+}
+
 // ── One-time migration from localStorage/IDB → Supabase ────
 async function migrateLocalToSupabase() {
   _sbSetStatus('☁ MIGRATING...', '#f5c518');
@@ -830,7 +855,7 @@ async function _sbInitLoad() {
     if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
     if (typeof renderTvTrades === 'function') renderTvTrades();
     if (typeof renderTvCal === 'function') renderTvCal();
-  }, 6000);
+  }, 15000);
 
   try {
     var { data, error } = await _supa.from('valgo_data').select('key,value');
@@ -4633,7 +4658,7 @@ function renderTvTrades(){
     }
     return true;
   });
-  var tLen=function(t){try{var a=t.openTime.split(':'),b=t.closeTime.split(':');return(parseInt(b[0])*60+parseInt(b[1]))-(parseInt(a[0])*60+parseInt(a[1]));}catch(e){return 0;}};
+  var tLen=function(t){try{if(!t.closeTime||!t.openTime)return 0;var a=t.openTime.split(':'),b=t.closeTime.split(':');return(parseInt(b[0])*60+parseInt(b[1]))-(parseInt(a[0])*60+parseInt(a[1]));}catch(e){return 0;}};
   filtered.sort(function(a,b){
     if(tvSortField==='date')return tvSortDir*(a.date.localeCompare(b.date)||a.openTime.localeCompare(b.openTime));
     if(tvSortField==='symbol')return tvSortDir*a.symbol.localeCompare(b.symbol);
@@ -4660,7 +4685,7 @@ function renderTvTrades(){
     return '<div class="tv-trade-row" style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px;align-items:center;gap:0;padding:7px 14px;border-bottom:1px solid var(--border);">'
       +'<span style="font-size:10px;color:var(--text);">'+t.date.slice(5)+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">'+t.openTime.slice(0,5)+'</span>'
-      +'<span style="font-size:10px;color:var(--muted);">'+t.closeTime.slice(0,5)+'</span>'
+      +'<span style="font-size:10px;color:var(--muted);">'+(t.closeTime?t.closeTime.slice(0,5):'—')+'</span>'
       +'<span style="font-size:14px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>'
       +'<span style="font-size:9px;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';background:'+(t.side==='long'?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)')+';padding:2px 6px;border-radius:3px;">'+(t.side==='long'?'LONG':'SHORT')+'</span>'
       +'<span style="font-size:10px;color:var(--muted);padding-left:6px;">'+t.volume+'</span>'
@@ -5088,7 +5113,7 @@ function tvRptRefresh(){
 }
 
 function tvRptSubTab(tab){
-  ['main','wrr','jeppez','rolling'].forEach(function(t){
+  ['main','wrr','jeppez','rolling','compound'].forEach(function(t){
     var pm={main:'tvRptMain',wrr:'tvRptWrr',jeppez:'tvRptJeppez',rolling:'tvRptRolling',compound:'tvRptCompound'};
     var bm={main:'tvRptTabMain',wrr:'tvRptTabWrr',jeppez:'tvRptTabJeppez',rolling:'tvRptTabRolling',compound:'tvRptTabCompound'};
     var el2=document.getElementById(pm[t]); if(el2) el2.style.display=t===tab?'block':'none';
