@@ -9234,6 +9234,7 @@ function kinfoRenderGrades() {
     row.appendChild(gradeCell(t.key,'exec',g.exec!=null?g.exec:undefined));
 
     // EOD Edge Score cell
+    try {
     var edgeCell = document.createElement('div');
     edgeCell.style.cssText = 'display:flex;align-items:center;';
     (function(){
@@ -9241,7 +9242,7 @@ function kinfoRenderGrades() {
       var autoEdge = null;
       if(typeof ttEntries !== 'undefined'){
         var sym = t.symbol ? t.symbol.toUpperCase() : '';
-        var match = ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; });
+        var match = (typeof ttEntries!=='undefined'&&Array.isArray(ttEntries)) ? ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; }) : null;
         if(match) autoEdge = match.edge;
       }
       var savedEdge = g.eodEdge != null ? g.eodEdge : (g.disc===0 ? 0 : autoEdge);
@@ -9282,6 +9283,7 @@ function kinfoRenderGrades() {
       errCell.appendChild(inp);
     })();
     row.appendChild(errCell);
+    } catch(gradeColErr){ console.warn('grade col err:', gradeColErr); }
 
     // View button
     var viewBtn=document.createElement('span'); viewBtn.style.cssText='font-size:13px;cursor:pointer;color:rgba(255,255,255,0.3);'; viewBtn.textContent='⤢';
@@ -9302,7 +9304,8 @@ function showExecErrSuggestions(inp, key){
   // Collect all saved exec errors
   var grades = kinfoLoadGrades();
   var allErrs = {};
-  Object.values(grades).forEach(function(g){
+  var gradeVals = Object.keys(grades).map(function(k){return grades[k];});
+  gradeVals.forEach(function(g){
     if(g.execErr) allErrs[g.execErr] = (allErrs[g.execErr]||0)+1;
   });
   var suggestions = Object.keys(allErrs).filter(function(e){
@@ -9535,18 +9538,20 @@ function kinfoRender() {
   }, 50);
 
   // ── EQUITY CURVE ──
+  try {
   var ecCanvas = document.getElementById('kinfoEquityCurve');
-  if(ecCanvas){
-    if(window._kinfoEqChart){ window._kinfoEqChart.destroy(); window._kinfoEqChart=null; }
+  if(ecCanvas && typeof Chart !== 'undefined'){
+    if(window._kinfoEqChart){ try{window._kinfoEqChart.destroy();}catch(e){} window._kinfoEqChart=null; }
     // Build cumulative curve — skip null gaps
     var ecLabels=[], ecValues=[], running=0;
     chartDates.forEach(function(d, i){
-      if(!d || values[i]===null) return;
+      if(!d || values[i]===null || values[i]===undefined) return;
       running += values[i];
       var lbl = labels[i] || '';
       ecLabels.push(lbl);
       ecValues.push(parseFloat(running.toFixed(2)));
     });
+    if(!ecLabels.length){ ecLabels=['—']; ecValues=[0]; }
     var ecColor = ecValues.length && ecValues[ecValues.length-1] >= 0 ? '#00e676' : '#ef5350';
     window._kinfoEqChart = new Chart(ecCanvas, {
       type: 'line',
@@ -9597,6 +9602,7 @@ function kinfoRender() {
       }
     });
   }
+  } catch(ecErr){ console.warn('Equity curve error:', ecErr); }
   // Draw HTML star overlay
   function _drawKinfoStars() {
     var overlay = document.getElementById('kinfoStarOverlay');
