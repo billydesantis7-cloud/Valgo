@@ -9250,9 +9250,10 @@ function kinfoRenderExecErrors(){
   el.innerHTML='';
   var hdr = document.createElement('div');
   hdr.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
+  var totalErrCount = Object.keys(errMap).reduce(function(s,k){return s+errMap[k].count;},0);
   hdr.innerHTML='<div style="font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:2px;color:#ff9800;">⚠ EXECUTION ERRORS</div>'
-    +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique errors across '+Object.values(errMap).reduce(function(s,v){return s+v.count;},0)+' trades</div>'
-    +'<button onclick="el._gradesTab='trades';kinfoRenderGrades();" style="margin-left:auto;font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;">← BACK</button>';
+    +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique errors across '+totalErrCount+' trades</div>'
+    +'<button onclick="document.getElementById(\'kinfoGradesContent\')._gradesTab=\'trades\';kinfoRenderGrades();" style="margin-left:auto;font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;">← BACK</button>';
   el.appendChild(hdr);
   if(!sorted.length){
     el.innerHTML+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;">No execution errors recorded yet.</div>';
