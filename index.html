@@ -8844,53 +8844,6 @@ function kinfoOpenGradeReview(trades, idx) {
     box.appendChild(navBar);
     box.appendChild(makeGradeSection('DISCRETION SELECTION', 'disc', g2.disc));
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
-
-    // EOD Edge Score
-    var edgeRow = document.createElement('div');
-    edgeRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
-    var edgeLbl = document.createElement('span');
-    edgeLbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
-    edgeLbl.textContent = 'EOD EDGE SCORE';
-    edgeRow.appendChild(edgeLbl);
-    var autoEdge2 = null;
-    if(typeof ttEntries !== 'undefined'){
-      var sym2 = t.symbol?t.symbol.toUpperCase():'';
-      var ttm = ttEntries.find(function(te){ return te.ticker&&te.ticker.toUpperCase().indexOf(sym2)>=0&&sym2.length>=2; });
-      if(ttm) autoEdge2 = ttm.edge;
-    }
-    var edgeVal = g2.eodEdge!=null?g2.eodEdge:(g2.disc===0?0:autoEdge2);
-    var edgeInp = document.createElement('input');
-    edgeInp.type='number'; edgeInp.min=0; edgeInp.max=100;
-    edgeInp.value = edgeVal!=null?edgeVal:'';
-    edgeInp.placeholder = g2.disc===0?'0 (auto)':(autoEdge2!=null?autoEdge2+' (auto)':'enter 0-100');
-    edgeInp.style.cssText='width:80px;font-family:var(--mono);font-size:14px;font-weight:bold;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:var(--accent);padding:6px 8px;text-align:center;';
-    edgeInp.onchange=function(){ var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(t.key,'eodEdge',v); renderModal(); };
-    edgeRow.appendChild(edgeInp);
-    if(autoEdge2!=null && g2.eodEdge==null){
-      var autoTag=document.createElement('span');
-      autoTag.style.cssText='font-family:var(--mono);font-size:9px;color:#26a69a;padding:2px 6px;background:rgba(38,166,154,0.15);border-radius:3px;';
-      autoTag.textContent='AUTO FROM TT';
-      edgeRow.appendChild(autoTag);
-    }
-    box.appendChild(edgeRow);
-
-    // Exec Error
-    var errRow = document.createElement('div');
-    errRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
-    var errLbl = document.createElement('span');
-    errLbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
-    errLbl.textContent = 'EXECUTION ERROR';
-    errRow.appendChild(errLbl);
-    var errInp = document.createElement('input');
-    errInp.type='text';
-    errInp.value = g2.execErr||'';
-    errInp.placeholder='describe the error...';
-    errInp.style.cssText='flex:1;font-family:var(--mono);font-size:12px;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:#ff9800;padding:6px 10px;';
-    errInp.oninput=function(){ showExecErrSuggestions(errInp, t.key); };
-    errInp.onblur=function(){setTimeout(function(){var d=document.getElementById('_execErrDropdown');if(d)d.remove();},200);};
-    errInp.onchange=function(){ kinfoSaveGrade(t.key,'execErr',this.value.trim()||null); };
-    errRow.appendChild(errInp);
-    box.appendChild(errRow);
   }
 
   renderModal();
@@ -8911,12 +8864,11 @@ function kinfoRenderGrades() {
   // ── TAB SWITCHER ──
   var tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:16px;';
-  ['trades','stats','execerrs'].forEach(function(tb) {
+  ['trades','stats'].forEach(function(tb) {
     var btn = document.createElement('button');
-    var lbl = tb==='trades'?'TRADES':tb==='stats'?'STATS':'⚠ EXEC ERRORS';
     btn.style.cssText = 'font-family:var(--mono);font-size:10px;padding:5px 16px;border:none;cursor:pointer;letter-spacing:1px;background:'+(tb===_tab?'var(--accent)':'transparent')+';color:'+(tb===_tab?'var(--bg)':'var(--muted)')+';';
-    btn.textContent = lbl;
-    btn.onclick = function(){ el._gradesTab = tb; if(tb==='execerrs') kinfoRenderExecErrors(); else kinfoRenderGrades(); };
+    btn.textContent = tb.toUpperCase();
+    btn.onclick = function(){ el._gradesTab = tb; kinfoRenderGrades(); };
     tabBar.appendChild(btn);
   });
   el.appendChild(tabBar);
@@ -9175,10 +9127,10 @@ function kinfoRenderGrades() {
   }
 
   // ── TRADES VIEW ──
-  var COLS = '90px 80px 80px 65px 120px 120px 90px 90px 40px';
+  var COLS = '90px 80px 80px 65px 120px 120px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
-  ['DATE','SYMBOL','P&L','R','DISCRETION\nSELECTION','SYSTEM\nALGO EXEC','EOD\nEDGE','EOD\nEXEC ERR',''].forEach(function(h) {
+  ['DATE','SYMBOL','P&L','R','DISCRETION\nSELECTION','SYSTEM\nALGO EXEC',''].forEach(function(h) {
     var s = document.createElement('span');
     s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
     s.textContent = h;
@@ -9232,58 +9184,6 @@ function kinfoRenderGrades() {
 
     row.appendChild(gradeCell(t.key,'disc',g.disc!=null?g.disc:undefined));
     row.appendChild(gradeCell(t.key,'exec',g.exec!=null?g.exec:undefined));
-
-    // EOD Edge Score cell
-    try {
-    var edgeCell = document.createElement('div');
-    edgeCell.style.cssText = 'display:flex;align-items:center;';
-    (function(){
-      // Auto-fill from Ticker Tracker if disc!=0 and no override
-      var autoEdge = null;
-      if(typeof ttEntries !== 'undefined'){
-        var sym = t.symbol ? t.symbol.toUpperCase() : '';
-        var match = (typeof ttEntries!=='undefined'&&Array.isArray(ttEntries)) ? ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; }) : null;
-        if(match) autoEdge = match.edge;
-      }
-      var savedEdge = g.eodEdge != null ? g.eodEdge : (g.disc===0 ? 0 : autoEdge);
-      var inp = document.createElement('input');
-      inp.type='number'; inp.min=0; inp.max=100;
-      inp.value = savedEdge!=null ? savedEdge : '';
-      inp.placeholder = g.disc===0 ? '0' : (autoEdge!=null?autoEdge:'—');
-      inp.style.cssText = 'width:56px;font-family:var(--mono);font-size:10px;font-weight:bold;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+(savedEdge!=null?(savedEdge>=60?'#4caf50':savedEdge>=40?'#ff9800':'#ef5350'):'rgba(255,255,255,0.3)')+';padding:2px 4px;text-align:center;';
-      inp.onclick=function(e){e.stopPropagation();};
-      inp.onchange=function(e){
-        e.stopPropagation();
-        var v = this.value===''?null:parseFloat(this.value);
-        kinfoSaveGrade(t.key,'eodEdge',v);
-        kinfoRenderGrades();
-      };
-      edgeCell.appendChild(inp);
-    })();
-    row.appendChild(edgeCell);
-
-    // EOD Exec Error cell
-    var errCell = document.createElement('div');
-    errCell.style.cssText = 'display:flex;align-items:center;position:relative;';
-    (function(){
-      var savedErr = g.execErr || '';
-      var inp = document.createElement('input');
-      inp.type='text';
-      inp.value = savedErr;
-      inp.placeholder = 'error...';
-      inp.style.cssText = 'width:82px;font-family:var(--mono);font-size:9px;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+(savedErr?'#ff9800':'rgba(255,255,255,0.3)')+';padding:2px 4px;';
-      inp.onclick=function(e){e.stopPropagation(); showExecErrSuggestions(inp, t.key);};
-      inp.oninput=function(e){e.stopPropagation(); showExecErrSuggestions(inp, t.key);};
-      inp.onblur=function(){setTimeout(function(){var d=document.getElementById('_execErrDropdown');if(d)d.remove();},200);};
-      inp.onchange=function(e){
-        e.stopPropagation();
-        kinfoSaveGrade(t.key,'execErr',this.value.trim()||null);
-        kinfoRenderGrades();
-      };
-      errCell.appendChild(inp);
-    })();
-    row.appendChild(errCell);
-    } catch(gradeColErr){ console.warn('grade col err:', gradeColErr); }
 
     // View button
     var viewBtn=document.createElement('span'); viewBtn.style.cssText='font-size:13px;cursor:pointer;color:rgba(255,255,255,0.3);'; viewBtn.textContent='⤢';
@@ -9537,72 +9437,7 @@ function kinfoRender() {
     if(kinfoChart) kinfoChart.resize();
   }, 50);
 
-  // ── EQUITY CURVE ──
-  try {
-  var ecCanvas = document.getElementById('kinfoEquityCurve');
-  if(ecCanvas && typeof Chart !== 'undefined'){
-    if(window._kinfoEqChart){ try{window._kinfoEqChart.destroy();}catch(e){} window._kinfoEqChart=null; }
-    // Build cumulative curve — skip null gaps
-    var ecLabels=[], ecValues=[], running=0;
-    chartDates.forEach(function(d, i){
-      if(!d || values[i]===null || values[i]===undefined) return;
-      running += values[i];
-      var lbl = labels[i] || '';
-      ecLabels.push(lbl);
-      ecValues.push(parseFloat(running.toFixed(2)));
-    });
-    if(!ecLabels.length){ ecLabels=['—']; ecValues=[0]; }
-    var ecColor = ecValues.length && ecValues[ecValues.length-1] >= 0 ? '#00e676' : '#ef5350';
-    window._kinfoEqChart = new Chart(ecCanvas, {
-      type: 'line',
-      data: {
-        labels: ecLabels,
-        datasets: [{
-          data: ecValues,
-          borderColor: ecColor,
-          borderWidth: 1.5,
-          pointRadius: 2,
-          pointBackgroundColor: ecColor,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: ecColor,
-          pointHoverBorderWidth: 2,
-          tension: 0.2,
-          fill: false
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(item){
-                var v=item.raw;
-                return (v>=0?'+':'')+( kinfoUnit==='R' ? v.toFixed(2)+'R' : '$'+Math.abs(v).toFixed(2));
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: 'rgba(255,255,255,0.3)', font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:12 },
-            grid: { color: 'rgba(255,255,255,0.03)' }
-          },
-          y: {
-            ticks: {
-              color: 'rgba(255,255,255,0.4)', font:{size:9},
-              callback: function(v){ return kinfoUnit==='R' ? (v>=0?'+':'')+v.toFixed(1)+'R' : (v>=0?'+$':'-$')+Math.abs(v).toFixed(0); }
-            },
-            grid: { color: 'rgba(255,255,255,0.05)' }
-          }
-        }
-      }
-    });
-  }
-  } catch(ecErr){ console.warn('Equity curve error:', ecErr); }
+  // EQUITY CURVE REMOVED
   // Draw HTML star overlay
   function _drawKinfoStars() {
     var overlay = document.getElementById('kinfoStarOverlay');
