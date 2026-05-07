@@ -9397,6 +9397,81 @@ function showExecErrSuggestions(inp, key){
 }
 
 // ── EXECUTION ERRORS SUMMARY VIEW ──
+function kinfoShowErrLightbox(images, startIdx){
+  var existing = document.getElementById('_errLightbox');
+  if(existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = '_errLightbox';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+
+  var idx = startIdx || 0;
+
+  var box = document.createElement('div');
+  box.style.cssText = 'position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;gap:10px;';
+
+  // Label
+  var lbl = document.createElement('div');
+  lbl.style.cssText = 'font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.6);letter-spacing:1px;';
+
+  // Image
+  var img = document.createElement('img');
+  img.style.cssText = 'max-width:85vw;max-height:75vh;object-fit:contain;border-radius:6px;display:block;';
+
+  // Nav row
+  var nav = document.createElement('div');
+  nav.style.cssText = 'display:flex;align-items:center;gap:16px;';
+
+  var prevBtn = document.createElement('button');
+  prevBtn.style.cssText = 'font-family:var(--mono);font-size:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;';
+  prevBtn.textContent = '◀ PREV';
+
+  var counter = document.createElement('span');
+  counter.style.cssText = 'font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.5);min-width:60px;text-align:center;';
+
+  var nextBtn = document.createElement('button');
+  nextBtn.style.cssText = 'font-family:var(--mono);font-size:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;';
+  nextBtn.textContent = 'NEXT ▶';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'position:absolute;top:-36px;right:0;font-family:var(--mono);font-size:11px;background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);padding:4px 12px;border-radius:4px;cursor:pointer;';
+  closeBtn.textContent = '✕ CLOSE';
+  closeBtn.onclick = function(){ overlay.remove(); };
+
+  function show(i){
+    idx = (i + images.length) % images.length;
+    img.src = images[idx].src;
+    lbl.textContent = images[idx].label;
+    counter.textContent = (idx+1)+' / '+images.length;
+    prevBtn.style.opacity = images.length > 1 ? '1' : '0.3';
+    nextBtn.style.opacity = images.length > 1 ? '1' : '0.3';
+  }
+
+  prevBtn.onclick = function(){ show(idx - 1); };
+  nextBtn.onclick = function(){ show(idx + 1); };
+
+  // Keyboard nav
+  function onKey(e){
+    if(e.key==='ArrowLeft') show(idx-1);
+    else if(e.key==='ArrowRight') show(idx+1);
+    else if(e.key==='Escape'){ overlay.remove(); document.removeEventListener('keydown',onKey); }
+  }
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('remove', function(){ document.removeEventListener('keydown',onKey); });
+
+  nav.appendChild(prevBtn);
+  nav.appendChild(counter);
+  nav.appendChild(nextBtn);
+  box.appendChild(closeBtn);
+  box.appendChild(lbl);
+  box.appendChild(img);
+  box.appendChild(nav);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  show(idx);
+}
+
 function kinfoRenderExecErrors(){
   var el = document.getElementById('kinfoGradesContent');
   if(!el) return;
@@ -9487,27 +9562,32 @@ function kinfoRenderExecErrors(){
       var expand = document.createElement('div');
       expand.style.cssText='display:none;padding:0 10px 10px;';
 
-      // Trade chips with images
+      // Collect all images for lightbox
+      var allErrImages = [];
+      data.trades.forEach(function(t){
+        var imgKey = t.date+'_'+t.symbol+'_'+(t.side||'');
+        var imgSrc = (typeof myTradeImages!=='undefined'&&myTradeImages[imgKey]) || null;
+        if(imgSrc) allErrImages.push({src:imgSrc, label:t.symbol+' · '+t.date});
+      });
+
+      // Trade rows with thumbnails
       data.trades.forEach(function(t){
         var tradeRow = document.createElement('div');
         tradeRow.style.cssText='margin-bottom:8px;';
 
-        // Chip label
         var chip = document.createElement('div');
         chip.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);padding:2px 0 4px;';
         chip.textContent=t.symbol+' '+t.date.slice(5);
         tradeRow.appendChild(chip);
 
-        // Images
-        var imgs = t.myTradeImages ? [t.myTradeImages] : [];
-        // Try to get image from myTradeImages store
         var imgKey = t.date+'_'+t.symbol+'_'+(t.side||'');
         var imgSrc = (typeof myTradeImages!=='undefined'&&myTradeImages[imgKey]) || null;
         if(imgSrc){
+          var imgIdx = allErrImages.findIndex(function(x){ return x.src===imgSrc; });
           var img = document.createElement('img');
           img.src=imgSrc;
-          img.style.cssText='width:100%;max-height:120px;object-fit:contain;background:#080c14;border-radius:3px;cursor:zoom-in;display:block;';
-          img.onclick=(function(src){ return function(e){ e.stopPropagation(); expandMyImg(src); }; })(imgSrc);
+          img.style.cssText='width:100%;max-height:120px;object-fit:contain;background:#080c14;border-radius:3px;cursor:zoom-in;display:block;border:1px solid rgba(255,255,255,0.05);';
+          img.onclick=(function(ii,imgs){ return function(e){ e.stopPropagation(); kinfoShowErrLightbox(imgs, ii); }; })(imgIdx >= 0 ? imgIdx : 0, allErrImages);
           tradeRow.appendChild(img);
         }
 
