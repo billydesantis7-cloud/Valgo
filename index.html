@@ -7824,7 +7824,10 @@ function videoShowSetup(){
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="position:relative;height:290px;width:100%;"><canvas id="kinfoChart" style="display:block;"></canvas><div id="kinfoStarOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></div></div>
       </div>
-
+      <div id="kinfoEquityCurveWrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">EQUITY CURVE</div>
+        <div style="position:relative;height:160px;width:100%;"><canvas id="kinfoEquityCurve" style="display:block;"></canvas></div>
+      </div>
     </div>
     <!-- ERRORS VIEW -->
     <div id="kinfoErrorsView" style="display:none;">
@@ -8841,6 +8844,48 @@ function kinfoOpenGradeReview(trades, idx) {
     box.appendChild(navBar);
     box.appendChild(makeGradeSection('DISCRETION SELECTION', 'disc', g2.disc));
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
+    // EOD Edge Score row
+    (function(){
+      var sym2 = t.symbol ? t.symbol.toUpperCase() : '';
+      var autoE = null;
+      if(typeof ttEntries !== 'undefined' && Array.isArray(ttEntries)){
+        var m = ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym2)>=0 && sym2.length>=2; });
+        if(m) autoE = m.edge;
+      }
+      var edgeVal = g2.eodEdge!=null ? g2.eodEdge : (g2.disc===0 ? 0 : autoE);
+      var row2 = document.createElement('div');
+      row2.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+      var lbl2 = document.createElement('span');
+      lbl2.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
+      lbl2.textContent = 'EOD EDGE SCORE';
+      row2.appendChild(lbl2);
+      var ei = document.createElement('input');
+      ei.type='number'; ei.min=0; ei.max=100;
+      ei.value = edgeVal!=null ? edgeVal : '';
+      ei.placeholder = autoE!=null ? autoE+' (auto)' : '0-100';
+      ei.style.cssText = 'width:80px;font-family:var(--mono);font-size:14px;font-weight:bold;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:var(--accent);padding:6px 8px;text-align:center;';
+      ei.onchange = (function(key){ return function(){ var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodEdge',v); renderModal(); }; })(t.key);
+      row2.appendChild(ei);
+      if(autoE!=null && g2.eodEdge==null){ var tag=document.createElement('span'); tag.style.cssText='font-family:var(--mono);font-size:9px;color:#26a69a;padding:2px 6px;background:rgba(38,166,154,0.15);border-radius:3px;'; tag.textContent='AUTO FROM TT'; row2.appendChild(tag); }
+      box.appendChild(row2);
+    })();
+    // Exec Error row
+    (function(){
+      var row3 = document.createElement('div');
+      row3.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+      var lbl3 = document.createElement('span');
+      lbl3.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
+      lbl3.textContent = 'EXECUTION ERROR';
+      row3.appendChild(lbl3);
+      var erri = document.createElement('input');
+      erri.type='text'; erri.value = g2.execErr||''; erri.placeholder='describe the error...';
+      erri.style.cssText='flex:1;font-family:var(--mono);font-size:12px;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:#ff9800;padding:6px 10px;';
+      erri.oninput = function(){ kinfoShowErrSuggestions(erri, t.key); };
+      erri.onblur = function(){ setTimeout(function(){ var d=document.getElementById('_execErrDD'); if(d) d.remove(); }, 200); };
+      erri.onchange = (function(key){ return function(){ kinfoSaveGrade(key,'execErr',this.value.trim()||null); }; })(t.key);
+      row3.appendChild(erri);
+      box.appendChild(row3);
+    })();
   }
 
   renderModal();
@@ -8861,11 +8906,12 @@ function kinfoRenderGrades() {
   // ── TAB SWITCHER ──
   var tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:16px;';
-  ['trades','stats'].forEach(function(tb) {
+  ['trades','stats','execerrs'].forEach(function(tb) {
     var btn = document.createElement('button');
+    var lbl = tb==='trades'?'TRADES':tb==='stats'?'STATS':'EXEC ERRORS';
     btn.style.cssText = 'font-family:var(--mono);font-size:10px;padding:5px 16px;border:none;cursor:pointer;letter-spacing:1px;background:'+(tb===_tab?'var(--accent)':'transparent')+';color:'+(tb===_tab?'var(--bg)':'var(--muted)')+';';
-    btn.textContent = tb.toUpperCase();
-    btn.onclick = function(){ el._gradesTab = tb; kinfoRenderGrades(); };
+    btn.textContent = lbl;
+    btn.onclick = (function(t2){ return function(){ el._gradesTab=t2; if(t2==='execerrs') kinfoRenderExecErrors(); else kinfoRenderGrades(); }; })(tb);
     tabBar.appendChild(btn);
   });
   el.appendChild(tabBar);
@@ -9124,10 +9170,10 @@ function kinfoRenderGrades() {
   }
 
   // ── TRADES VIEW ──
-  var COLS = '90px 80px 80px 65px 120px 120px 40px';
+  var COLS = '90px 80px 80px 65px 120px 120px 80px 90px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
-  ['DATE','SYMBOL','P&L','R','DISCRETION\nSELECTION','SYSTEM\nALGO EXEC',''].forEach(function(h) {
+  ['DATE','SYMBOL','P&L','R','DISCRETION\nSELECTION','SYSTEM\nALGO EXEC','EOD\nEDGE','EXEC\nERROR',''].forEach(function(h) {
     var s = document.createElement('span');
     s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
     s.textContent = h;
@@ -9181,6 +9227,46 @@ function kinfoRenderGrades() {
 
     row.appendChild(gradeCell(t.key,'disc',g.disc!=null?g.disc:undefined));
     row.appendChild(gradeCell(t.key,'exec',g.exec!=null?g.exec:undefined));
+
+    // EOD Edge Score
+    (function(){
+      var sym = t.symbol ? t.symbol.toUpperCase() : '';
+      var autoEdge = null;
+      if(typeof ttEntries !== 'undefined' && Array.isArray(ttEntries)){
+        var match = ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; });
+        if(match) autoEdge = match.edge;
+      }
+      var savedEdge = g.eodEdge != null ? g.eodEdge : (g.disc===0 ? 0 : autoEdge);
+      var edgeCell = document.createElement('div');
+      edgeCell.style.cssText = 'display:flex;align-items:center;';
+      var inp = document.createElement('input');
+      inp.type='number'; inp.min=0; inp.max=100;
+      inp.value = savedEdge!=null ? savedEdge : '';
+      inp.placeholder = savedEdge!=null ? '' : (autoEdge!=null ? autoEdge : '—');
+      var ec = savedEdge!=null ? (savedEdge>=60?'#4caf50':savedEdge>=40?'#ff9800':'#ef5350') : 'rgba(255,255,255,0.3)';
+      inp.style.cssText = 'width:54px;font-family:var(--mono);font-size:10px;font-weight:bold;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+ec+';padding:2px 4px;text-align:center;';
+      inp.onclick = function(e){ e.stopPropagation(); };
+      inp.onchange = (function(key){ return function(e){ e.stopPropagation(); var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodEdge',v); kinfoRenderGrades(); }; })(t.key);
+      edgeCell.appendChild(inp);
+      row.appendChild(edgeCell);
+    })();
+
+    // Exec Error
+    (function(){
+      var errCell = document.createElement('div');
+      errCell.style.cssText = 'display:flex;align-items:center;';
+      var inp = document.createElement('input');
+      inp.type='text';
+      inp.value = g.execErr || '';
+      inp.placeholder = 'error...';
+      inp.style.cssText = 'width:82px;font-family:var(--mono);font-size:9px;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+(g.execErr?'#ff9800':'rgba(255,255,255,0.3)')+';padding:2px 4px;';
+      inp.onclick = function(e){ e.stopPropagation(); };
+      inp.oninput = function(e){ e.stopPropagation(); kinfoShowErrSuggestions(this, t.key); };
+      inp.onblur = function(){ setTimeout(function(){ var d=document.getElementById('_execErrDD'); if(d) d.remove(); }, 200); };
+      inp.onchange = (function(key){ return function(e){ e.stopPropagation(); kinfoSaveGrade(key,'execErr',this.value.trim()||null); kinfoRenderGrades(); }; })(t.key);
+      errCell.appendChild(inp);
+      row.appendChild(errCell);
+    })();
 
     // View button
     var viewBtn=document.createElement('span'); viewBtn.style.cssText='font-size:13px;cursor:pointer;color:rgba(255,255,255,0.3);'; viewBtn.textContent='⤢';
@@ -9281,6 +9367,77 @@ function kinfoRenderExecErrors(){
           return '<span style="font-family:var(--mono);font-size:9px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;color:var(--muted);">'+t.symbol+' '+t.date.slice(5)+'</span>';
         }).join('')
       +'</div>';
+    el.appendChild(card);
+  });
+}
+
+function kinfoShowErrSuggestions(inp, key){
+  var existing = document.getElementById('_execErrDD');
+  if(existing) existing.remove();
+  var query = inp.value.trim().toLowerCase();
+  var grades = kinfoLoadGrades();
+  var allErrs = {};
+  Object.keys(grades).forEach(function(k){ var g=grades[k]; if(g.execErr) allErrs[g.execErr]=(allErrs[g.execErr]||0)+1; });
+  var suggestions = Object.keys(allErrs).filter(function(e){ return !query||e.toLowerCase().indexOf(query)>=0; }).sort(function(a,b){return allErrs[b]-allErrs[a];}).slice(0,8);
+  if(!suggestions.length) return;
+  var dd = document.createElement('div');
+  dd.id='_execErrDD';
+  var rect = inp.getBoundingClientRect();
+  dd.style.cssText='position:fixed;left:'+rect.left+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  suggestions.forEach(function(s){
+    var item = document.createElement('div');
+    item.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 12px;cursor:pointer;display:flex;justify-content:space-between;';
+    var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
+    var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:9px;'; t2.textContent='x'+allErrs[s]; item.appendChild(t2);
+    item.onmousedown=(function(sv,k){ return function(e){ e.preventDefault(); inp.value=sv; kinfoSaveGrade(k,'execErr',sv); dd.remove(); kinfoRenderGrades(); }; })(s,key);
+    item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
+    item.onmouseout=function(){this.style.background='transparent';};
+    dd.appendChild(item);
+  });
+  document.body.appendChild(dd);
+}
+
+function kinfoRenderExecErrors(){
+  var el = document.getElementById('kinfoGradesContent');
+  if(!el) return;
+  var grades = kinfoLoadGrades();
+  var trades = kinfoGetGradeTrades();
+  var errMap = {};
+  trades.forEach(function(t){
+    var g = grades[t.key]||{};
+    if(g.execErr){ if(!errMap[g.execErr]) errMap[g.execErr]={count:0,trades:[]}; errMap[g.execErr].count++; errMap[g.execErr].trades.push(t); }
+  });
+  var sorted = Object.keys(errMap).sort(function(a,b){ return errMap[b].count-errMap[a].count; });
+  el.innerHTML='';
+  var totalCount = Object.keys(errMap).reduce(function(s,k){return s+errMap[k].count;},0);
+  var hdr = document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
+  var backBtn = document.createElement('button');
+  backBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;';
+  backBtn.textContent='← BACK';
+  backBtn.onclick=function(){ el._gradesTab='trades'; kinfoRenderGrades(); };
+  hdr.innerHTML='<div style="font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:2px;color:#ff9800;">EXECUTION ERRORS</div><div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique · '+totalCount+' total</div>';
+  hdr.appendChild(backBtn);
+  el.appendChild(hdr);
+  if(!sorted.length){ var empty=document.createElement('div'); empty.style.cssText='font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;'; empty.textContent='No execution errors recorded yet.'; el.appendChild(empty); return; }
+  var maxCount = errMap[sorted[0]].count;
+  sorted.forEach(function(err,i){
+    var data=errMap[err];
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid #ff9800;border-radius:8px;padding:14px 16px;margin-bottom:10px;';
+    var topRow=document.createElement('div'); topRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:8px;';
+    var num=document.createElement('div'); num.style.cssText='font-family:var(--display);font-size:24px;font-weight:bold;color:#ff9800;'; num.textContent='#'+(i+1); topRow.appendChild(num);
+    var mid=document.createElement('div'); mid.style.cssText='flex:1;';
+    var errName=document.createElement('div'); errName.style.cssText='font-family:var(--mono);font-size:12px;font-weight:bold;color:var(--text);'; errName.textContent=err; mid.appendChild(errName);
+    var errCnt=document.createElement('div'); errCnt.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);'; errCnt.textContent=data.count+' occurrence'+(data.count>1?'s':''); mid.appendChild(errCnt);
+    topRow.appendChild(mid);
+    var cnt=document.createElement('div'); cnt.style.cssText='font-family:var(--display);font-size:20px;font-weight:bold;color:#ff9800;'; cnt.textContent=data.count+'x'; topRow.appendChild(cnt);
+    card.appendChild(topRow);
+    var bar=document.createElement('div'); bar.style.cssText='height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;margin-bottom:8px;';
+    var fill=document.createElement('div'); fill.style.cssText='height:100%;width:'+Math.round(data.count/maxCount*100)+'%;background:#ff9800;border-radius:3px;'; bar.appendChild(fill); card.appendChild(bar);
+    var chips=document.createElement('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:4px;';
+    data.trades.forEach(function(t){ var chip=document.createElement('span'); chip.style.cssText='font-family:var(--mono);font-size:9px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;color:var(--muted);'; chip.textContent=t.symbol+' '+t.date.slice(5); chips.appendChild(chip); });
+    card.appendChild(chips);
     el.appendChild(card);
   });
 }
@@ -9420,7 +9577,37 @@ function kinfoRender() {
     if(kinfoChart) kinfoChart.resize();
   }, 50);
 
-  // EQUITY CURVE REMOVED
+  // ── EQUITY CURVE ──
+  setTimeout(function(){
+    try {
+      var ecCanvas = document.getElementById('kinfoEquityCurve');
+      if(!ecCanvas) return;
+      if(window._kinfoEqChart){ try{window._kinfoEqChart.destroy();}catch(e){} window._kinfoEqChart=null; }
+      var ecLabels=[], ecVals=[], running=0;
+      for(var ei=0;ei<chartDates.length;ei++){
+        if(!chartDates[ei] || values[ei]==null) continue;
+        running += values[ei];
+        ecLabels.push(labels[ei]||'');
+        ecVals.push(parseFloat(running.toFixed(2)));
+      }
+      if(!ecLabels.length) return;
+      var ecColor = ecVals[ecVals.length-1]>=0 ? '#00e676' : '#ef5350';
+      window._kinfoEqChart = new Chart(ecCanvas, {
+        type:'line',
+        data:{labels:ecLabels,datasets:[{data:ecVals,borderColor:ecColor,borderWidth:1.5,pointRadius:2,pointBackgroundColor:ecColor,pointHoverRadius:5,tension:0.2,fill:false}]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(item){var v=item.raw;return (v>=0?'+':'')+(kinfoUnit==='R'?v.toFixed(2)+'R':'$'+Math.abs(v).toFixed(0));}}}},
+          scales:{
+            x:{ticks:{color:'rgba(255,255,255,0.3)',font:{size:8},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},
+            y:{ticks:{color:'rgba(255,255,255,0.4)',font:{size:9},callback:function(v){return kinfoUnit==='R'?(v>=0?'+':'')+v.toFixed(1)+'R':(v>=0?'+$':'-$')+Math.abs(v).toFixed(0);}},grid:{color:'rgba(255,255,255,0.05)'}}
+          }
+        }
+      });
+    } catch(e){ console.warn('equity curve:', e); }
+  }, 100);
+
   // Draw HTML star overlay
   function _drawKinfoStars() {
     var overlay = document.getElementById('kinfoStarOverlay');
