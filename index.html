@@ -8078,7 +8078,7 @@ function tvOpenTradeTagModal(date,symbol,side,_tradeList){
   var chartImg=(typeof tvTradeImages!=='undefined'?(tvTradeImages[imgKey]||tvTradeImages[imgKeyAlt]):null)||myTradeImages[imgKey]||myTradeImages[imgKeyAlt]||null;
   if(chartImg){
     var imgSec=document.createElement('div');imgSec.style.cssText='border-radius:8px;overflow:hidden;background:#080c14;';
-    var cImg=document.createElement('img');cImg.src=chartImg;cImg.style.cssText='width:100%;max-height:540px;object-fit:contain;display:block;cursor:zoom-in;';
+    var cImg=document.createElement('img');cImg.src=chartImg;cImg.style.cssText='width:100%;max-height:420px;object-fit:contain;display:block;cursor:zoom-in;';
     cImg.onclick=function(){expandMyImg(chartImg);};
     imgSec.appendChild(cImg);body.appendChild(imgSec);
   }
@@ -8849,7 +8849,8 @@ function kinfoOpenGradeReview(trades, idx) {
       var sym2 = t.symbol ? t.symbol.toUpperCase() : '';
       var autoE = null;
       if(typeof ttEntries !== 'undefined' && Array.isArray(ttEntries)){
-        var m = ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym2)>=0 && sym2.length>=2; });
+        var symMatches2 = ttEntries.filter(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym2)>=0 && sym2.length>=2; });
+        var m = symMatches2.find(function(te){ return te.date===t.date; }) || symMatches2.sort(function(a,b){return b.date.localeCompare(a.date);})[0] || null;
         if(m) autoE = m.edge;
       }
       var edgeVal = g2.eodEdge!=null ? g2.eodEdge : (g2.disc===0 ? 0 : autoE);
@@ -9233,7 +9234,9 @@ function kinfoRenderGrades() {
       var sym = t.symbol ? t.symbol.toUpperCase() : '';
       var autoEdge = null;
       if(typeof ttEntries !== 'undefined' && Array.isArray(ttEntries)){
-        var match = ttEntries.find(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; });
+        // Match by same date first, fall back to most recent entry for that symbol
+        var symMatches = ttEntries.filter(function(te){ return te.ticker && te.ticker.toUpperCase().indexOf(sym)>=0 && sym.length>=2; });
+        var match = symMatches.find(function(te){ return te.date===t.date; }) || symMatches.sort(function(a,b){return b.date.localeCompare(a.date);})[0] || null;
         if(match) autoEdge = match.edge;
       }
       var savedEdge = g.eodEdge != null ? g.eodEdge : (g.disc===0 ? 0 : autoEdge);
