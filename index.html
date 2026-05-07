@@ -9318,11 +9318,11 @@ function kinfoRenderGrades() {
       var mTable = document.createElement('div');
       mTable.style.cssText = 'overflow-x:auto;';
       var mGrid = document.createElement('div');
-      mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(2, 1fr) repeat(2, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:420px;';
+      mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(3, 1fr) repeat(3, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:560px;';
 
       // Header
-      var mHdrs = ['MONTH','DISCRETION SELECTION = 0','% OF TRADES','SYSTEM EXECUTION = 0','% OF TRADES'];
-      var mHdrColors = ['var(--muted)','#f5c518','#f5c518','#90caf9','#90caf9'];
+      var mHdrs = ['MONTH','DISCRETION SEL = 0','% OF TRADES','P&L (R)','SYSTEM EXEC = 0','% OF TRADES','P&L (R)'];
+      var mHdrColors = ['var(--muted)','#f5c518','#f5c518','#f5c518','#90caf9','#90caf9','#90caf9'];
       mHdrs.forEach(function(h, hi) {
         var hc = document.createElement('div');
         hc.style.cssText = 'font-family:var(--mono);font-size:8px;color:'+mHdrColors[hi]+';letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'');
@@ -9331,7 +9331,7 @@ function kinfoRenderGrades() {
       });
 
       // Sub-header: total graded
-      var subHdrs = ['', 'count', 'of graded', 'count', 'of graded'];
+      var subHdrs = ['', 'count', 'of graded', 'total R', 'count', 'of graded', 'total R'];
       subHdrs.forEach(function(h, hi) {
         var hc = document.createElement('div');
         hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
@@ -9342,10 +9342,16 @@ function kinfoRenderGrades() {
       months.forEach(function(mk, mi) {
         var mTrades = monthGroups[mk];
         var total = mTrades.length;
-        var disc0 = mTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); }).length;
-        var exec0 = mTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); }).length;
+        var disc0Trades = mTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); });
+        var exec0Trades = mTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); });
+        var disc0 = disc0Trades.length;
+        var exec0 = exec0Trades.length;
         var disc0Pct = total ? Math.round(disc0/total*100) : 0;
         var exec0Pct = total ? Math.round(exec0/total*100) : 0;
+        // P&L in R for disc=0 and exec=0 trades
+        function tradeR(x){ var dayR=tvDayR[x.t.date]; return dayR?(x.t.pnl||0)/dayR:null; }
+        var disc0R = disc0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
+        var exec0R = exec0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
         var monthLabel = new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
         var isEven = mi%2===0;
         var rowBg = isEven ? 'rgba(255,255,255,0.02)' : 'transparent';
@@ -9373,11 +9379,20 @@ function kinfoRenderGrades() {
           return c;
         }
 
+        function mCellR(r, col) {
+          var rCol = r > 0 ? '#4caf50' : r < 0 ? '#ef5350' : 'var(--muted)';
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+rCol+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
+          return c;
+        }
         mGrid.appendChild(mCell(monthLabel, 'var(--text)', rowBg, true));
         mGrid.appendChild(mCellWithBar(disc0, disc0Pct, '#f5c518', total));
         mGrid.appendChild(mCellPct(disc0Pct, '#f5c518'));
+        mGrid.appendChild(mCellR(disc0R, '#f5c518'));
         mGrid.appendChild(mCellWithBar(exec0, exec0Pct, '#90caf9', total));
         mGrid.appendChild(mCellPct(exec0Pct, '#90caf9'));
+        mGrid.appendChild(mCellR(exec0R, '#90caf9'));
       });
       mTable.appendChild(mGrid);
       monthDiv.appendChild(mTable);
