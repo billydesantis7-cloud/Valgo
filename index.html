@@ -8991,12 +8991,13 @@ function kinfoRenderGrades() {
     insightDiv.style.cssText = 'margin-bottom:20px;';
     insightDiv.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">⚡ KEY INSIGHTS — WHAT THE DATA IS TELLING YOU</div>';
 
+    function hasZero(g, field){ var v=g[field]; return v===0||(Array.isArray(v)&&v.indexOf(0)>=0); }
     function getInsightStats(field, tradeSet) {
       var relevant = tradeSet.filter(function(t){ return (allGrades[t.key]||{})[field]!=null; });
       var losses = relevant.filter(function(t){ return t.pnl<=0; });
       var wins = relevant.filter(function(t){ return t.pnl>0; });
-      var lossZero = losses.filter(function(t){ return (allGrades[t.key]||{})[field]===0; });
-      var allZero = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===0; });
+      var lossZero = losses.filter(function(t){ return hasZero(allGrades[t.key]||{}, field); });
+      var allZero = relevant.filter(function(t){ return hasZero(allGrades[t.key]||{}, field); });
       return {
         relevant: relevant.length,
         lossZeroPct: losses.length ? Math.round(lossZero.length/losses.length*100) : 0,
@@ -9005,7 +9006,7 @@ function kinfoRenderGrades() {
         allZeroPct: relevant.length ? Math.round(allZero.length/relevant.length*100) : 0,
         allZeroCount: allZero.length,
         winCount: wins.length,
-        winZero: wins.filter(function(t){ return (allGrades[t.key]||{})[field]===0; }).length
+        winZero: wins.filter(function(t){ return hasZero(allGrades[t.key]||{}, field); }).length
       };
     }
 
@@ -9054,7 +9055,7 @@ function kinfoRenderGrades() {
     notice.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:4px;';
     notice.textContent = gradedTrades.length+' graded · '+ungraded+' ungraded · '+trades.length+' total in view';
     insightDiv.appendChild(notice);
-    el.appendChild(insightDiv);
+    // Month comparison moved above - see below
 
     // ── SECTION 2: BREAKDOWN PANELS ──
     function buildBreakdown(title, color, field) {
@@ -9083,9 +9084,10 @@ function kinfoRenderGrades() {
       });
 
       [{v:0,col:'#ef5350'},{v:0.5,col:'#ff9800'},{v:1,col:'#4caf50'}].forEach(function(gv) {
-        var subAll = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
-        var subWin = wins.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
-        var subLos = losses.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
+        function hasVal(g){ var vv=g[field]; return vv===gv.v||(Array.isArray(vv)&&vv.indexOf(gv.v)>=0); }
+        var subAll = relevant.filter(function(t){ return hasVal(allGrades[t.key]||{}); });
+        var subWin = wins.filter(function(t){ return hasVal(allGrades[t.key]||{}); });
+        var subLos = losses.filter(function(t){ return hasVal(allGrades[t.key]||{}); });
         var pAll = relevant.length ? Math.round(subAll.length/relevant.length*100) : 0;
         var pWin = wins.length ? Math.round(subWin.length/wins.length*100) : 0;
         var pLos = losses.length ? Math.round(subLos.length/losses.length*100) : 0;
@@ -9148,7 +9150,7 @@ function kinfoRenderGrades() {
       mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(2, 1fr) repeat(2, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:420px;';
 
       // Header
-      var mHdrs = ['MONTH','DISC = 0','% OF TRADES','EXEC = 0','% OF TRADES'];
+      var mHdrs = ['MONTH','DISCRETION SELECTION = 0','% OF TRADES','SYSTEM EXECUTION = 0','% OF TRADES'];
       var mHdrColors = ['var(--muted)','#f5c518','#f5c518','#90caf9','#90caf9'];
       mHdrs.forEach(function(h, hi) {
         var hc = document.createElement('div');
@@ -9169,8 +9171,8 @@ function kinfoRenderGrades() {
       months.forEach(function(mk, mi) {
         var mTrades = monthGroups[mk];
         var total = mTrades.length;
-        var disc0 = mTrades.filter(function(x){ return x.g.disc===0; }).length;
-        var exec0 = mTrades.filter(function(x){ return x.g.exec===0; }).length;
+        var disc0 = mTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); }).length;
+        var exec0 = mTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); }).length;
         var disc0Pct = total ? Math.round(disc0/total*100) : 0;
         var exec0Pct = total ? Math.round(exec0/total*100) : 0;
         var monthLabel = new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
@@ -9210,7 +9212,9 @@ function kinfoRenderGrades() {
       monthDiv.appendChild(mTable);
     }
 
-    el.appendChild(monthDiv);
+    // Prepend month comparison at top, then insights, then breakdown
+    el.insertBefore(monthDiv, el.firstChild);
+    el.insertBefore(insightDiv, el.firstChild);
     return;
   }
 
