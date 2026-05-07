@@ -8765,7 +8765,7 @@ function kinfoOpenGradeReview(trades, idx) {
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
 
   var box = document.createElement('div');
-  box.style.cssText = 'background:#0d1117;border:1px solid var(--border);border-radius:10px;width:860px;max-width:95vw;max-height:92vh;overflow-y:auto;padding:24px;position:relative;';
+  box.style.cssText = 'background:#0d1117;border:1px solid var(--border);border-radius:10px;width:920px;max-width:95vw;max-height:92vh;overflow-y:auto;padding:24px;position:relative;display:grid;grid-template-columns:1fr 220px;column-gap:20px;';
 
   function renderModal() {
     var g2 = kinfoLoadGrades()[t.key] || {};
@@ -8880,27 +8880,26 @@ function kinfoOpenGradeReview(trades, idx) {
       lblE.textContent = 'EOD EXEC SCORE';
       rowE.appendChild(lblE);
       var exi = document.createElement('input');
-      exi.type='number'; exi.min=0; exi.max=100;
+      exi.type='number'; exi.min=0; exi.max=10; exi.step=0.5;
       exi.value = g2.eodExec!=null ? g2.eodExec : '';
-      exi.placeholder='0-100';
+      exi.placeholder='0-10';
       exi.style.cssText='width:80px;font-family:var(--mono);font-size:14px;font-weight:bold;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:#90caf9;padding:6px 8px;text-align:center;';
       exi.onchange=(function(key){ return function(){ var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodExec',v); renderModal(); }; })(t.key);
       rowE.appendChild(exi);
       box.appendChild(rowE);
     })();
-    // Exec Error row — multi-tag widget
+    // Exec Error — right column panel
     (function(){
-      var row3 = document.createElement('div');
-      row3.style.cssText = 'display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;';
-      var lbl3 = document.createElement('span');
-      lbl3.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;padding-top:6px;';
+      var panel = document.createElement('div');
+      panel.style.cssText = 'grid-row:1/20;grid-column:2;padding-left:16px;border-left:1px solid var(--border);';
+      var lbl3 = document.createElement('div');
+      lbl3.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;';
       lbl3.textContent = 'EXECUTION ERRORS';
-      row3.appendChild(lbl3);
+      panel.appendChild(lbl3);
       var tagContainer = document.createElement('div');
-      tagContainer.style.cssText = 'flex:1;';
       kinfoMakeTagInput(t.key, tagContainer, null);
-      row3.appendChild(tagContainer);
-      box.appendChild(row3);
+      panel.appendChild(tagContainer);
+      box.appendChild(panel);
     })();
   }
 
@@ -9277,10 +9276,10 @@ function kinfoRenderGrades() {
       var execCell = document.createElement('div');
       execCell.style.cssText = 'display:flex;align-items:center;';
       var inp = document.createElement('input');
-      inp.type='number'; inp.min=0; inp.max=100;
+      inp.type='number'; inp.min=0; inp.max=10; inp.step=0.5;
       inp.value = savedExec!=null ? savedExec : '';
-      inp.placeholder = '0-100';
-      var ec2 = savedExec!=null ? (savedExec>=60?'#4caf50':savedExec>=40?'#ff9800':'#ef5350') : 'rgba(255,255,255,0.3)';
+      inp.placeholder = '0-10';
+      var ec2 = savedExec!=null ? (savedExec>=7?'#4caf50':savedExec>=4?'#ff9800':'#ef5350') : 'rgba(255,255,255,0.3)';
       inp.style.cssText = 'width:54px;font-family:var(--mono);font-size:10px;font-weight:bold;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+ec2+';padding:2px 4px;text-align:center;';
       inp.onclick = function(e){ e.stopPropagation(); };
       inp.onchange = (function(key){ return function(e){ e.stopPropagation(); var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodExec',v); kinfoRenderGrades(); }; })(t.key);
@@ -9339,7 +9338,10 @@ function showExecErrSuggestions(inp, key){
   var dd = document.createElement('div');
   dd.id='_execErrDropdown';
   var rect = inp.getBoundingClientRect();
-  dd.style.cssText='position:fixed;left:'+rect.left+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  // Position to the right if near bottom of screen, otherwise below
+  var spaceBelow = window.innerHeight - rect.bottom;
+  var topPos = spaceBelow < 200 ? (rect.top - 200) : rect.bottom + 2;
+  dd.style.cssText='position:fixed;left:'+rect.left+'px;top:'+topPos+'px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow-y:auto;max-height:200px;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
   suggestions.forEach(function(s){
     var item = document.createElement('div');
     item.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 12px;cursor:pointer;display:flex;justify-content:space-between;';
