@@ -9118,10 +9118,10 @@ function kinfoRenderGrades() {
     // ── STATS VIEW — CLEAN COACH REDESIGN ──
     var allGrades = kinfoLoadGrades();
     // Use ALL tvTrades for monthly comparison, not just filtered
-    var allTvTrades = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function(t){ return t.date && t.symbol; });
-    // Build grade key for tvTrades entries
-    function tvTradeKey(t) { return t.date+'_'+t.symbol+'_'+(t.side||''); }
-    var gradedTrades = allTvTrades.map(function(t){ var key=t.date+"_"+t.symbol+"_"+(t.side||""); var g=allGrades[key]||{}; return Object.assign({},t,{key:key,g:g}); }).filter(function(x){ return x.g.disc!=null||x.g.exec!=null; });
+    // Use grouped trades (per ticker per day) — same as the trades list view
+    var allTvTrades = kinfoGetGradeTrades();
+    function tvTradeKey(t) { return t.key || (t.date+'_'+t.symbol+'_'+(t.side||'')); }
+    var gradedTrades = allTvTrades.filter(function(t){ var g=allGrades[t.key]||{}; return g.disc!=null||g.exec!=null; }).map(function(t){ var g=allGrades[t.key]||{}; return Object.assign({},t,{g:g}); });
     var ungraded = allTvTrades.length - gradedTrades.length;
 
     // Helper: bar fill element
@@ -9277,14 +9277,37 @@ function kinfoRenderGrades() {
 
     // Group ALL tvTrades by month, with grades
     var monthGroups = {};
-    allTvTrades.forEach(function(t) {
+    // allTvTrades is already grouped per ticker per day from kinfoGetGradeTrades
+    // For month comparison we need ALL months, so re-fetch without date filter
+    var _allForMonth = (function(){
+      var all = [];
+      try {
+        var raw = JSON.parse(localStorage.getItem('tvTrades')||'[]');
+        var dayRaw = JSON.parse(localStorage.getItem('tvDayR')||'{}');
+        var seen = {};
+        raw.forEach(function(t){
+          if(!t.date||!t.symbol) return;
+          var side=(t.side||'').toLowerCase().indexOf('short')>=0?'short':'long';
+          var key=t.date+'_'+t.symbol+'_'+side;
+          if(seen[key]) return; seen[key]=true;
+          all.push({date:t.date,symbol:t.symbol,side:side,key:key,pnl:0});
+        });
+        raw.forEach(function(t){
+          var side=(t.side||'').toLowerCase().indexOf('short')>=0?'short':'long';
+          var key=t.date+'_'+t.symbol+'_'+side;
+          var found=all.find(function(x){return x.key===key;});
+          if(found) found.pnl+=(t.pnl||0);
+        });
+      } catch(e){}
+      return all;
+    })();
+    _allForMonth.forEach(function(t) {
       if (!t.date) return;
-      var mk = t.date.slice(0,7); // YYYY-MM
-      var key = tvTradeKey(t);
-      var g = allGrades[key] || {};
-      if (g.disc == null && g.exec == null) return; // only graded
+      var mk = t.date.slice(0,7);
+      var g = allGrades[t.key] || {};
+      if (g.disc == null && g.exec == null) return;
       if (!monthGroups[mk]) monthGroups[mk] = [];
-      monthGroups[mk].push({t:t, g:g, key:key});
+      monthGroups[mk].push({t:t, g:g, key:t.key});
     });
 
     var months = Object.keys(monthGroups).sort();
