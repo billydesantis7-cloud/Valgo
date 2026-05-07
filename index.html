@@ -8768,6 +8768,80 @@ function kinfoGetGradeTrades() {
 // Grade review modal
 var _gradeReviewIdx = 0;
 var _gradeReviewTrades = [];
+function kinfoGetAllErrTags(fieldKey){
+  var fk = fieldKey||'execErr';
+  var grades = kinfoLoadGrades();
+  var counts = {};
+  Object.keys(grades).forEach(function(k){
+    var g=grades[k];
+    var tags = Array.isArray(g[fk])?g[fk]:(g[fk]?[g[fk]]:[]);
+    tags.forEach(function(t){ counts[t]=(counts[t]||0)+1; });
+  });
+  return counts;
+}
+
+function kinfoShowErrSuggestions(inp, key, onSelect, fieldKey){
+  var existing = document.getElementById('_execErrDD');
+  if(existing) existing.remove();
+  var query = inp.value.trim().toLowerCase();
+  var allErrs = kinfoGetAllErrTags(fieldKey);
+  var suggestions = Object.keys(allErrs).filter(function(e){ return !query||e.toLowerCase().indexOf(query)>=0; }).sort(function(a,b){return allErrs[b]-allErrs[a];}).slice(0,8);
+  if(!suggestions.length) return;
+  var dd = document.createElement('div');
+  dd.id='_execErrDD';
+  var rect = inp.getBoundingClientRect();
+  var spaceBelow = window.innerHeight - rect.bottom;
+  var topPos = spaceBelow < 200 ? (rect.top - 200) : rect.bottom + 2;
+  dd.style.cssText='position:fixed;left:'+rect.left+'px;top:'+topPos+'px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow-y:auto;max-height:200px;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  suggestions.forEach(function(s){
+    var item = document.createElement('div');
+    item.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 12px;cursor:pointer;display:flex;justify-content:space-between;';
+    var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
+    var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:9px;'; t2.textContent='x'+allErrs[s]; item.appendChild(t2);
+    item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
+    item.onmouseout=function(){this.style.background='transparent';};
+    item.onmousedown=(function(sv){ return function(e){ e.preventDefault(); inp.value=''; dd.remove(); if(onSelect) onSelect(sv); }; })(s);
+    dd.appendChild(item);
+  });
+  document.body.appendChild(dd);
+}
+
+function kinfoMakeTagInput(key, container, onUpdate, category){
+  var fieldKey = category==='entry'?'execErrEntry':category==='exitTP'?'execErrExitTP':category==='exitStop'?'execErrExitStop':'execErr';
+  var g = kinfoLoadGrades()[key]||{};
+  var tags = Array.isArray(g[fieldKey])?g[fieldKey].slice():(g[fieldKey]?[g[fieldKey]]:[]);
+
+  function saveTags(){ kinfoSaveGrade(key,fieldKey,tags.length?tags:null); if(onUpdate) onUpdate(); }
+
+  function render(){
+    container.innerHTML='';
+    container.style.cssText='display:flex;flex-wrap:wrap;gap:4px;align-items:center;border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:4px 6px;min-height:28px;cursor:text;';
+    tags.forEach(function(tag,i){
+      var chip=document.createElement('span');
+      chip.style.cssText='display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:2px 6px;border-radius:3px;';
+      var txt=document.createElement('span'); txt.textContent=tag; chip.appendChild(txt);
+      var x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;opacity:0.7;font-size:11px;';
+      x.onclick=(function(idx){ return function(e){ e.stopPropagation(); tags.splice(idx,1); saveTags(); render(); }; })(i);
+      chip.appendChild(x);
+      container.appendChild(chip);
+    });
+    var inp=document.createElement('input');
+    inp.type='text'; inp.placeholder=tags.length?'add tag...':'type error, press Enter';
+    inp.style.cssText='border:none;background:transparent;font-family:var(--mono);font-size:9px;color:var(--text);outline:none;min-width:80px;flex:1;padding:0 2px;';
+    inp.oninput=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ tags.push(sel); saveTags(); render(); }, fieldKey); };
+    inp.onfocus=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ tags.push(sel); saveTags(); render(); }, fieldKey); };
+    inp.onblur=function(){ setTimeout(function(){ var d=document.getElementById('_execErrDD'); if(d) d.remove(); },200); };
+    inp.onclick=function(e){ e.stopPropagation(); };
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'){ e.preventDefault(); var v=inp.value.trim(); if(v){ tags.push(v); inp.value=''; saveTags(); render(); } }
+      else if(e.key==='Backspace'&&inp.value===''&&tags.length){ tags.pop(); saveTags(); render(); }
+    };
+    container.appendChild(inp);
+    container.onclick=function(){ inp.focus(); };
+  }
+  render();
+}
+
 function kinfoOpenGradeReview(trades, idx) {
   _gradeReviewTrades = trades;
   _gradeReviewIdx = idx;
