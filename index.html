@@ -9186,10 +9186,10 @@ function kinfoRenderGrades() {
   }
 
   // ── TRADES VIEW ──
-  var COLS = '90px 80px 80px 65px 120px 72px 120px 72px 110px 40px';
+  var COLS = '90px 90px 65px 120px 72px 120px 72px 110px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
-  ['DATE','SYMBOL','P&L','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','EXEC ERRORS',''].forEach(function(h) {
+  ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','EXEC ERRORS',''].forEach(function(h) {
     var s = document.createElement('span');
     s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
     s.textContent = h;
@@ -9238,7 +9238,6 @@ function kinfoRenderGrades() {
 
     var dateEl=document.createElement('span'); dateEl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);'; dateEl.textContent=t.date.slice(5); row.appendChild(dateEl);
     var symEl=document.createElement('span'); symEl.style.cssText='font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);'; symEl.textContent=t.symbol+(t.side==='short'?' ↓':' ↑'); row.appendChild(symEl);
-    var pnlEl=document.createElement('span'); pnlEl.style.cssText='font-family:var(--mono);font-size:10px;font-weight:bold;color:'+(isPos?'var(--bull)':'var(--bear)')+';'; pnlEl.textContent=t.pnl!=null?(isPos?'+':'')+t.pnl.toFixed(0):'—'; row.appendChild(pnlEl);
     var rEl=document.createElement('span'); rEl.style.cssText='font-family:var(--mono);font-size:10px;font-weight:bold;color:'+(t.r>0?'var(--bull)':t.r<0?'var(--bear)':'var(--muted)')+';'; rEl.textContent=t.r!=null?(t.r>0?'+':'')+t.r.toFixed(2)+'R':'—'; row.appendChild(rEl);
 
     row.appendChild(gradeCell(t.key,'disc',g.disc!=null?g.disc:undefined));
@@ -9471,6 +9470,7 @@ function kinfoMakeTagInput(key, container, onUpdate){
     inp.type='text'; inp.placeholder=tags.length?'add tag...':'type error, press Enter';
     inp.style.cssText='border:none;background:transparent;font-family:var(--mono);font-size:9px;color:var(--text);outline:none;min-width:80px;flex:1;padding:0 2px;';
     inp.oninput=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ if(tags.indexOf(sel)<0) tags.push(sel); saveTags(); render(); }); };
+    inp.onfocus=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ if(tags.indexOf(sel)<0) tags.push(sel); saveTags(); render(); }); };
     inp.onblur=function(){ setTimeout(function(){ var d=document.getElementById('_execErrDD'); if(d) d.remove(); },200); };
     inp.onclick=function(e){ e.stopPropagation(); };
     inp.onkeydown=function(e){
