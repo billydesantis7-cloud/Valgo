@@ -8948,9 +8948,13 @@ function kinfoRenderGrades() {
 
   el.innerHTML = '';
 
-  // ── TAB SWITCHER ──
+  // ── TOP BAR: TABS + DATE FILTER ──
+  var topBar = document.createElement('div');
+  topBar.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;';
+
+  // Tab switcher
   var tabBar = document.createElement('div');
-  tabBar.style.cssText = 'display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:16px;';
+  tabBar.style.cssText = 'display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;';
   ['trades','stats','execerrs'].forEach(function(tb) {
     var btn = document.createElement('button');
     var lbl = tb==='trades'?'TRADES':tb==='stats'?'STATS':'EXEC ERRORS';
@@ -8959,7 +8963,77 @@ function kinfoRenderGrades() {
     btn.onclick = (function(t2){ return function(){ el._gradesTab=t2; if(t2==='execerrs') kinfoRenderExecErrors(); else kinfoRenderGrades(); }; })(tb);
     tabBar.appendChild(btn);
   });
-  el.appendChild(tabBar);
+  topBar.appendChild(tabBar);
+
+  // Separator
+  var sep = document.createElement('div');
+  sep.style.cssText='width:1px;height:24px;background:var(--border);';
+  topBar.appendChild(sep);
+
+  // Quick date buttons
+  var _gradeRange = el._gradeRange || kinfoRange || '1M';
+  var _gradeFrom = el._gradeFrom || '';
+  var _gradeTo = el._gradeTo || '';
+  ['1W','MTD','1M','3M','1Y','ALL'].forEach(function(r){
+    var rb = document.createElement('button');
+    rb.style.cssText='font-family:var(--mono);font-size:9px;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:1px;border:1px solid '+(_gradeRange===r&&!_gradeFrom?'var(--accent)':'var(--border)')+';background:'+(_gradeRange===r&&!_gradeFrom?'rgba(200,169,110,0.15)':'transparent')+';color:'+(_gradeRange===r&&!_gradeFrom?'var(--accent)':'var(--muted)')+';';
+    rb.textContent = r;
+    rb.onclick = function(){
+      el._gradeRange = r;
+      el._gradeFrom = '';
+      el._gradeTo = '';
+      kinfoRenderGrades();
+    };
+    topBar.appendChild(rb);
+  });
+
+  // Custom date range
+  var fromInp = document.createElement('input');
+  fromInp.type='date'; fromInp.value=_gradeFrom;
+  fromInp.style.cssText='font-family:var(--mono);font-size:9px;background:var(--surface);border:1px solid '+(_gradeFrom?'var(--accent)':'var(--border)')+';color:var(--text);padding:3px 6px;border-radius:4px;width:120px;';
+  fromInp.onchange=function(){ el._gradeFrom=this.value; el._gradeTo=toInp.value; el._gradeRange=''; kinfoRenderGrades(); };
+
+  var toInp = document.createElement('input');
+  toInp.type='date'; toInp.value=_gradeTo;
+  toInp.style.cssText='font-family:var(--mono);font-size:9px;background:var(--surface);border:1px solid '+(_gradeTo?'var(--accent)':'var(--border)')+';color:var(--text);padding:3px 6px;border-radius:4px;width:120px;';
+  toInp.onchange=function(){ el._gradeTo=this.value; el._gradeFrom=fromInp.value; el._gradeRange=''; kinfoRenderGrades(); };
+
+  var rangeLabel = document.createElement('span');
+  rangeLabel.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);';
+  rangeLabel.textContent='to';
+
+  topBar.appendChild(fromInp);
+  topBar.appendChild(rangeLabel);
+  topBar.appendChild(toInp);
+
+  if(_gradeFrom||_gradeTo){
+    var clearBtn = document.createElement('button');
+    clearBtn.style.cssText='font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:4px;cursor:pointer;';
+    clearBtn.textContent='✕';
+    clearBtn.onclick=function(){ el._gradeFrom=''; el._gradeTo=''; el._gradeRange='1M'; kinfoRenderGrades(); };
+    topBar.appendChild(clearBtn);
+  }
+
+  el.appendChild(topBar);
+
+  // Apply custom date filter to trades if set
+  if(_gradeFrom||_gradeTo){
+    trades = trades.filter(function(t){
+      if(_gradeFrom && t.date < _gradeFrom) return false;
+      if(_gradeTo && t.date > _gradeTo) return false;
+      return true;
+    });
+  } else if(_gradeRange && _gradeRange!==kinfoRange){
+    var now2=new Date(), from2=new Date(now2);
+    if(_gradeRange==='1W') from2.setDate(now2.getDate()-7);
+    else if(_gradeRange==='MTD') from2=new Date(now2.getFullYear(),now2.getMonth(),1);
+    else if(_gradeRange==='1M') from2.setMonth(now2.getMonth()-1);
+    else if(_gradeRange==='3M') from2.setMonth(now2.getMonth()-3);
+    else if(_gradeRange==='1Y') from2.setFullYear(now2.getFullYear()-1);
+    else if(_gradeRange==='ALL') from2=new Date('2000-01-01');
+    var fromStr2=from2.toISOString().slice(0,10);
+    trades = trades.filter(function(t){ return t.date >= fromStr2; });
+  }
 
   if (!trades.length) {
     el.innerHTML += '<div style="padding:40px;text-align:center;font-size:12px;color:var(--muted);font-style:italic;">No trades in this period.</div>';
