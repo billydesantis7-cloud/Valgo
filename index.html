@@ -9402,139 +9402,8 @@ function kinfoRenderExecErrors(){
   if(!el) return;
   var grades = kinfoLoadGrades();
   var trades = kinfoGetGradeTrades();
-  var errMap = {};
-  trades.forEach(function(t){
-    var g = grades[t.key]||{};
-    if(g.execErr){
-      if(!errMap[g.execErr]) errMap[g.execErr]={count:0,trades:[]};
-      errMap[g.execErr].count++;
-      errMap[g.execErr].trades.push(t);
-    }
-  });
-  var sorted = Object.keys(errMap).sort(function(a,b){ return errMap[b].count-errMap[a].count; });
   el.innerHTML='';
-  var hdr = document.createElement('div');
-  hdr.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
-  var totalErrCount = Object.keys(errMap).reduce(function(s,k){return s+errMap[k].count;},0);
-  hdr.innerHTML='<div style="font-family:var(--mono);font-size:11px;font-weight:bold;letter-spacing:2px;color:#ff9800;">⚠ EXECUTION ERRORS</div>'
-    +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique errors across '+totalErrCount+' trades</div>'
-    +'<button onclick="document.getElementById(\'kinfoGradesContent\')._gradesTab=\'trades\';kinfoRenderGrades();" style="margin-left:auto;font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;">← BACK</button>';
-  el.appendChild(hdr);
-  if(!sorted.length){
-    el.innerHTML+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;">No execution errors recorded yet.</div>';
-    return;
-  }
-  var maxCount = errMap[sorted[0]].count;
-  sorted.forEach(function(err, i){
-    var data = errMap[err];
-    var pct = Math.round(data.count/maxCount*100);
-    var card = document.createElement('div');
-    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid #ff9800;border-radius:8px;padding:14px 16px;margin-bottom:10px;';
-    card.innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
-      +'<div style="font-family:var(--display);font-size:24px;font-weight:bold;color:#ff9800;">#'+(i+1)+'</div>'
-      +'<div style="flex:1;">'
-        +'<div style="font-family:var(--mono);font-size:12px;font-weight:bold;color:var(--text);">'+err+'</div>'
-        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+data.count+' occurrence'+(data.count>1?'s':'')+'</div>'
-      +'</div>'
-      +'<div style="font-family:var(--display);font-size:20px;font-weight:bold;color:#ff9800;">'+data.count+'×</div>'
-      +'</div>'
-      +'<div style="height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;">'
-        +'<div style="height:100%;width:'+pct+'%;background:#ff9800;border-radius:3px;"></div>'
-      +'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">'
-        +data.trades.map(function(t){
-          return '<span style="font-family:var(--mono);font-size:9px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;color:var(--muted);">'+t.symbol+' '+t.date.slice(5)+'</span>';
-        }).join('')
-      +'</div>';
-    el.appendChild(card);
-  });
-}
 
-function kinfoGetAllErrTags(fieldKey){
-  var fk = fieldKey||'execErr';
-  var grades = kinfoLoadGrades();
-  var counts = {};
-  Object.keys(grades).forEach(function(k){
-    var g=grades[k];
-    var tags = Array.isArray(g[fk])?g[fk]:(g[fk]?[g[fk]]:[]);
-    tags.forEach(function(t){ counts[t]=(counts[t]||0)+1; });
-  });
-  return counts;
-}
-
-function kinfoShowErrSuggestions(inp, key, onSelect, fieldKey){
-  var existing = document.getElementById('_execErrDD');
-  if(existing) existing.remove();
-  var query = inp.value.trim().toLowerCase();
-  var allErrs = kinfoGetAllErrTags(fieldKey);
-  var suggestions = Object.keys(allErrs).filter(function(e){ return !query||e.toLowerCase().indexOf(query)>=0; }).sort(function(a,b){return allErrs[b]-allErrs[a];}).slice(0,8);
-  if(!suggestions.length) return;
-  var dd = document.createElement('div');
-  dd.id='_execErrDD';
-  var rect = inp.getBoundingClientRect();
-  dd.style.cssText='position:fixed;left:'+rect.left+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
-  suggestions.forEach(function(s){
-    var item = document.createElement('div');
-    item.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 12px;cursor:pointer;display:flex;justify-content:space-between;';
-    var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
-    var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:9px;'; t2.textContent='x'+allErrs[s]; item.appendChild(t2);
-    item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
-    item.onmouseout=function(){this.style.background='transparent';};
-    item.onmousedown=(function(sv){ return function(e){ e.preventDefault(); inp.value=''; dd.remove(); if(onSelect) onSelect(sv); }; })(s);
-    dd.appendChild(item);
-  });
-  document.body.appendChild(dd);
-}
-
-// Build a tag input widget for exec errors
-function kinfoMakeTagInput(key, container, onUpdate, category){
-  // category: 'entry' | 'exitTP' | 'exitStop'
-  var fieldKey = category==='entry'?'execErrEntry':category==='exitTP'?'execErrExitTP':category==='exitStop'?'execErrExitStop':'execErr';
-  var g = kinfoLoadGrades()[key]||{};
-  var tags = Array.isArray(g[fieldKey])?g[fieldKey].slice():(g[fieldKey]?[g[fieldKey]]:[]);
-
-  function saveTags(){ kinfoSaveGrade(key,fieldKey,tags.length?tags:null); if(onUpdate) onUpdate(); }
-
-  function render(){
-    container.innerHTML='';
-    container.style.cssText='display:flex;flex-wrap:wrap;gap:4px;align-items:center;border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:4px 6px;min-height:28px;cursor:text;';
-    tags.forEach(function(tag,i){
-      var chip=document.createElement('span');
-      chip.style.cssText='display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);color:#ff9800;padding:2px 6px;border-radius:3px;';
-      var txt=document.createElement('span'); txt.textContent=tag; chip.appendChild(txt);
-      var x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;opacity:0.7;font-size:11px;';
-      x.onclick=(function(idx){ return function(e){ e.stopPropagation(); tags.splice(idx,1); saveTags(); render(); }; })(i);
-      chip.appendChild(x);
-      container.appendChild(chip);
-    });
-    var inp=document.createElement('input');
-    inp.type='text'; inp.placeholder=tags.length?'add tag...':'type error, press Enter';
-    inp.style.cssText='border:none;background:transparent;font-family:var(--mono);font-size:9px;color:var(--text);outline:none;min-width:80px;flex:1;padding:0 2px;';
-    inp.oninput=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ if(tags.indexOf(sel)<0) tags.push(sel); saveTags(); render(); }, fieldKey); };
-    inp.onfocus=function(e){ e.stopPropagation(); kinfoShowErrSuggestions(inp, key, function(sel){ if(tags.indexOf(sel)<0) tags.push(sel); saveTags(); render(); }, fieldKey); };
-    inp.onblur=function(){ setTimeout(function(){ var d=document.getElementById('_execErrDD'); if(d) d.remove(); },200); };
-    inp.onclick=function(e){ e.stopPropagation(); };
-    inp.onkeydown=function(e){
-      if(e.key==='Enter'){ e.preventDefault(); var v=inp.value.trim(); if(v&&tags.indexOf(v)<0){ tags.push(v); saveTags(); render(); } else inp.value=''; }
-      else if(e.key==='Backspace'&&inp.value===''&&tags.length){ tags.pop(); saveTags(); render(); }
-    };
-    container.appendChild(inp);
-    container.onclick=function(){ inp.focus(); };
-  }
-  render();
-}
-
-function kinfoRenderExecErrors(){
-  var el = document.getElementById('kinfoGradesContent');
-  if(!el) return;
-  var grades = kinfoLoadGrades();
-  var trades = kinfoGetGradeTrades();
-  var catDefs = [
-    {field:'execErrEntry',    label:'ENTRIES',             color:'#f5c518'},
-    {field:'execErrExitTP',   label:'EXITS — TAKE PROFIT', color:'#4caf50'},
-    {field:'execErrExitStop', label:'EXITS — STOP',        color:'#ef5350'},
-  ];
-  el.innerHTML='';
   var hdr = document.createElement('div');
   hdr.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
   var backBtn = document.createElement('button');
@@ -9545,8 +9414,28 @@ function kinfoRenderExecErrors(){
   hdr.appendChild(backBtn);
   el.appendChild(hdr);
 
-  var anyFound = false;
+  var catDefs = [
+    {field:'execErrEntry',    label:'ENTRIES',             color:'#f5c518'},
+    {field:'execErrExitTP',   label:'EXITS — TAKE PROFIT', color:'#4caf50'},
+    {field:'execErrExitStop', label:'EXITS — STOP',        color:'#ef5350'},
+  ];
+
+  // 3-column grid
+  var grid = document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start;';
+  el.appendChild(grid);
+
   catDefs.forEach(function(cat){
+    var col = document.createElement('div');
+    col.style.cssText='min-width:0;';
+
+    var colHdr = document.createElement('div');
+    colHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid '+cat.color+'44;';
+    colHdr.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+cat.color+';display:inline-block;flex-shrink:0;"></span>'
+      +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;color:'+cat.color+';">'+cat.label+'</span>';
+    col.appendChild(colHdr);
+
+    // Build error map counting duplicates
     var errMap = {};
     trades.forEach(function(t){
       var g = grades[t.key]||{};
@@ -9554,49 +9443,96 @@ function kinfoRenderExecErrors(){
       tags.forEach(function(tag){
         if(!errMap[tag]) errMap[tag]={count:0,trades:[]};
         errMap[tag].count++;
+        // Store trade once but track count separately
         if(!errMap[tag].trades.some(function(x){return x.key===t.key;})) errMap[tag].trades.push(t);
       });
     });
-    var sorted = Object.keys(errMap).sort(function(a,b){ return errMap[b].count-errMap[a].count; });
-    if(!sorted.length) return;
-    anyFound = true;
 
-    var secHdr = document.createElement('div');
-    secHdr.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:4px;';
-    secHdr.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+cat.color+';display:inline-block;flex-shrink:0;"></span>'
-      +'<span style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+cat.color+';">'+cat.label+'</span>'
-      +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique</span>';
-    el.appendChild(secHdr);
+    var sorted = Object.keys(errMap).sort(function(a,b){ return errMap[b].count-errMap[a].count; });
+
+    if(!sorted.length){
+      var empty=document.createElement('div');
+      empty.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);padding:10px 0;';
+      empty.textContent='None recorded yet';
+      col.appendChild(empty);
+      grid.appendChild(col);
+      return;
+    }
 
     var maxCount = errMap[sorted[0]].count;
     sorted.forEach(function(err,i){
-    var data=errMap[err];
-    var card=document.createElement('div');
-    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid #ff9800;border-radius:8px;padding:14px 16px;margin-bottom:10px;';
-    var topRow=document.createElement('div'); topRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:8px;';
-    var num=document.createElement('div'); num.style.cssText='font-family:var(--display);font-size:24px;font-weight:bold;color:#ff9800;'; num.textContent='#'+(i+1); topRow.appendChild(num);
-    var mid=document.createElement('div'); mid.style.cssText='flex:1;';
-    var errName=document.createElement('div'); errName.style.cssText='font-family:var(--mono);font-size:12px;font-weight:bold;color:var(--text);'; errName.textContent=err; mid.appendChild(errName);
-    var errCnt=document.createElement('div'); errCnt.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);'; errCnt.textContent=data.count+' occurrence'+(data.count>1?'s':''); mid.appendChild(errCnt);
-    topRow.appendChild(mid);
-    var cnt=document.createElement('div'); cnt.style.cssText='font-family:var(--display);font-size:20px;font-weight:bold;color:#ff9800;'; cnt.textContent=data.count+'x'; topRow.appendChild(cnt);
-    card.appendChild(topRow);
-    var bar=document.createElement('div'); bar.style.cssText='height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;margin-bottom:8px;';
-    var fill=document.createElement('div'); fill.style.cssText='height:100%;width:'+Math.round(data.count/maxCount*100)+'%;background:#ff9800;border-radius:3px;'; bar.appendChild(fill); card.appendChild(bar);
-    var chips=document.createElement('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:4px;';
-    data.trades.forEach(function(t){ var chip=document.createElement('span'); chip.style.cssText='font-family:var(--mono);font-size:9px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;color:var(--muted);'; chip.textContent=t.symbol+' '+t.date.slice(5); chips.appendChild(chip); });
-    card.appendChild(chips);
-    el.appendChild(card);
-    });  // end sorted.forEach
+      var data = errMap[err];
+      var card = document.createElement('div');
+      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+cat.color+';border-radius:6px;margin-bottom:8px;overflow:hidden;';
 
-    // spacer between categories
-    var spacer = document.createElement('div'); spacer.style.cssText='height:12px;border-bottom:1px solid var(--border);margin-bottom:12px;'; el.appendChild(spacer);
-  });  // end catDefs.forEach
+      // Card header - clickable to expand
+      var cardHdr = document.createElement('div');
+      cardHdr.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;user-select:none;';
+      cardHdr.innerHTML='<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">#'+(i+1)+'</span>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+err+'</div>'
+          +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+data.count+' occurrence'+(data.count>1?'s':'')+'</div>'
+        +'</div>'
+        +'<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">'+data.count+'×</div>'
+        +'<span class="_errChevron" style="font-size:10px;color:var(--muted);margin-left:4px;">▶</span>';
 
-  if(!anyFound){
-    var empty=document.createElement('div'); empty.style.cssText='font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;'; empty.textContent='No execution errors recorded yet.'; el.appendChild(empty);
-  }
+      // Fill bar
+      var barWrap = document.createElement('div');
+      barWrap.style.cssText='height:3px;background:rgba(255,255,255,0.06);margin:0 12px 8px;border-radius:2px;';
+      var barFill = document.createElement('div');
+      barFill.style.cssText='height:100%;width:'+Math.round(data.count/maxCount*100)+'%;background:'+cat.color+';border-radius:2px;';
+      barWrap.appendChild(barFill);
+
+      // Expandable content
+      var expand = document.createElement('div');
+      expand.style.cssText='display:none;padding:0 10px 10px;';
+
+      // Trade chips with images
+      data.trades.forEach(function(t){
+        var tradeRow = document.createElement('div');
+        tradeRow.style.cssText='margin-bottom:8px;';
+
+        // Chip label
+        var chip = document.createElement('div');
+        chip.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);padding:2px 0 4px;';
+        chip.textContent=t.symbol+' '+t.date.slice(5);
+        tradeRow.appendChild(chip);
+
+        // Images
+        var imgs = t.myTradeImages ? [t.myTradeImages] : [];
+        // Try to get image from myTradeImages store
+        var imgKey = t.date+'_'+t.symbol+'_'+(t.side||'');
+        var imgSrc = (typeof myTradeImages!=='undefined'&&myTradeImages[imgKey]) || null;
+        if(imgSrc){
+          var img = document.createElement('img');
+          img.src=imgSrc;
+          img.style.cssText='width:100%;max-height:120px;object-fit:contain;background:#080c14;border-radius:3px;cursor:zoom-in;display:block;';
+          img.onclick=(function(src){ return function(e){ e.stopPropagation(); expandMyImg(src); }; })(imgSrc);
+          tradeRow.appendChild(img);
+        }
+
+        expand.appendChild(tradeRow);
+      });
+
+      var expanded = false;
+      cardHdr.onclick = function(){
+        expanded = !expanded;
+        expand.style.display = expanded ? 'block' : 'none';
+        var chev = cardHdr.querySelector('._errChevron');
+        if(chev) chev.textContent = expanded ? '▼' : '▶';
+        card.style.borderColor = expanded ? cat.color : 'var(--border)';
+      };
+
+      card.appendChild(cardHdr);
+      card.appendChild(barWrap);
+      card.appendChild(expand);
+      col.appendChild(card);
+    });
+
+    grid.appendChild(col);
+  });
 }
+
 
 function kinfoRender() {
   var fromDate = kinfoGetDateRange();
