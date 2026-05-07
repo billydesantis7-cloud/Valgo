@@ -9341,7 +9341,7 @@ function kinfoRenderGrades() {
     row.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:5px 12px;align-items:center;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;';
     row.onmouseover=function(){this.style.background='rgba(255,255,255,0.03)';};
     row.onmouseout=function(){this.style.background='transparent';};
-    row.onclick = function(){ kinfoOpenGradeReview(trades, i); };
+    row.onclick = (function(tr,ii){ return function(e){ if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON') return; kinfoOpenGradeReview(tr,ii); }; })(trades,i);
 
     var dateEl=document.createElement('span'); dateEl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);'; dateEl.textContent=t.date.slice(5); row.appendChild(dateEl);
     var symEl=document.createElement('span'); symEl.style.cssText='font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);'; symEl.textContent=t.symbol+(t.side==='short'?' ↓':' ↑'); row.appendChild(symEl);
@@ -9424,7 +9424,7 @@ function kinfoRenderGrades() {
 
     // View button
     var viewBtn=document.createElement('span'); viewBtn.style.cssText='font-size:13px;cursor:pointer;color:rgba(255,255,255,0.3);'; viewBtn.textContent='⤢';
-    viewBtn.onclick=function(e){e.stopPropagation();kinfoOpenGradeReview(trades,i);};
+    viewBtn.onclick=(function(tr,ii){ return function(e){e.stopPropagation();kinfoOpenGradeReview(tr,ii);}; })(trades,i);
     row.appendChild(viewBtn);
 
     tbody.appendChild(row);
