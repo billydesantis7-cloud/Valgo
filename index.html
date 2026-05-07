@@ -8786,6 +8786,7 @@ function kinfoOpenGradeReview(trades, idx) {
   box.style.cssText = 'background:#0d1117;border:1px solid var(--border);border-radius:10px;width:920px;max-width:95vw;max-height:92vh;overflow-y:auto;padding:24px;position:relative;display:grid;grid-template-columns:1fr 220px;column-gap:20px;';
 
   function renderModal() {
+    try {
     var g2 = kinfoLoadGrades()[t.key] || {};
     box.innerHTML = '';
 
@@ -8795,7 +8796,7 @@ function kinfoOpenGradeReview(trades, idx) {
     hdr.innerHTML = '<div style="display:flex;align-items:center;gap:12px;">'
       +'<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>'
       +'<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">'+t.date+' · '+(t.side==='short'?'<span style="color:#ef5350">SHORT</span>':'<span style="color:#26a69a">LONG</span>')+'</span>'
-      +'<span style="font-family:var(--mono);font-size:13px;font-weight:bold;color:'+(t.pnl>0?'var(--bull)':'var(--bear)')+';">'+(t.pnl>0?'+':'')+t.pnl.toFixed(0)+'</span>'
+      +'<span style="font-family:var(--mono);font-size:13px;font-weight:bold;color:'+((t.pnl||0)>0?'var(--bull)':'var(--bear)')+';">'+(((t.pnl||0)>0)?'+':'')+((t.pnl||0).toFixed(0))+'</span>'
       +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;">'
@@ -8933,7 +8934,7 @@ function kinfoOpenGradeReview(trades, idx) {
     })();
   }
 
-  renderModal();
+  try{ renderModal(); } catch(e){ box.innerHTML='<div style="padding:20px;color:#ef5350;font-family:monospace;font-size:11px;">ERROR: '+e.message+'</div>'; }
   modal.appendChild(box);
   modal.onclick = function(e){ if(e.target===modal){ modal.remove(); kinfoRenderGrades(); } };
   document.body.appendChild(modal);
