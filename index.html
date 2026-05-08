@@ -5226,25 +5226,23 @@ function renderTvWrr(){
     return{period:p,pts:pts,ws:ws,ls:ls,wr:wr,avgW:avgW,avgL:avgL,rr:rr,totalPnl:totalPnl,totalR:totalR,rT:rT};
   });
   rows.sort(function(a,b){
-    var d=tvWrrSortDir;
-    switch(tvWrrSortField){
-      case 'period': return d*a.period.localeCompare(b.period);
-      case 't': return d*(a.pts.length-b.pts.length);
-      case 'w': return d*(a.ws.length-b.ws.length);
-      case 'l': return d*(a.ls.length-b.ls.length);
-      case 'avgw': var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2);
-      case 'avgl': var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2);
-      case 'pnl': return d*(a.totalPnl-b.totalPnl);
-      case 'pf': var pf1=a.totalLoss?Math.abs(a.totalWon/a.totalLoss):0; var pf2=b.totalLoss?Math.abs(b.totalWon/b.totalLoss):0; return d*(pf1-pf2);
-      case 'totalwon': return d*(a.totalWon-b.totalWon);
-      case 'totalloss': return d*(a.totalLoss-b.totalLoss);
-      case 'wr': return d*(a.wr-b.wr);
-      case 'rr': return d*((a.rr||0)-(b.rr||0));
-      case 'lgwin': return d*((a.lgWin||0)-(b.lgWin||0));
-      case 'lgloss': return d*((a.lgLoss||0)-(b.lgLoss||0));
-      case 'lgwl': var lw1=(a.lgLoss&&a.lgLoss!==0)?a.lgWin/Math.abs(a.lgLoss):0; var lw2=(b.lgLoss&&b.lgLoss!==0)?b.lgWin/Math.abs(b.lgLoss):0; return d*(lw1-lw2);
-      default: return d*a.period.localeCompare(b.period);
-    }
+    var d=tvWrrSortDir, f=tvWrrSortField;
+    if(f==='period') return d*a.period.localeCompare(b.period);
+    if(f==='t') return d*(a.pts.length-b.pts.length);
+    if(f==='w') return d*(a.ws.length-b.ws.length);
+    if(f==='l') return d*(a.ls.length-b.ls.length);
+    if(f==='avgw'){ var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2); }
+    if(f==='avgl'){ var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2); }
+    if(f==='pnl') return d*(a.totalPnl-b.totalPnl);
+    if(f==='pf'){ var pf1=a.totalLoss?Math.abs(a.totalWon/a.totalLoss):0; var pf2=b.totalLoss?Math.abs(b.totalWon/b.totalLoss):0; return d*(pf1-pf2); }
+    if(f==='totalwon') return d*(a.totalWon-b.totalWon);
+    if(f==='totalloss') return d*(a.totalLoss-b.totalLoss);
+    if(f==='wr') return d*(a.wr-b.wr);
+    if(f==='rr') return d*((a.rr||0)-(b.rr||0));
+    if(f==='lgwin') return d*((a.lgWin||0)-(b.lgWin||0));
+    if(f==='lgloss') return d*((a.lgLoss||0)-(b.lgLoss||0));
+    if(f==='lgwl'){ var lw1=(a.lgLoss&&a.lgLoss!==0)?a.lgWin/Math.abs(a.lgLoss):0; var lw2=(b.lgLoss&&b.lgLoss!==0)?b.lgWin/Math.abs(b.lgLoss):0; return d*(lw1-lw2); }
+    return d*a.period.localeCompare(b.period);
   });
 
   var COLS='160px 64px 56px 56px 88px 88px 90px 110px 80px 80px 80px 72px 84px 84px 80px';
