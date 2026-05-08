@@ -5234,14 +5234,26 @@ function renderTvWrr(){
     if(f==='avgw'){ var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2); }
     if(f==='avgl'){ var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2); }
     if(f==='pnl') return d*(a.totalPnl-b.totalPnl);
-    if(f==='pf'){ var pf1=a.totalLoss?Math.abs(a.totalWon/a.totalLoss):0; var pf2=b.totalLoss?Math.abs(b.totalWon/b.totalLoss):0; return d*(pf1-pf2); }
-    if(f==='totalwon') return d*(a.totalWon-b.totalWon);
-    if(f==='totalloss') return d*(a.totalLoss-b.totalLoss);
+    if(f==='pf'){
+      var aw_a=a.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
+      var al_a=Math.abs(a.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
+      var aw_b=b.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
+      var al_b=Math.abs(b.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
+      return d*((al_a?aw_a/al_a:0)-(al_b?aw_b/al_b:0));
+    }
+    if(f==='totalwon') return d*(a.ws.reduce(function(s,t){return s+(t.pnl||0);},0)-b.ws.reduce(function(s,t){return s+(t.pnl||0);},0));
+    if(f==='totalloss') return d*(a.ls.reduce(function(s,t){return s+(t.pnl||0);},0)-b.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
     if(f==='wr') return d*(a.wr-b.wr);
     if(f==='rr') return d*((a.rr||0)-(b.rr||0));
-    if(f==='lgwin') return d*((a.lgWin||0)-(b.lgWin||0));
-    if(f==='lgloss') return d*((a.lgLoss||0)-(b.lgLoss||0));
-    if(f==='lgwl'){ var lw1=(a.lgLoss&&a.lgLoss!==0)?a.lgWin/Math.abs(a.lgLoss):0; var lw2=(b.lgLoss&&b.lgLoss!==0)?b.lgWin/Math.abs(b.lgLoss):0; return d*(lw1-lw2); }
+    if(f==='lgwin'){ var lwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return t.pnl;})):0; var lwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return t.pnl;})):0; return d*(lwa-lwb); }
+    if(f==='lgloss'){ var lla=a.ls.length?Math.min.apply(null,a.ls.map(function(t){return t.pnl;})):0; var llb=b.ls.length?Math.min.apply(null,b.ls.map(function(t){return t.pnl;})):0; return d*(lla-llb); }
+    if(f==='lgwl'){
+      var lgwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return t.pnl;})):0;
+      var lgla=a.ls.length?Math.abs(Math.min.apply(null,a.ls.map(function(t){return t.pnl;}))):0;
+      var lgwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return t.pnl;})):0;
+      var lglb=b.ls.length?Math.abs(Math.min.apply(null,b.ls.map(function(t){return t.pnl;}))):0;
+      return d*((lgla?lgwa/lgla:0)-(lglb?lgwb/lglb:0));
+    }
     return d*a.period.localeCompare(b.period);
   });
 
