@@ -5318,11 +5318,17 @@ function renderTvWrr(){
     var hdrFields=['period','t','w','l','avgw','avgl','pnl','pf','totalwon','totalloss','wr','rr','lgwin','lgloss','lgwl'];
     var hdrLabels=['PERIOD','T','W','L','AVG WIN','AVG LOSS','P&L','PROFIT FACTOR','TOTAL WON','TOTAL LOSS','WIN RATE','RR','LG WIN','LG LOSS','LG W/LG L'];
     var aligns=['left','center','center','center','right','right','right','right','right','right','center','right','right','right','right'];
-    hdrEl.innerHTML=hdrFields.map(function(f,i){
+    hdrEl.innerHTML='';
+    hdrFields.forEach(function(f,i){
       var isActive=tvWrrSortField===f;
       var arrow=isActive?(tvWrrSortDir===1?' ▲':' ▼'):'';
-      return '<span onclick="tvWrrSort(''+f+'')" style="font-size:9px;color:'+(isActive?'var(--accent)':'rgba(255,255,255,0.7)')+';text-align:'+(aligns[i]||'right')+';letter-spacing:1px;font-weight:bold;cursor:pointer;user-select:none;" title="Sort by '+hdrLabels[i]+'">'+hdrLabels[i]+arrow+'</span>';
-    }).join('');
+      var span=document.createElement('span');
+      span.style.cssText='font-size:9px;color:'+(isActive?'var(--accent)':'rgba(255,255,255,0.7)')+';text-align:'+(aligns[i]||'right')+';letter-spacing:1px;font-weight:bold;cursor:pointer;user-select:none;';
+      span.textContent=hdrLabels[i]+arrow;
+      span.title='Sort by '+hdrLabels[i];
+      span.onclick=(function(field){ return function(){ tvWrrSort(field); }; })(f);
+      hdrEl.appendChild(span);
+    });
   }
 
   // ── RR Scatter Chart ──────────────────────────────────────
