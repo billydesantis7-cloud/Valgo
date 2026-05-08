@@ -5226,7 +5226,27 @@ function renderTvWrr(){
     var totalR=rT.reduce(function(s,t){return s+rOf(t);},0);
     return{period:p,pts:pts,ws:ws,ls:ls,wr:wr,avgW:avgW,avgL:avgL,rr:rr,totalPnl:totalPnl,totalR:totalR,rT:rT};
   });
-  rows.sort(function(a,b){if(tvWrrSortField==='period')return tvWrrSortDir*b.period.localeCompare(a.period);if(tvWrrSortField==='pnl')return tvWrrSortDir*(a.totalPnl-b.totalPnl);if(tvWrrSortField==='wr')return tvWrrSortDir*(a.wr-b.wr);return 0;});
+  rows.sort(function(a,b){
+    var d=tvWrrSortDir;
+    switch(tvWrrSortField){
+      case 'period': return d*a.period.localeCompare(b.period);
+      case 't': return d*(a.pts.length-b.pts.length);
+      case 'w': return d*(a.ws.length-b.ws.length);
+      case 'l': return d*(a.ls.length-b.ls.length);
+      case 'avgw': var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2);
+      case 'avgl': var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2);
+      case 'pnl': return d*(a.totalPnl-b.totalPnl);
+      case 'pf': var pf1=a.totalLoss?Math.abs(a.totalWon/a.totalLoss):0; var pf2=b.totalLoss?Math.abs(b.totalWon/b.totalLoss):0; return d*(pf1-pf2);
+      case 'totalwon': return d*(a.totalWon-b.totalWon);
+      case 'totalloss': return d*(a.totalLoss-b.totalLoss);
+      case 'wr': return d*(a.wr-b.wr);
+      case 'rr': return d*((a.rr||0)-(b.rr||0));
+      case 'lgwin': return d*((a.lgWin||0)-(b.lgWin||0));
+      case 'lgloss': return d*((a.lgLoss||0)-(b.lgLoss||0));
+      case 'lgwl': var lw1=(a.lgLoss&&a.lgLoss!==0)?a.lgWin/Math.abs(a.lgLoss):0; var lw2=(b.lgLoss&&b.lgLoss!==0)?b.lgWin/Math.abs(b.lgLoss):0; return d*(lw1-lw2);
+      default: return d*a.period.localeCompare(b.period);
+    }
+  });
 
   var COLS='160px 64px 56px 56px 88px 88px 90px 110px 80px 80px 80px 72px 84px 84px 80px';
 
@@ -5298,9 +5318,13 @@ function renderTvWrr(){
   var hdrEl=document.getElementById('tvWrrTableHdr');
   if(hdrEl){
     hdrEl.style.gridTemplateColumns=COLS;
-    hdrEl.innerHTML=['PERIOD','T','W','L','AVG WIN','AVG LOSS','P&L','PROFIT FACTOR','TOTAL WON','TOTAL LOSS','WIN RATE','RR','LG WIN','LG LOSS','LG W/LG L'].map(function(h,i){
-      var aligns=['left','center','center','center','right','right','right','right','right','right','center','right','right','right','right'];
-      return '<span style="font-size:9px;color:#ffffff;text-align:'+(aligns[i]||'right')+';letter-spacing:1px;font-weight:bold;">'+h+'</span>';
+    var hdrFields=['period','t','w','l','avgw','avgl','pnl','pf','totalwon','totalloss','wr','rr','lgwin','lgloss','lgwl'];
+    var hdrLabels=['PERIOD','T','W','L','AVG WIN','AVG LOSS','P&L','PROFIT FACTOR','TOTAL WON','TOTAL LOSS','WIN RATE','RR','LG WIN','LG LOSS','LG W/LG L'];
+    var aligns=['left','center','center','center','right','right','right','right','right','right','center','right','right','right','right'];
+    hdrEl.innerHTML=hdrFields.map(function(f,i){
+      var isActive=tvWrrSortField===f;
+      var arrow=isActive?(tvWrrSortDir===1?' ▲':' ▼'):'';
+      return '<span onclick="tvWrrSort(''+f+'')" style="font-size:9px;color:'+(isActive?'var(--accent)':'rgba(255,255,255,0.7)')+';text-align:'+(aligns[i]||'right')+';letter-spacing:1px;font-weight:bold;cursor:pointer;user-select:none;" title="Sort by '+hdrLabels[i]+'">'+hdrLabels[i]+arrow+'</span>';
     }).join('');
   }
 
