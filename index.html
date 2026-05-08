@@ -5152,27 +5152,15 @@ function tvRptSubTab(tab){
   if(tab==='compound'){
     var inp = document.getElementById('cmpStartVal');
     if(inp && !inp._manuallySet){
-      // Get latest end value directly from Jeppez allRows (same data Jeppez page shows)
-      var _latestEnd = (function(){
-        var yearStart = JEPPEZ_STATIC[0] ? JEPPEZ_STATIC[0].start : 4684;
-        var prevEnd = JEPPEZ_STATIC.length ? JEPPEZ_STATIC[JEPPEZ_STATIC.length-1].end : yearStart;
-        var now = new Date(), cy = now.getFullYear();
-        var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        for(var mi = 2; mi <= now.getMonth(); mi++){
-          var mp = String(mi+1).padStart(2,'0');
-          var pf = cy+'-'+mp;
-          var mt = tvTrades.filter(function(t){ return t.date && t.date.startsWith(pf) && !t.openedOnly; });
-          var pnl = mt.reduce(function(s,t){ return s+(t.pnl||0); }, 0);
-          prevEnd = prevEnd + pnl;
-        }
-        // Also include current month so far
-        var curMp = String(now.getMonth()+1).padStart(2,'0');
-        var curPf = cy+'-'+curMp;
-        var curTrades = tvTrades.filter(function(t){ return t.date && t.date.startsWith(curPf) && !t.openedOnly; });
-        var curPnl = curTrades.reduce(function(s,t){ return s+(t.pnl||0); }, 0);
-        return prevEnd + curPnl;
-      })();
-      inp.value = Math.round(_latestEnd);
+      // Ensure Jeppez has rendered so _jeppezAllRows is populated
+      if(!window._jeppezAllRows) renderJeppez();
+      var _rows = window._jeppezAllRows || [];
+      // Find last row that has an end value
+      var _lastEnd = null;
+      for(var _ri = _rows.length-1; _ri >= 0; _ri--){
+        if(_rows[_ri].end != null){ _lastEnd = _rows[_ri].end; break; }
+      }
+      if(_lastEnd != null) inp.value = Math.round(_lastEnd);
     }
     renderCompounding();
   }
@@ -5444,6 +5432,7 @@ function renderJeppez(){
     }
   }
   var allRows=patchedStatic.concat(liveRows);
+  window._jeppezAllRows = allRows; // cache for compounding tab
   var jepFilter=document.getElementById('jepMonthFilter');
   var jepFilterVal=jepFilter?jepFilter.value:'all';
   var filteredMonths=jepFilterVal==='all'?JEPPEZ_MONTHS:[jepFilterVal];
