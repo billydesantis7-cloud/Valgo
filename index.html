@@ -3991,6 +3991,33 @@ var tvCalMonth = new Date().getMonth();
 var tvCharts = {};
 
 try{tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(e){}
+// Pre-compute Jeppez end value for compounding tab without rendering
+(function(){
+  try{
+    if(!JEPPEZ_STATIC||!JEPPEZ_STATIC.length) return;
+    var yearStart=JEPPEZ_STATIC[0]?JEPPEZ_STATIC[0].start:4684;
+    var febEnd=JEPPEZ_STATIC.length>1?JEPPEZ_STATIC[JEPPEZ_STATIC.length-1].end:yearStart;
+    var now=new Date(), cy=now.getFullYear();
+    var cumRunning=(JEPPEZ_STATIC[0]?JEPPEZ_STATIC[0].pnl:0)+(JEPPEZ_STATIC[1]?JEPPEZ_STATIC[1].pnl:0);
+    var rows=JEPPEZ_STATIC.slice();
+    var prevEnd=febEnd;
+    for(var mi=2;mi<=now.getMonth();mi++){
+      var mp=String(mi+1).padStart(2,'0');
+      var pf=cy+'-'+mp;
+      var mt=tvTrades.filter(function(t){return t.date&&t.date.startsWith(pf)&&!t.openedOnly;});
+      var pnl=mt.reduce(function(s,t){return s+(t.pnl||0);},0);
+      var end=prevEnd+pnl;
+      rows.push({month:['','','','March','April','May','June','July','August','September','October','November','December'][mi+1]||'',end:end,start:prevEnd});
+      prevEnd=end;
+    }
+    // Current month
+    var curMp=String(now.getMonth()+1).padStart(2,'0');
+    var curTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(cy+'-'+curMp)&&!t.openedOnly;});
+    var curPnl=curTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+    rows.push({end:prevEnd+curPnl});
+    window._jeppezAllRows=rows;
+  }catch(e){}
+})();
 
 try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
@@ -5152,8 +5179,6 @@ function tvRptSubTab(tab){
   if(tab==='compound'){
     var inp = document.getElementById('cmpStartVal');
     if(inp && !inp._manuallySet){
-      // Ensure Jeppez has rendered so _jeppezAllRows is populated
-      if(!window._jeppezAllRows) renderJeppez();
       var _rows = window._jeppezAllRows || [];
       // Find last row that has an end value
       var _lastEnd = null;
@@ -5456,7 +5481,7 @@ function renderJeppez(){
     }
   }
   var allRows=patchedStatic.concat(liveRows);
-  window._jeppezAllRows = allRows; // cache for compounding tab
+  window._jeppezAllRows = allRows;
   var jepFilter=document.getElementById('jepMonthFilter');
   var jepFilterVal=jepFilter?jepFilter.value:'all';
   var filteredMonths=jepFilterVal==='all'?JEPPEZ_MONTHS:[jepFilterVal];
