@@ -8805,6 +8805,42 @@ function kinfoGetGradeTrades() {
 // Grade review modal
 var _gradeReviewIdx = 0;
 var _gradeReviewTrades = [];
+
+var EXEC_SCORE_RUBRIC = [
+  {section:'ENTRY', items:[
+    {key:'e1', label:"Didn't fomo chase", weight:2},
+    {key:'e2', label:"Didn't miss an entry", weight:2},
+    {key:'e3', label:'Systematic', weight:2},
+    {key:'e4', label:'Hit the correct size (not too much or too little)', weight:2},
+    {key:'e5', label:"Didn't hit new lows too early", weight:2},
+    {key:'e6', label:'Not too early', weight:1},
+    {key:'e7', label:'Not forced', weight:1},
+  ]},
+  {section:'EXIT', items:[
+    {key:'x1', label:'Good % exits (not too much not too little)', weight:4},
+    {key:'x2', label:"Didn't get flat for no reason", weight:3},
+    {key:'x3', label:'Systematic', weight:2},
+    {key:'x4', label:'Not forced out mid range', weight:1},
+  ]},
+  {section:'STOP', items:[
+    {key:'s1', label:'Not forced to stop', weight:1},
+    {key:'s2', label:'Not flat for no reason', weight:1},
+    {key:'s3', label:"Didn't stop out too much %", weight:1},
+  ]},
+];
+var EXEC_SCORE_MAX = 25;
+
+function kinfoCalcExecScore(checks){
+  // checks is an object {e1:true, e2:false, ...}
+  var total = 0;
+  EXEC_SCORE_RUBRIC.forEach(function(sec){
+    sec.items.forEach(function(item){
+      if(checks && checks[item.key]) total += item.weight;
+    });
+  });
+  return Math.round((total / EXEC_SCORE_MAX) * 100);
+}
+
 function kinfoGetAllErrTags(fieldKey){
   var fk = fieldKey||'execErr';
   var grades = kinfoLoadGrades();
@@ -9000,22 +9036,101 @@ function kinfoOpenGradeReview(trades, idx) {
     })();
     // System/Algo Exec (after EOD Edge)
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
-    // EOD Exec Score
+    // EOD Exec Score — systematic checklist
     (function(){
-      var rowE = document.createElement('div');
-      rowE.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
-      var lblE = document.createElement('span');
-      lblE.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
-      lblE.textContent = 'EOD EXEC SCORE';
-      rowE.appendChild(lblE);
-      var exi = document.createElement('input');
-      exi.type='number'; exi.min=0; exi.max=10; exi.step=0.5;
-      exi.value = g2.eodExec!=null ? g2.eodExec : '';
-      exi.placeholder='0-10';
-      exi.style.cssText='width:80px;font-family:var(--mono);font-size:14px;font-weight:bold;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:#90caf9;padding:6px 8px;text-align:center;';
-      exi.onchange=(function(key){ return function(){ var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodExec',v); renderModal(); }; })(t.key);
-      rowE.appendChild(exi);
-      box.appendChild(rowE);
+      var checks = g2.execChecks || {};
+
+      function saveAndRefresh(){
+        var score = kinfoCalcExecScore(checks);
+        kinfoSaveGrade(t.key, 'execChecks', checks);
+        kinfoSaveGrade(t.key, 'eodExec', score);
+        // Update score display
+        var sd = document.getElementById('_execScoreDisplay_'+t.key);
+        if(sd){
+          sd.textContent = score;
+          sd.style.color = score>=80?'#4caf50':score>=60?'#ff9800':'#ef5350';
+        }
+        // Update total in checklist
+        var td = document.getElementById('_execTotalDisplay_'+t.key);
+        var raw = 0;
+        EXEC_SCORE_RUBRIC.forEach(function(s){ s.items.forEach(function(it){ if(checks[it.key]) raw+=it.weight; }); });
+        if(td) td.textContent = raw + ' / ' + EXEC_SCORE_MAX + ' pts  →  ' + score + ' / 100';
+        // Refresh row
+        kinfoRenderGrades();
+      }
+
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+
+      // Header with live score
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(144,202,249,0.07);border-bottom:1px solid var(--border);';
+      var hdrLbl = document.createElement('span');
+      hdrLbl.style.cssText = 'font-family:var(--mono);font-size:9px;color:#90caf9;letter-spacing:2px;font-weight:bold;';
+      hdrLbl.textContent = 'EOD EXECUTION SCORE';
+      var scoreDisp = document.createElement('span');
+      scoreDisp.id = '_execScoreDisplay_'+t.key;
+      var curScore = kinfoCalcExecScore(checks);
+      scoreDisp.style.cssText = 'font-family:var(--display);font-size:22px;font-weight:bold;color:'+(curScore>=80?'#4caf50':curScore>=60?'#ff9800':'#ef5350')+';';
+      scoreDisp.textContent = curScore;
+      hdr.appendChild(hdrLbl);
+      hdr.appendChild(scoreDisp);
+      wrap.appendChild(hdr);
+
+      // Sections
+      EXEC_SCORE_RUBRIC.forEach(function(sec){
+        var secHdr = document.createElement('div');
+        secHdr.style.cssText = 'font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);padding:5px 14px 3px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.04);';
+        secHdr.textContent = sec.section;
+        wrap.appendChild(secHdr);
+
+        sec.items.forEach(function(item){
+          var row = document.createElement('label');
+          row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s;';
+          row.onmouseover = function(){ this.style.background='rgba(255,255,255,0.03)'; };
+          row.onmouseout = function(){ this.style.background='transparent'; };
+
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !!checks[item.key];
+          cb.style.cssText = 'width:15px;height:15px;cursor:pointer;accent-color:#90caf9;flex-shrink:0;';
+          cb.onchange = (function(k){ return function(){
+            checks[k] = this.checked;
+            saveAndRefresh();
+          }; })(item.key);
+
+          var lbl = document.createElement('span');
+          lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--text);flex:1;';
+          lbl.textContent = item.label;
+
+          var wgt = document.createElement('span');
+          wgt.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);flex-shrink:0;';
+          wgt.textContent = '+'+item.weight;
+
+          row.appendChild(cb);
+          row.appendChild(lbl);
+          row.appendChild(wgt);
+          wrap.appendChild(row);
+        });
+      });
+
+      // Total row
+      var raw0 = 0;
+      EXEC_SCORE_RUBRIC.forEach(function(s){ s.items.forEach(function(it){ if(checks[it.key]) raw0+=it.weight; }); });
+      var totalRow = document.createElement('div');
+      totalRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(0,0,0,0.3);';
+      var totalLbl = document.createElement('span');
+      totalLbl.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);';
+      totalLbl.textContent = 'TOTAL';
+      var totalVal = document.createElement('span');
+      totalVal.id = '_execTotalDisplay_'+t.key;
+      totalVal.style.cssText = 'font-family:var(--mono);font-size:10px;color:#90caf9;font-weight:bold;';
+      totalVal.textContent = raw0 + ' / ' + EXEC_SCORE_MAX + ' pts  →  ' + curScore + ' / 100';
+      totalRow.appendChild(totalLbl);
+      totalRow.appendChild(totalVal);
+      wrap.appendChild(totalRow);
+
+      box.appendChild(wrap);
     })();
     // Execution Error categories — right column panel
     (function(){
@@ -9533,10 +9648,10 @@ function kinfoRenderGrades() {
       var execCell = document.createElement('div');
       execCell.style.cssText = 'display:flex;align-items:center;';
       var inp = document.createElement('input');
-      inp.type='number'; inp.min=0; inp.max=10; inp.step=0.5;
+      inp.type='number'; inp.min=0; inp.max=100; inp.step=1;
       inp.value = savedExec!=null ? savedExec : '';
-      inp.placeholder = '0-10';
-      var ec2 = savedExec!=null ? (savedExec>=7?'#4caf50':'#ef5350') : 'rgba(255,255,255,0.3)';
+      inp.placeholder = '0-100';
+      var ec2 = savedExec!=null ? (savedExec>=70?'#4caf50':savedExec>=50?'#ff9800':'#ef5350') : 'rgba(255,255,255,0.3)';
       inp.style.cssText = 'width:54px;font-family:var(--mono);font-size:10px;font-weight:bold;background:transparent;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:'+ec2+';padding:2px 4px;text-align:center;';
       inp.onclick = function(e){ e.stopPropagation(); };
       inp.onchange = (function(key){ return function(e){ e.stopPropagation(); var v=this.value===''?null:parseFloat(this.value); kinfoSaveGrade(key,'eodExec',v); kinfoRenderGrades(); }; })(t.key);
