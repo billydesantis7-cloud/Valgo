@@ -9155,6 +9155,72 @@ function kinfoOpenGradeReview(trades, idx) {
         panel.appendChild(sec);
       });
 
+
+      // EOD Exec Score checklist — in right panel
+      (function(){
+        var checks = g2.execChecks || {};
+        var checkDiv = document.createElement('div');
+        checkDiv.style.cssText = 'margin-top:10px;border:1px solid rgba(144,202,249,0.2);border-radius:6px;overflow:hidden;';
+
+        var chkHdr = document.createElement('div');
+        chkHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(144,202,249,0.07);border-bottom:1px solid rgba(255,255,255,0.06);';
+        var chkLbl = document.createElement('span');
+        chkLbl.style.cssText = 'font-family:var(--mono);font-size:8px;color:#90caf9;letter-spacing:1px;font-weight:bold;';
+        chkLbl.textContent = 'EOD EXEC SCORE';
+        var chkScore = document.createElement('span');
+        chkScore.id = '_execScoreDisplay_'+t.key;
+        var cs0 = kinfoCalcExecScore(checks);
+        chkScore.style.cssText = 'font-family:var(--display);font-size:18px;font-weight:bold;color:'+(cs0>=80?'#4caf50':cs0>=60?'#ff9800':'#ef5350')+';';
+        chkScore.textContent = cs0+'/100';
+        chkHdr.appendChild(chkLbl); chkHdr.appendChild(chkScore);
+        checkDiv.appendChild(chkHdr);
+
+        function saveChecks(){
+          var score=kinfoCalcExecScore(checks);
+          kinfoSaveGrade(t.key,'execChecks',checks);
+          kinfoSaveGrade(t.key,'eodExec',score);
+          var sd=document.getElementById('_execScoreDisplay_'+t.key);
+          if(sd){sd.textContent=score+'/100';sd.style.color=score>=80?'#4caf50':score>=60?'#ff9800':'#ef5350';}
+          var td=document.getElementById('_execTotalDisplay_'+t.key);
+          var raw=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(checks[it.key])raw+=it.weight;});});
+          if(td)td.textContent=raw+'/'+EXEC_SCORE_MAX+'  →  '+score+'/100';
+          kinfoRenderGrades();
+        }
+
+        EXEC_SCORE_RUBRIC.forEach(function(sec){
+          var secHdr=document.createElement('div');
+          secHdr.style.cssText='font-family:var(--mono);font-size:7px;letter-spacing:1px;color:var(--muted);padding:4px 10px 2px;background:rgba(0,0,0,0.2);';
+          secHdr.textContent=sec.section;
+          checkDiv.appendChild(secHdr);
+          sec.items.forEach(function(item){
+            var row=document.createElement('label');
+            row.style.cssText='display:flex;align-items:center;gap:7px;padding:4px 10px;border-top:1px solid rgba(255,255,255,0.03);cursor:pointer;';
+            row.onmouseover=function(){this.style.background='rgba(255,255,255,0.03)';};
+            row.onmouseout=function(){this.style.background='transparent';};
+            var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!checks[item.key];
+            cb.style.cssText='width:12px;height:12px;cursor:pointer;accent-color:#90caf9;flex-shrink:0;';
+            cb.onchange=(function(k){return function(){checks[k]=this.checked;saveChecks();};})(item.key);
+            var lbl=document.createElement('span');lbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);flex:1;line-height:1.3;';
+            lbl.textContent=item.label;
+            var wgt=document.createElement('span');wgt.style.cssText='font-family:var(--mono);font-size:8px;color:rgba(144,202,249,0.5);flex-shrink:0;';
+            wgt.textContent='+'+item.weight;
+            row.appendChild(cb);row.appendChild(lbl);row.appendChild(wgt);
+            checkDiv.appendChild(row);
+          });
+        });
+
+        var raw0=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(checks[it.key])raw0+=it.weight;});});
+        var totRow=document.createElement('div');
+        totRow.style.cssText='display:flex;justify-content:space-between;padding:5px 10px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.06);';
+        var totLbl=document.createElement('span');totLbl.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);';totLbl.textContent='TOTAL';
+        var totVal=document.createElement('span');totVal.id='_execTotalDisplay_'+t.key;
+        totVal.style.cssText='font-family:var(--mono);font-size:8px;color:#90caf9;font-weight:bold;';
+        totVal.textContent=raw0+'/'+EXEC_SCORE_MAX+'  →  '+cs0+'/100';
+        totRow.appendChild(totLbl);totRow.appendChild(totVal);
+        checkDiv.appendChild(totRow);
+        panel.appendChild(checkDiv);
+      })();
+
       box.appendChild(panel);
     })();
   }
