@@ -5710,8 +5710,9 @@ function renderTT(){
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(vt,true).size+';color:'+_nvbCell(vt,true).color+';text-align:center;font-weight:'+_nvbCell(vt,true).weight+';">'+_nvbCell(vt,true).displayText+'</span>'
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(nt,true).size+';color:'+_nvbCell(nt,true).color+';text-align:center;font-weight:'+_nvbCell(nt,true).weight+';">'+_nvbCell(nt,true).displayText+'</span>'
         +(function(){
-          var why=(typeof ttWhyData!=='undefined'&&ttWhyData[e.id])||'';
-          return '<span class="tt-why-cell" data-id="'+e.id+'" style="font-family:var(--mono);font-size:8px;color:'+(why?'#f5c518':'rgba(255,255,255,0.25)')+';overflow:hidden;text-overflow:ellipsis;white-space:normal;word-break:break-word;cursor:pointer;padding:0 3px;line-height:1.3;" title="'+(why||'click to add why missed')+'">'+( why || '+ why')+'</span>';
+          var whyTags=typeof ttGetWhyTags==='function'?ttGetWhyTags(e.id):[];
+          var whyDisp=whyTags.length?whyTags.map(function(t){return '<span style="display:inline-block;background:rgba(245,197,24,0.15);border:1px solid rgba(245,197,24,0.35);border-radius:2px;padding:0 3px;margin:1px 1px;font-size:7px;color:#f5c518;">'+t+'</span>';}).join(''):'<span style="color:rgba(255,255,255,0.25);">+ why</span>';
+          return '<span class="tt-why-cell" data-id="'+e.id+'" style="cursor:pointer;display:block;padding:0 2px;line-height:1.4;" title="click to edit">'+whyDisp+'</span>';
         })()
         +'</div>';
     }).join('');
@@ -8856,70 +8857,96 @@ function kinfoCalcExecScore(checks){
 // ── TT WHY MISSED ──
 var ttWhyData = (function(){ try{ return JSON.parse(localStorage.getItem('ttWhyData')||'{}'); }catch(e){ return {}; } })();
 
-function ttSaveWhy(id, val){
-  if(val) ttWhyData[id]=val; else delete ttWhyData[id];
+function ttSaveWhy(id, tags){
+  if(tags&&tags.length) ttWhyData[id]=tags; else delete ttWhyData[id];
   try{ localStorage.setItem('ttWhyData', JSON.stringify(ttWhyData)); }catch(e){}
+}
+
+function ttGetWhyTags(id){
+  var v=ttWhyData[id];
+  if(!v) return [];
+  return Array.isArray(v)?v:[v];
 }
 
 function ttGetAllWhys(){
   var counts={};
-  Object.values(ttWhyData).forEach(function(w){ if(w) counts[w]=(counts[w]||0)+1; });
+  Object.keys(ttWhyData).forEach(function(id){
+    ttGetWhyTags(id).forEach(function(w){ if(w) counts[w]=(counts[w]||0)+1; });
+  });
   return counts;
 }
 
 function ttShowWhyInput(cell, id){
   var existing=document.getElementById('_ttWhyPopup');
   if(existing) existing.remove();
-  var currentWhy=ttWhyData[id]||'';
+  var tags = ttGetWhyTags(id).slice();
   var rect=cell.getBoundingClientRect();
   var popup=document.createElement('div');
   popup.id='_ttWhyPopup';
-  var popW=240;
-  var leftPos=rect.right-popW < 0 ? rect.left : Math.min(rect.left, window.innerWidth-popW-8);
+  var popW=260;
+  var leftPos=Math.min(rect.left, window.innerWidth-popW-8);
   popup.style.cssText='position:fixed;left:'+leftPos+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:8px;width:'+popW+'px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
-
-  var inp=document.createElement('input');
-  inp.type='text'; inp.value=currentWhy; inp.placeholder='why did you miss this?';
-  inp.style.cssText='width:100%;font-family:var(--mono);font-size:10px;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;box-sizing:border-box;outline:none;';
 
   var dd=document.createElement('div');
   dd.style.cssText='margin-top:4px;';
 
-  function showSuggestions(){
-    dd.innerHTML='';
-    var q=inp.value.trim().toLowerCase();
-    var allW=ttGetAllWhys();
-    var sugs=Object.keys(allW).filter(function(w){return !q||w.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return allW[b]-allW[a];}).slice(0,6);
-    sugs.forEach(function(s){
-      var item=document.createElement('div');
-      item.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);padding:5px 8px;cursor:pointer;border-radius:3px;display:flex;justify-content:space-between;';
-      item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
-      item.onmouseout=function(){this.style.background='transparent';};
-      var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
-      var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:8px;'; t2.textContent='x'+allW[s]; item.appendChild(t2);
-      item.onmousedown=function(e){ e.preventDefault(); inp.value=s; commit(s); };
-      dd.appendChild(item);
-    });
+  function save(){ ttSaveWhy(id, tags.length?tags:null); renderTT(); }
+
+  function render(){
+    popup.innerHTML='';
+    // Tag chips
+    if(tags.length){
+      var chips=document.createElement('div');
+      chips.style.cssText='display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;';
+      tags.forEach(function(tag,i){
+        var chip=document.createElement('span');
+        chip.style.cssText='display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;background:rgba(245,197,24,0.15);border:1px solid rgba(245,197,24,0.4);color:#f5c518;padding:2px 6px;border-radius:3px;';
+        var t=document.createElement('span'); t.textContent=tag; chip.appendChild(t);
+        var x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;opacity:0.7;';
+        x.onmousedown=(function(ii){return function(e){e.preventDefault();tags.splice(ii,1);save();render();};})(i);
+        chip.appendChild(x);
+        chips.appendChild(chip);
+      });
+      popup.appendChild(chips);
+    }
+    // Input
+    var inp=document.createElement('input');
+    inp.type='text'; inp.placeholder='add reason, press Enter';
+    inp.style.cssText='width:100%;font-family:var(--mono);font-size:10px;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;box-sizing:border-box;outline:none;';
+    popup.appendChild(inp);
+    popup.appendChild(dd);
+
+    function showSuggestions(){
+      dd.innerHTML='';
+      var q=inp.value.trim().toLowerCase();
+      var allW=ttGetAllWhys();
+      var sugs=Object.keys(allW).filter(function(w){return !q||w.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return allW[b]-allW[a];}).slice(0,6);
+      sugs.forEach(function(s){
+        var item=document.createElement('div');
+        item.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);padding:5px 8px;cursor:pointer;border-radius:3px;display:flex;justify-content:space-between;';
+        item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
+        item.onmouseout=function(){this.style.background='transparent';};
+        var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
+        var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:8px;'; t2.textContent='x'+allW[s]; item.appendChild(t2);
+        item.onmousedown=function(e){ e.preventDefault(); if(tags.indexOf(s)<0) tags.push(s); inp.value=''; save(); render(); setTimeout(function(){popup.querySelector('input')&&popup.querySelector('input').focus();},50); };
+        dd.appendChild(item);
+      });
+    }
+
+    inp.oninput=showSuggestions;
+    inp.onfocus=showSuggestions;
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'){
+        var v=inp.value.trim();
+        if(v){ tags.push(v); inp.value=''; save(); render(); setTimeout(function(){popup.querySelector('input')&&popup.querySelector('input').focus();},50); }
+      } else if(e.key==='Escape'){ popup.remove(); }
+    };
+    inp.onblur=function(){ setTimeout(function(){ if(!popup.matches(':hover')&&document.getElementById('_ttWhyPopup')) popup.remove(); },300); };
+    setTimeout(function(){ inp.focus(); showSuggestions(); },50);
   }
 
-  function commit(val){
-    ttSaveWhy(id, val.trim()||null);
-    popup.remove();
-    renderTT();
-  }
-
-  inp.oninput=showSuggestions;
-  inp.onfocus=showSuggestions;
-  inp.onkeydown=function(e){
-    if(e.key==='Enter'){ commit(inp.value); }
-    else if(e.key==='Escape'){ popup.remove(); }
-  };
-  inp.onblur=function(){ setTimeout(function(){ if(document.getElementById('_ttWhyPopup')) popup.remove(); },300); };
-
-  popup.appendChild(inp);
-  popup.appendChild(dd);
   document.body.appendChild(popup);
-  setTimeout(function(){ inp.focus(); showSuggestions(); }, 50);
+  render();
 }
 
 function ttShowWhyPage(){
@@ -8945,11 +8972,13 @@ function ttShowWhyPage(){
   var allEntries=(typeof ttEntries!=='undefined'?ttEntries:[]);
   var byWhy={};
   Object.keys(ttWhyData).forEach(function(id){
-    var w=ttWhyData[id]; if(!w) return;
+    var tags=ttGetWhyTags(id); if(!tags.length) return;
     var entry=allEntries.find(function(e){return e.id===id;});
     if(!entry) return;
-    if(!byWhy[w]) byWhy[w]=[];
-    byWhy[w].push(entry);
+    tags.forEach(function(w){
+      if(!byWhy[w]) byWhy[w]=[];
+      if(!byWhy[w].some(function(x){return x.id===id;})) byWhy[w].push(entry);
+    });
   });
 
   var whyKeys=Object.keys(byWhy).sort(function(a,b){return byWhy[b].length-byWhy[a].length;});
