@@ -9007,6 +9007,9 @@ function ttShowWhyPage(){
     page.appendChild(sections);
 
     var keys=filterWhy?[filterWhy]:whyKeys;
+    // Collect all images across all sections for global lightbox navigation
+    var _allWhyImages=[];
+
     keys.forEach(function(w){
       var trades=byWhy[w];
       var sec=document.createElement('div');
@@ -9050,18 +9053,100 @@ function ttShowWhyPage(){
           }
         }
 
+        var imgArea=document.createElement('div');
+        imgArea.style.cssText='position:relative;background:#080c14;';
+
         if(imgSrc){
           var img=document.createElement('img');
           img.src=imgSrc;
-          img.style.cssText='width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in;background:#080c14;';
-          img.onclick=(function(s){return function(){expandMyImg(s);};} )(imgSrc);
-          card.appendChild(img);
+          img.style.cssText='width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in;';
+          img.onclick=(function(s,images,entry){return function(){
+            // Open lightbox with all section images
+            kinfoShowErrLightbox(images.map(function(x){return {src:x.src,label:x.label};}), images.findIndex(function(x){return x.src===s;}));
+          };})(imgSrc,_allWhyImages,e);
+          imgArea.appendChild(img);
+          _allWhyImages.push({src:imgSrc,label:e.ticker+' · '+e.date.slice(5).replace('-','/')});
         } else {
-          var noImg=document.createElement('div');
-          noImg.style.cssText='height:60px;display:flex;align-items:center;justify-content:center;background:#080c14;font-family:var(--mono);font-size:9px;color:var(--muted);';
-          noImg.textContent='NO CHART';
-          card.appendChild(noImg);
+          // Paste zone
+          var pasteZone=document.createElement('div');
+          pasteZone.style.cssText='height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;border:1px dashed rgba(255,255,255,0.12);border-radius:4px;margin:4px;transition:border-color 0.15s;';
+          pasteZone.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.25);">NO CHART</span>'
+            +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.15);">click + paste image</span>';
+          pasteZone.onmouseover=function(){this.style.borderColor='rgba(245,197,24,0.4)';};
+          pasteZone.onmouseout=function(){this.style.borderColor='rgba(255,255,255,0.12)';};
+
+          // Click to focus then paste
+          pasteZone.onclick=function(){
+            pasteZone.style.borderColor='#f5c518';
+            pasteZone.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:#f5c518;">⌘V / Ctrl+V to paste</span>';
+            pasteZone.setAttribute('tabindex','0');
+            pasteZone.focus();
+          };
+
+          pasteZone.addEventListener('paste', (function(eid, pz){
+            return function(ev){
+              var items=(ev.clipboardData||ev.originalEvent&&ev.originalEvent.clipboardData).items;
+              for(var i=0;i<items.length;i++){
+                if(items[i].type.indexOf('image')>=0){
+                  var blob=items[i].getAsFile();
+                  var reader=new FileReader();
+                  reader.onload=(function(pzone,entryId){
+                    return function(re){
+                      var dataUrl=re.target.result;
+                      // Save to myTradeImages
+                      var sym=entryId.split('_')[0]||'';
+                      // Use entry id as key
+                      if(typeof myTradeImages==='undefined') window.myTradeImages={};
+                      myTradeImages['why_'+entryId]=dataUrl;
+                      try{
+                        var stored=JSON.parse(localStorage.getItem('myTradeImages')||'{}');
+                        stored['why_'+entryId]=dataUrl;
+                        localStorage.setItem('myTradeImages',JSON.stringify(stored));
+                      }catch(e){}
+                      // Show the image
+                      var newImg=document.createElement('img');
+                      newImg.src=dataUrl;
+                      newImg.style.cssText='width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in;';
+                      newImg.onclick=(function(s,images,lbl){return function(){
+                        kinfoShowErrLightbox(images.map(function(x){return {src:x.src,label:x.label};}),images.findIndex(function(x){return x.src===s;})||0);
+                      };})(dataUrl,_allWhyImages,e.ticker+' · '+e.date.slice(5).replace('-','/'));
+                      _allWhyImages.push({src:dataUrl,label:e.ticker+' · '+e.date.slice(5).replace('-','/')});
+                      pzone.replaceWith(newImg);
+                    };
+                  })(pz, eid);
+                  reader.readAsDataURL(blob);
+                  ev.preventDefault();
+                  break;
+                }
+              }
+            };
+          })(e.id, pasteZone));
+
+          // Also listen for paste on window when this zone is focused
+          pasteZone.addEventListener('keydown',function(ev){
+            if((ev.metaKey||ev.ctrlKey)&&ev.key==='v') pasteZone.style.borderColor='rgba(0,230,118,0.5)';
+          });
+
+          imgArea.appendChild(pasteZone);
+
+          // Check if we previously pasted an image for this entry
+          try{
+            var stored2=JSON.parse(localStorage.getItem('myTradeImages')||'{}');
+            var savedUrl=stored2['why_'+e.id];
+            if(savedUrl){
+              var savedImg=document.createElement('img');
+              savedImg.src=savedUrl;
+              savedImg.style.cssText='width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in;';
+              savedImg.onclick=(function(s,images,lbl){return function(){
+                kinfoShowErrLightbox(images.map(function(x){return {src:x.src,label:x.label};}),images.findIndex(function(x){return x.src===s;})||0);
+              };})(savedUrl,_allWhyImages,e.ticker+' · '+e.date.slice(5).replace('-','/'));
+              _allWhyImages.push({src:savedUrl,label:e.ticker+' · '+e.date.slice(5).replace('-','/')});
+              pasteZone.replaceWith(savedImg);
+            }
+          }catch(ex){}
         }
+
+        card.appendChild(imgArea);
 
         var info=document.createElement('div');
         info.style.cssText='padding:8px 10px;';
@@ -10041,6 +10126,82 @@ function kinfoShowErrLightbox(images, startIdx){
   document.addEventListener('keydown', onKey);
   overlay.addEventListener('remove', function(){ document.removeEventListener('keydown',onKey); });
 
+  // Replace button
+  var replaceBtn = document.createElement('button');
+  replaceBtn.style.cssText = 'font-family:var(--mono);font-size:10px;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);color:#f5c518;padding:6px 14px;border-radius:4px;cursor:pointer;';
+  replaceBtn.textContent = '⌘V REPLACE IMAGE';
+  replaceBtn.title = 'Click then paste (Ctrl+V / Cmd+V) to replace this image';
+
+  var replaceHint = document.createElement('div');
+  replaceHint.style.cssText = 'font-family:var(--mono);font-size:9px;color:rgba(245,197,24,0.5);display:none;margin-top:2px;';
+  replaceHint.textContent = 'Now paste your image...';
+
+  var replacing = false;
+  replaceBtn.onclick = function(){
+    replacing = true;
+    replaceBtn.textContent = '📋 READY — paste now';
+    replaceBtn.style.background = 'rgba(245,197,24,0.2)';
+    replaceHint.style.display = 'block';
+    overlay.focus();
+  };
+
+  overlay.setAttribute('tabindex','0');
+  overlay.addEventListener('paste', function(ev){
+    if(!replacing) return;
+    var items = (ev.clipboardData||{}).items||[];
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image')>=0){
+        var blob = items[i].getAsFile();
+        var reader = new FileReader();
+        reader.onload = function(re){
+          var dataUrl = re.target.result;
+          // Update images array at current idx
+          images[idx].src = dataUrl;
+          // Save to myTradeImages with why_ prefix if label exists
+          if(typeof myTradeImages === 'undefined') window.myTradeImages = {};
+          var saveKey = 'why_replaced_'+idx+'_'+Date.now();
+          if(images[idx].entryId) saveKey = 'why_'+images[idx].entryId;
+          myTradeImages[saveKey] = dataUrl;
+          try{
+            var stored = JSON.parse(localStorage.getItem('myTradeImages')||'{}');
+            stored[saveKey] = dataUrl;
+            localStorage.setItem('myTradeImages', JSON.stringify(stored));
+          }catch(e){}
+          // Refresh display
+          show(idx);
+          replacing = false;
+          replaceBtn.textContent = '✓ REPLACED';
+          replaceBtn.style.background = 'rgba(76,175,80,0.2)';
+          replaceBtn.style.borderColor = 'rgba(76,175,80,0.4)';
+          replaceBtn.style.color = '#4caf50';
+          replaceHint.style.display = 'none';
+          setTimeout(function(){
+            replaceBtn.textContent = '⌘V REPLACE IMAGE';
+            replaceBtn.style.background = 'rgba(245,197,24,0.1)';
+            replaceBtn.style.borderColor = 'rgba(245,197,24,0.3)';
+            replaceBtn.style.color = '#f5c518';
+          }, 2000);
+        };
+        reader.readAsDataURL(blob);
+        ev.preventDefault();
+        break;
+      }
+    }
+  });
+
+  // Also handle keyboard paste via onKey
+  var origOnKey = onKey;
+  function onKey(e){
+    if(e.key==='ArrowLeft'){ replacing=false; replaceBtn.textContent='⌘V REPLACE IMAGE'; replaceHint.style.display='none'; show(idx-1); }
+    else if(e.key==='ArrowRight'){ replacing=false; replaceBtn.textContent='⌘V REPLACE IMAGE'; replaceHint.style.display='none'; show(idx+1); }
+    else if(e.key==='Escape'){ overlay.remove(); document.removeEventListener('keydown',onKey); }
+  }
+
+  var bottomRow = document.createElement('div');
+  bottomRow.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;';
+  bottomRow.appendChild(replaceBtn);
+  bottomRow.appendChild(replaceHint);
+
   nav.appendChild(prevBtn);
   nav.appendChild(counter);
   nav.appendChild(nextBtn);
@@ -10048,9 +10209,11 @@ function kinfoShowErrLightbox(images, startIdx){
   box.appendChild(lbl);
   box.appendChild(img);
   box.appendChild(nav);
+  box.appendChild(bottomRow);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
   show(idx);
+  setTimeout(function(){ overlay.focus(); }, 50);
 }
 
 function kinfoRenderExecErrors(){
