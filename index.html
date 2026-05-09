@@ -9027,15 +9027,27 @@ function ttShowWhyPage(){
         var card=document.createElement('div');
         card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;';
 
-        // Image area — try to find execution image
+        // Image area — try my trade images first, then Val's execution images
+        var sym0 = e.ticker.split(/[\s\/,\-]+/)[0].toUpperCase();
         var imgKey=e.date+'_'+e.ticker+'_long';
         var imgSrc=(typeof myTradeImages!=='undefined'&&myTradeImages[imgKey])
           ||(typeof myTradeImages!=='undefined'&&myTradeImages[e.date+'_'+e.ticker+'_short'])
           ||null;
-        // Also check valgo exec images
+        // Check Val's executions — match by date AND any symbol word in ticker
         if(!imgSrc && typeof executions!=='undefined'){
-          var ex=executions.find(function(x){ return x.date===e.date && x.ticker&&x.ticker.toUpperCase().indexOf(e.ticker.split(' ')[0].toUpperCase())>=0; });
-          if(ex && ex.image_urls && ex.image_urls[0]) imgSrc=ex.image_urls[0];
+          var ex=executions.find(function(x){
+            if(!x.image_urls||!x.image_urls.length) return false;
+            if(x.date!==e.date) return false;
+            // Match if any word of the TT ticker appears in the exec content/ticker
+            var words = e.ticker.toUpperCase().split(/[\s\/,\-]+/).filter(function(w){return w.length>=2;});
+            var haystack=(x.content||x.ticker||'').toUpperCase();
+            return words.some(function(w){ return haystack.indexOf(w)>=0; });
+          });
+          if(ex){
+            // Try to find the image that best matches — use resolveDiscordImg if available
+            var rawUrl = ex.image_urls[0];
+            imgSrc = typeof resolveDiscordImg==='function' ? resolveDiscordImg(rawUrl) : rawUrl;
+          }
         }
 
         if(imgSrc){
