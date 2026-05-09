@@ -5638,7 +5638,7 @@ function ttNavMonth(d){
   renderTT();
 }
 
-var TT_DAY_W=302, TT_GAP=3, TT_COL_PX='grid-template-columns:76px 34px 108px 26px 26px 26px', TT_PLAY_W=320, TT_PLAY_GAP=12;
+var TT_DAY_W=302, TT_GAP=3, TT_COL_PX='grid-template-columns:76px 34px 108px 26px 26px 26px', TT_PLAY_W=420, TT_PLAY_GAP=12;
 
 function getValTradersForDate(ds){
   if(typeof executions==='undefined') return [];
@@ -5689,7 +5689,7 @@ function renderTT(){
   allPlays.forEach(function(e){var wk=getWeekMon(e.date);if(!weekPlayMap[wk])weekPlayMap[wk]=[];weekPlayMap[wk].push(e);});
   var monthKey=ttYear+'-'+String(ttMonth+1).padStart(2,'0');
   var monthPlays=allPlays.filter(function(e){return e.date&&e.date.slice(0,7)===monthKey;});
-  var P_COL='grid-template-columns:44px 64px 32px 1fr 36px 24px 24px 24px 80px';
+  var P_COL='grid-template-columns:38px 58px 28px 1fr 32px 22px 22px 22px 72px';
   function playsHdr(){var h='<div style="display:grid;'+P_COL+';gap:0;background:rgba(0,0,0,0.5);padding:3px 6px;">';['DATE','TICKER','EDG','NOTES','R POT','BT','VT','NT','WHY MISSED'].forEach(function(l,i){h+='<span style="font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;'+(i===2||(i>=4&&i<=7)?'text-align:center;':'')+'">'  +l+'</span>';});return h+'</div>';}
   function playsRows(plays,sortKey){
     var p=plays.slice();
