@@ -580,6 +580,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <span id="ttEdgeMinVal" style="display:none;">0</span>
       <span id="ttEdgeMaxVal" style="display:none;">100</span>
       <button onclick="ttAddEntry(null)" style="font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--accent);border:none;padding:7px 16px;border-radius:4px;cursor:pointer;letter-spacing:1px;">+ ADD</button>
+      <button onclick="ttShowWhyPage()" style="font-family:var(--mono);font-size:11px;color:#f5c518;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);padding:7px 14px;border-radius:4px;cursor:pointer;letter-spacing:1px;">⚡ WHY MISSED</button>
       <label id="videoBtnMain" style="font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:7px 14px;border-radius:4px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">📹 SELECT RECORDINGS<input type="file" multiple accept=".mkv,.mp4,.mov,.avi,.webm,.pbf" style="display:none;" onchange="videoHandleFiles(this)"></label>
       <button onclick="videoShowSetup()" style="font-family:var(--mono);font-size:10px;color:#666;background:transparent;border:1px solid #2a2a2a;padding:7px 10px;border-radius:4px;cursor:pointer;" title="Generate PotPlayer registry setup">⚙ POTPLAYER SETUP</button>
     </div>
@@ -5688,8 +5689,8 @@ function renderTT(){
   allPlays.forEach(function(e){var wk=getWeekMon(e.date);if(!weekPlayMap[wk])weekPlayMap[wk]=[];weekPlayMap[wk].push(e);});
   var monthKey=ttYear+'-'+String(ttMonth+1).padStart(2,'0');
   var monthPlays=allPlays.filter(function(e){return e.date&&e.date.slice(0,7)===monthKey;});
-  var P_COL='grid-template-columns:44px 64px 32px 1fr 36px 24px 24px 24px';
-  function playsHdr(){var h='<div style="display:grid;'+P_COL+';gap:0;background:rgba(0,0,0,0.5);padding:3px 6px;">';['DATE','TICKER','EDG','NOTES','R POT','BT','VT','NT'].forEach(function(l,i){h+='<span style="font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;'+(i===2||i>=4?'text-align:center;':'')+'">'  +l+'</span>';});return h+'</div>';}
+  var P_COL='grid-template-columns:44px 64px 32px 1fr 36px 24px 24px 24px 80px';
+  function playsHdr(){var h='<div style="display:grid;'+P_COL+';gap:0;background:rgba(0,0,0,0.5);padding:3px 6px;">';['DATE','TICKER','EDG','NOTES','R POT','BT','VT','NT','WHY MISSED'].forEach(function(l,i){h+='<span style="font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;'+(i===2||i>=4?'text-align:center;':'')+'">'  +l+'</span>';});return h+'</div>';}
   function playsRows(plays,sortKey){
     var p=plays.slice();
     if(sortKey==='date') p.sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(b.edge||0)-(a.edge||0);});
@@ -5708,6 +5709,10 @@ function renderTT(){
         +(function(){var c=_nvbCell(bt,false);return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(vt,true).size+';color:'+_nvbCell(vt,true).color+';text-align:center;font-weight:'+_nvbCell(vt,true).weight+';">'+_nvbCell(vt,true).displayText+'</span>'
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(nt,true).size+';color:'+_nvbCell(nt,true).color+';text-align:center;font-weight:'+_nvbCell(nt,true).weight+';">'+_nvbCell(nt,true).displayText+'</span>'
+        +(function(){
+          var why=(typeof ttWhyData!=='undefined'&&ttWhyData[e.id])||'';
+          return '<span class="tt-why-cell" data-id="'+e.id+'" style="font-family:var(--mono);font-size:8px;color:'+(why?'#f5c518':'rgba(255,255,255,0.25)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:0 2px;" title="'+(why||'click to add why missed')+'">'+( why || '+ why')+'</span>';
+        })()
         +'</div>';
     }).join('');
   }
@@ -5913,6 +5918,12 @@ function renderTT(){
       var which=btn.getAttribute('data-which'), sort=btn.getAttribute('data-sort');
       if(which==='week') window.ttPlaysSortBy=sort; else window.ttMonthSortBy=sort;
       renderTT();
+    });
+  });
+  layout.querySelectorAll('.tt-why-cell').forEach(function(cell){
+    cell.addEventListener('click', function(e){
+      e.stopPropagation();
+      ttShowWhyInput(cell, cell.dataset.id);
     });
   });
   layout.querySelectorAll('.tt-play-row').forEach(function(row){
@@ -8839,6 +8850,221 @@ function kinfoCalcExecScore(checks){
     });
   });
   return Math.round((total / EXEC_SCORE_MAX) * 100);
+}
+
+
+// ── TT WHY MISSED ──
+var ttWhyData = (function(){ try{ return JSON.parse(localStorage.getItem('ttWhyData')||'{}'); }catch(e){ return {}; } })();
+
+function ttSaveWhy(id, val){
+  if(val) ttWhyData[id]=val; else delete ttWhyData[id];
+  try{ localStorage.setItem('ttWhyData', JSON.stringify(ttWhyData)); }catch(e){}
+}
+
+function ttGetAllWhys(){
+  var counts={};
+  Object.values(ttWhyData).forEach(function(w){ if(w) counts[w]=(counts[w]||0)+1; });
+  return counts;
+}
+
+function ttShowWhyInput(cell, id){
+  var existing=document.getElementById('_ttWhyPopup');
+  if(existing) existing.remove();
+  var currentWhy=ttWhyData[id]||'';
+  var rect=cell.getBoundingClientRect();
+  var popup=document.createElement('div');
+  popup.id='_ttWhyPopup';
+  popup.style.cssText='position:fixed;left:'+rect.left+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:8px;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+
+  var inp=document.createElement('input');
+  inp.type='text'; inp.value=currentWhy; inp.placeholder='why did you miss this?';
+  inp.style.cssText='width:100%;font-family:var(--mono);font-size:10px;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;box-sizing:border-box;outline:none;';
+
+  var dd=document.createElement('div');
+  dd.style.cssText='margin-top:4px;';
+
+  function showSuggestions(){
+    dd.innerHTML='';
+    var q=inp.value.trim().toLowerCase();
+    var allW=ttGetAllWhys();
+    var sugs=Object.keys(allW).filter(function(w){return !q||w.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return allW[b]-allW[a];}).slice(0,6);
+    sugs.forEach(function(s){
+      var item=document.createElement('div');
+      item.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);padding:5px 8px;cursor:pointer;border-radius:3px;display:flex;justify-content:space-between;';
+      item.onmouseover=function(){this.style.background='rgba(255,255,255,0.07)';};
+      item.onmouseout=function(){this.style.background='transparent';};
+      var t1=document.createElement('span'); t1.textContent=s; item.appendChild(t1);
+      var t2=document.createElement('span'); t2.style.cssText='color:var(--muted);font-size:8px;'; t2.textContent='x'+allW[s]; item.appendChild(t2);
+      item.onmousedown=function(e){ e.preventDefault(); inp.value=s; commit(s); };
+      dd.appendChild(item);
+    });
+  }
+
+  function commit(val){
+    ttSaveWhy(id, val.trim()||null);
+    popup.remove();
+    renderTT();
+  }
+
+  inp.oninput=showSuggestions;
+  inp.onfocus=showSuggestions;
+  inp.onkeydown=function(e){
+    if(e.key==='Enter'){ commit(inp.value); }
+    else if(e.key==='Escape'){ popup.remove(); }
+  };
+  inp.onblur=function(){ setTimeout(function(){ if(document.getElementById('_ttWhyPopup')) popup.remove(); },300); };
+
+  popup.appendChild(inp);
+  popup.appendChild(dd);
+  document.body.appendChild(popup);
+  setTimeout(function(){ inp.focus(); showSuggestions(); }, 50);
+}
+
+function ttShowWhyPage(){
+  var existing=document.getElementById('_ttWhyPage');
+  if(existing){ existing.remove(); return; }
+
+  var page=document.createElement('div');
+  page.id='_ttWhyPage';
+  page.style.cssText='position:fixed;inset:0;z-index:9998;background:var(--bg);overflow-y:auto;padding:28px;';
+
+  // Header
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:24px;';
+  hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#f5c518;">⚡ WHY I MISSED</div>';
+  var closeBtn=document.createElement('button');
+  closeBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:4px;cursor:pointer;';
+  closeBtn.textContent='✕ CLOSE';
+  closeBtn.onclick=function(){ page.remove(); };
+  hdr.appendChild(closeBtn);
+  page.appendChild(hdr);
+
+  // Group trades by why
+  var allEntries=(typeof ttEntries!=='undefined'?ttEntries:[]);
+  var byWhy={};
+  Object.keys(ttWhyData).forEach(function(id){
+    var w=ttWhyData[id]; if(!w) return;
+    var entry=allEntries.find(function(e){return e.id===id;});
+    if(!entry) return;
+    if(!byWhy[w]) byWhy[w]=[];
+    byWhy[w].push(entry);
+  });
+
+  var whyKeys=Object.keys(byWhy).sort(function(a,b){return byWhy[b].length-byWhy[a].length;});
+
+  if(!whyKeys.length){
+    var empty=document.createElement('div');
+    empty.style.cssText='font-family:var(--mono);font-size:13px;color:var(--muted);text-align:center;margin-top:60px;';
+    empty.textContent='No "why missed" data yet. Add reasons from the ticker tracker table.';
+    page.appendChild(empty);
+    document.body.appendChild(page);
+    return;
+  }
+
+  // Filter buttons
+  var filterBar=document.createElement('div');
+  filterBar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;';
+  var activeWhy=null;
+
+  function buildSections(filterWhy){
+    // Remove old sections
+    var old=page.querySelector('#_ttWhySections');
+    if(old) old.remove();
+
+    var sections=document.createElement('div');
+    sections.id='_ttWhySections';
+    page.appendChild(sections);
+
+    var keys=filterWhy?[filterWhy]:whyKeys;
+    keys.forEach(function(w){
+      var trades=byWhy[w];
+      var sec=document.createElement('div');
+      sec.style.cssText='margin-bottom:32px;';
+
+      var secHdr=document.createElement('div');
+      secHdr.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid rgba(245,197,24,0.3);';
+      secHdr.innerHTML='<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:#f5c518;">'+w+'</span>'
+        +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+trades.length+' trade'+(trades.length>1?'s':'')+'</span>';
+      sec.appendChild(secHdr);
+
+      // Grid of trade cards with images
+      var grid=document.createElement('div');
+      grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;';
+
+      trades.forEach(function(e){
+        var pair=typeof ttEdgeColorBg==='function'?ttEdgeColorBg(e.edge):['#fff','transparent'];
+        var card=document.createElement('div');
+        card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+
+        // Image area — try to find execution image
+        var imgKey=e.date+'_'+e.ticker+'_long';
+        var imgSrc=(typeof myTradeImages!=='undefined'&&myTradeImages[imgKey])
+          ||(typeof myTradeImages!=='undefined'&&myTradeImages[e.date+'_'+e.ticker+'_short'])
+          ||null;
+        // Also check valgo exec images
+        if(!imgSrc && typeof executions!=='undefined'){
+          var ex=executions.find(function(x){ return x.date===e.date && x.ticker&&x.ticker.toUpperCase().indexOf(e.ticker.split(' ')[0].toUpperCase())>=0; });
+          if(ex && ex.image_urls && ex.image_urls[0]) imgSrc=ex.image_urls[0];
+        }
+
+        if(imgSrc){
+          var img=document.createElement('img');
+          img.src=imgSrc;
+          img.style.cssText='width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in;background:#080c14;';
+          img.onclick=(function(s){return function(){expandMyImg(s);};} )(imgSrc);
+          card.appendChild(img);
+        } else {
+          var noImg=document.createElement('div');
+          noImg.style.cssText='height:60px;display:flex;align-items:center;justify-content:center;background:#080c14;font-family:var(--mono);font-size:9px;color:var(--muted);';
+          noImg.textContent='NO CHART';
+          card.appendChild(noImg);
+        }
+
+        var info=document.createElement('div');
+        info.style.cssText='padding:8px 10px;';
+        info.innerHTML='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+          +'<span style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+pair[0]+';">'+e.ticker+'</span>'
+          +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+e.date.slice(5).replace('-','/')+'</span>'
+          +'<span style="font-family:var(--display);font-size:12px;font-weight:bold;color:'+pair[0]+';margin-left:auto;">'+(e.edge||'')+'</span>'
+          +'</div>'
+          +(e.notes?'<div style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.notes+'</div>':'');
+        card.appendChild(info);
+        grid.appendChild(card);
+      });
+
+      sec.appendChild(grid);
+      sections.appendChild(sec);
+    });
+  }
+
+  // Filter buttons
+  var allBtn=document.createElement('button');
+  allBtn.style.cssText='font-family:var(--mono);font-size:10px;padding:5px 14px;border-radius:4px;cursor:pointer;border:1px solid #f5c518;background:rgba(245,197,24,0.15);color:#f5c518;';
+  allBtn.textContent='ALL ('+whyKeys.length+')';
+  allBtn.onclick=function(){ activeWhy=null; buildSections(null); updateFilterBtns(); };
+  filterBar.appendChild(allBtn);
+
+  whyKeys.forEach(function(w){
+    var btn=document.createElement('button');
+    btn.style.cssText='font-family:var(--mono);font-size:10px;padding:5px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);';
+    btn.textContent=w+' ('+byWhy[w].length+')';
+    btn.onclick=(function(ww){ return function(){ activeWhy=ww; buildSections(ww); updateFilterBtns(); }; })(w);
+    filterBar.appendChild(btn);
+  });
+
+  function updateFilterBtns(){
+    filterBar.querySelectorAll('button').forEach(function(b,i){
+      var isAll=(i===0&&activeWhy===null);
+      var isActive=!isAll&&b.textContent.startsWith(activeWhy);
+      b.style.border='1px solid '+(isAll||isActive?'#f5c518':'var(--border)');
+      b.style.background=(isAll||isActive)?'rgba(245,197,24,0.15)':'transparent';
+      b.style.color=(isAll||isActive)?'#f5c518':'var(--muted)';
+    });
+  }
+
+  page.appendChild(filterBar);
+  buildSections(null);
+  document.body.appendChild(page);
 }
 
 function kinfoGetAllErrTags(fieldKey){
