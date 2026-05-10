@@ -5723,7 +5723,7 @@ function renderTT(){
         +'<span style="font-family:var(--mono);font-size:8px;color:#ffffff;font-weight:bold;">'+d2+'</span>'
         +'<span style="font-family:var(--display);font-size:10px;color:'+pair[0]+';white-space:normal;overflow:hidden;word-break:break-word;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+e.ticker+'</span>'
         +'<span style="font-family:var(--display);font-size:11px;font-weight:bold;color:'+pair[0]+';text-align:center;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+(e.edge!=null?e.edge:'')+'</span>'
-        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;overflow:hidden;white-space:normal;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
         +'<span class="tt-rpot-cell" data-id="'+e.id+'" style="font-family:var(--mono);font-size:9px;color:#f5c518;text-align:center;cursor:pointer;font-weight:bold;" title="Click to set R potential">'+(e.rPotential!=null?e.rPotential+'R':'—')+'</span>'
         +(function(){var c=_nvbCell(bt,false);return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(vt,true).size+';color:'+_nvbCell(vt,true).color+';text-align:center;font-weight:'+_nvbCell(vt,true).weight+';">'+_nvbCell(vt,true).displayText+'</span>'
@@ -9174,7 +9174,7 @@ function ttShowWhyPage(){
           +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+e.date.slice(5).replace('-','/')+'</span>'
           +'<span style="font-family:var(--display);font-size:12px;font-weight:bold;color:'+pair[0]+';margin-left:auto;">'+(e.edge||'')+'</span>'
           +'</div>'
-          +(e.notes?'<div style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.notes+'</div>':'');
+          +(e.notes?'<div style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.5);overflow:hidden;white-space:normal;word-break:break-word;">'+e.notes+'</div>':'');
         card.appendChild(info);
         grid.appendChild(card);
       });
@@ -9328,7 +9328,7 @@ function ttShowNeedleMovers(){
     page.appendChild(statsGrid);
 
     // Table — same style as top-of-month
-    var NM_COL='grid-template-columns:38px 58px 28px 1fr 22px 22px 22px 58px 68px';
+    var NM_COL='grid-template-columns:38px 58px 46px 1fr 22px 22px 22px 58px 68px';
     var tableWrap=document.createElement('div');
     tableWrap.style.cssText='border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,0.3);';
 
@@ -9364,11 +9364,11 @@ function ttShowNeedleMovers(){
       });
       lsHtml+='</span>';
 
-      rowsHtml+='<div style="display:grid;'+NM_COL+';gap:0;padding:3px 6px;border-bottom:1px solid rgba(0,0,0,0.25);background:'+pair[1]+';align-items:center;">'
+      rowsHtml+='<div style="display:grid;'+NM_COL+';gap:0;padding:3px 6px;border-bottom:1px solid rgba(0,0,0,0.25);background:'+pair[1]+';align-items:start;">'
         +'<span style="font-family:var(--mono);font-size:8px;color:#fff;font-weight:bold;">'+d2+'</span>'
         +'<span style="font-family:var(--display);font-size:10px;color:'+pair[0]+';font-weight:bold;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+e.ticker+'</span>'
         +'<span class="nm-edge-cell" data-id="'+e.id+'" data-edge="'+(e.edge!=null?e.edge:'')+'" data-color="'+pair[0]+'"></span>'
-        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);overflow:hidden;white-space:normal;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
         +(function(){var c=typeof _nvbCell==='function'?_nvbCell(bt,false):{displayText:bt,color:'var(--muted)',size:'9px',weight:'normal'};return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +(function(){var c=typeof _nvbCell==='function'?_nvbCell(vt,true):{displayText:vt,color:'var(--muted)',size:'9px',weight:'normal'};return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:vt)+'</span>';})()
         +(function(){var c=typeof _nvbCell==='function'?_nvbCell(nt,true):{displayText:nt,color:'var(--muted)',size:'9px',weight:'normal'};return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:nt)+'</span>';})()
