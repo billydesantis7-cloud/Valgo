@@ -9242,6 +9242,8 @@ function ttShowNeedleMovers(){
 
   function buildPage(){
     page.innerHTML='';
+    // Reset appendChild to native before re-patching (prevents blank on re-render)
+    delete page.appendChild;
     var wrap=document.createElement('div'); wrap.style.cssText='width:520px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
     var _pa=page.appendChild.bind(page); page.appendChild=function(el){ if(el===wrap) _pa(el); else wrap.appendChild(el); };
 
