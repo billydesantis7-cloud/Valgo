@@ -9233,12 +9233,16 @@ function ttShowNeedleMovers(){
   page.id='_ttNeedlePage';
   page.style.cssText='position:fixed;inset:0;z-index:9998;background:#0a0d12;overflow-y:auto;padding:20px;';
 
-  // Get all top-ops with edge >= 50 (base pool, filter applied per buildPage)
-  var _nmAllEntries=(typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){ return (e.edge||0)>=50; });
-  _nmAllEntries=_nmAllEntries.slice().sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+  // Get all top-ops with edge >= 55 (base pool, filter applied per buildPage)
+  function _nmRefreshPool(){
+    var pool=(typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){ return (e.edge||0)>=55; });
+    pool.sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+    return pool;
+  }
+  var _nmAllEntries=_nmRefreshPool();
 
   // Edge filter state
-  var nmEdgeMin=50, nmEdgeMax=200;
+  var nmEdgeMin=55, nmEdgeMax=200;
 
   function buildPage(){
     page.innerHTML='';
@@ -9257,7 +9261,7 @@ function ttShowNeedleMovers(){
     var hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;';
     hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">📍 NEEDLE MOVERS</div>'
-      +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);">top ops across all months · edge ≥ 50</div>';
+      +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);">top ops across all months · edge ≥ 55</div>';
     var closeBtn=document.createElement('button');
     closeBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:4px;cursor:pointer;';
     closeBtn.textContent='✕ CLOSE';
@@ -9281,7 +9285,7 @@ function ttShowNeedleMovers(){
     var resetBtn=document.createElement('button');
     resetBtn.textContent='RESET';
     resetBtn.style.cssText='font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:1px;';
-    resetBtn.onclick=function(){ nmEdgeMin=50; nmEdgeMax=200; buildPage(); };
+    resetBtn.onclick=function(){ nmEdgeMin=55; nmEdgeMax=200; buildPage(); };
     var countLabel=document.createElement('span');
     countLabel.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:4px;';
     countLabel.textContent=allEntries.length+' shown';
@@ -9363,7 +9367,7 @@ function ttShowNeedleMovers(){
       rowsHtml+='<div style="display:grid;'+NM_COL+';gap:0;padding:3px 6px;border-bottom:1px solid rgba(0,0,0,0.25);background:'+pair[1]+';align-items:center;">'
         +'<span style="font-family:var(--mono);font-size:8px;color:#fff;font-weight:bold;">'+d2+'</span>'
         +'<span style="font-family:var(--display);font-size:10px;color:'+pair[0]+';font-weight:bold;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+e.ticker+'</span>'
-        +'<span style="font-family:var(--display);font-size:11px;font-weight:bold;color:'+pair[0]+';text-align:center;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+(e.edge||'')+'</span>'
+        +'<span class="nm-edge-cell" data-id="'+e.id+'" data-edge="'+(e.edge!=null?e.edge:'')+'" data-color="'+pair[0]+'"></span>'
         +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
         +(function(){var c=typeof _nvbCell==='function'?_nvbCell(bt,false):{displayText:bt,color:'var(--muted)',size:'9px',weight:'normal'};return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +(function(){var c=typeof _nvbCell==='function'?_nvbCell(vt,true):{displayText:vt,color:'var(--muted)',size:'9px',weight:'normal'};return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:vt)+'</span>';})()
@@ -9373,6 +9377,35 @@ function ttShowNeedleMovers(){
     });
 
     tableWrap.innerHTML=tHdrHtml+rowsHtml;
+
+    // Wire edge inputs — clicking the EDG cell shows an input to edit the score site-wide
+    tableWrap.querySelectorAll('.nm-edge-cell').forEach(function(cell){
+      var entryId=cell.dataset.id;
+      var curEdge=cell.dataset.edge!==''?parseInt(cell.dataset.edge):null;
+      var col=cell.dataset.color||'#fff';
+      var inp=document.createElement('input');
+      inp.type='number'; inp.min='0'; inp.max='300';
+      inp.value=curEdge!=null?curEdge:'';
+      inp.placeholder='—';
+      inp.style.cssText='width:100%;font-family:var(--display);font-size:11px;font-weight:bold;color:'+col+';background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.2);text-align:center;outline:none;padding:1px 2px;';
+      inp.title='Click to edit edge score (saves site-wide)';
+      inp.onchange=function(){
+        var v=inp.value!==''?parseInt(inp.value):null;
+        // Update ttEntries in-place and persist
+        if(typeof ttEntries!=='undefined'){
+          var entry=ttEntries.find(function(x){return x.id===entryId;});
+          if(entry){
+            entry.edge=v;
+            if(typeof ttSaveLS==='function') ttSaveLS();
+          }
+        }
+        // Refresh pool and rebuild so filter + colors update
+        _nmAllEntries=_nmRefreshPool();
+        buildPage();
+      };
+      inp.onclick=function(ev){ ev.stopPropagation(); inp.select(); };
+      cell.appendChild(inp);
+    });
 
     // Wire toggle clicks
     tableWrap.querySelectorAll('.nm-mr-btn').forEach(function(btn){
