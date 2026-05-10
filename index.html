@@ -9233,19 +9233,27 @@ function ttShowNeedleMovers(){
   page.id='_ttNeedlePage';
   page.style.cssText='position:fixed;inset:0;z-index:9998;background:#0a0d12;overflow-y:auto;padding:20px;';
 
-  // Get all top-ops with edge >= 50
-  var allEntries=(typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){ return (e.edge||0)>=50; });
-  // Sort by edge desc
-  allEntries=allEntries.slice().sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+  // Get all top-ops with edge >= 50 (base pool, filter applied per buildPage)
+  var _nmAllEntries=(typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){ return (e.edge||0)>=50; });
+  _nmAllEntries=_nmAllEntries.slice().sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+
+  // Edge filter state
+  var nmEdgeMin=50, nmEdgeMax=200;
 
   function buildPage(){
     page.innerHTML='';
     var wrap=document.createElement('div'); wrap.style.cssText='width:520px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
     var _pa=page.appendChild.bind(page); page.appendChild=function(el){ if(el===wrap) _pa(el); else wrap.appendChild(el); };
 
+    // Apply edge filter
+    var allEntries=_nmAllEntries.filter(function(e){
+      var eg=e.edge||0;
+      return eg>=nmEdgeMin && eg<=nmEdgeMax;
+    });
+
     // Header
     var hdr=document.createElement('div');
-    hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
+    hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;';
     hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">📍 NEEDLE MOVERS</div>'
       +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);">top ops across all months · edge ≥ 50</div>';
     var closeBtn=document.createElement('button');
@@ -9254,6 +9262,32 @@ function ttShowNeedleMovers(){
     closeBtn.onclick=function(){ page.remove(); };
     hdr.appendChild(closeBtn);
     page.appendChild(hdr);
+
+    // Edge filter row
+    var filterRow=document.createElement('div');
+    filterRow.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;';
+    filterRow.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;">EDGE RANGE</span>';
+    var minInp=document.createElement('input');
+    minInp.type='number'; minInp.min='0'; minInp.max='200'; minInp.value=nmEdgeMin; minInp.placeholder='Min';
+    minInp.style.cssText='width:60px;font-family:var(--display);font-size:13px;font-weight:bold;background:var(--bg);border:1px solid rgba(144,202,249,0.4);color:#90caf9;padding:4px 8px;border-radius:4px;text-align:center;';
+    var sep=document.createElement('span');
+    sep.style.cssText='font-family:var(--mono);font-size:11px;color:var(--muted);';
+    sep.textContent='–';
+    var maxInp=document.createElement('input');
+    maxInp.type='number'; maxInp.min='0'; maxInp.max='200'; maxInp.value=nmEdgeMax; maxInp.placeholder='Max';
+    maxInp.style.cssText='width:60px;font-family:var(--display);font-size:13px;font-weight:bold;background:var(--bg);border:1px solid rgba(144,202,249,0.4);color:#90caf9;padding:4px 8px;border-radius:4px;text-align:center;';
+    var resetBtn=document.createElement('button');
+    resetBtn.textContent='RESET';
+    resetBtn.style.cssText='font-family:var(--mono);font-size:9px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:1px;';
+    resetBtn.onclick=function(){ nmEdgeMin=50; nmEdgeMax=200; buildPage(); };
+    var countLabel=document.createElement('span');
+    countLabel.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:4px;';
+    countLabel.textContent=allEntries.length+' shown';
+    minInp.oninput=function(){ var v=parseInt(minInp.value); nmEdgeMin=isNaN(v)?50:v; buildPage(); };
+    maxInp.oninput=function(){ var v=parseInt(maxInp.value); nmEdgeMax=isNaN(v)?200:v; buildPage(); };
+    filterRow.appendChild(minInp); filterRow.appendChild(sep); filterRow.appendChild(maxInp);
+    filterRow.appendChild(resetBtn); filterRow.appendChild(countLabel);
+    page.appendChild(filterRow);
 
     // Compute stats
     var total=allEntries.length;
