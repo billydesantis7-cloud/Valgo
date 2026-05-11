@@ -4883,8 +4883,25 @@ function renderTvValDataBody() {
   function _avg(arr) { return arr.length ? _sum(arr)/arr.length : 0; }
   function _fmt(n) { return (n>=0?'+$':'-$')+Math.abs(n).toFixed(0); }
 
-  var yPnl = _sum(valYes), nPnl = _sum(valNo);
-  var yAvg = _avg(valYes), nAvg = _avg(valNo);
+  // Cards use ALL trades (deduped by date+symbol), not just current threshold pool
+  var _allGrouped = {};
+  _allTrades.forEach(function(t){
+    var gk=t.date+'__'+t.symbol.toUpperCase();
+    if(!_allGrouped[gk]) _allGrouped[gk]=[];
+    _allGrouped[gk].push(t);
+  });
+  var _allDeduped = Object.keys(_allGrouped).map(function(gk){
+    var grp=_allGrouped[gk];
+    var totalPnl=grp.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var vtValues=grp.map(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded||'';});
+    function bv(arr){return arr.indexOf('yes')>=0?'yes':arr.indexOf('no')>=0?'no':'';}
+    return {pnl:totalPnl, _valTraded:bv(vtValues), _allMks:grp.map(function(t){return _tvMetaKey(t.date,t.symbol,t.side);})};
+  });
+  var _allYes = _allDeduped.filter(function(t){return t._valTraded==='yes';});
+  var _allNo  = _allDeduped.filter(function(t){return t._valTraded==='no';});
+
+  var yPnl = _sum(_allYes), nPnl = _sum(_allNo);
+  var yAvg = _avg(_allYes), nAvg = _avg(_allNo);
 
   // ── Stats bar ──
   var stats = document.createElement('div');
@@ -4921,8 +4938,8 @@ function renderTvValDataBody() {
     return c;
   }
 
-  cards.appendChild(mkCard('VAL TRADED — YES', '#42a5f5', 'rgba(66,165,245,0.3)', valYes.length, yPnl, yAvg));
-  cards.appendChild(mkCard('VAL TRADED — NO',  '#ef5350', 'rgba(239,83,80,0.25)',  valNo.length,  nPnl, nAvg));
+  cards.appendChild(mkCard('ALL TRADES · VAL = YES', '#42a5f5', 'rgba(66,165,245,0.3)', _allYes.length, yPnl, yAvg));
+  cards.appendChild(mkCard('ALL TRADES · VAL = NO',  '#ef5350', 'rgba(239,83,80,0.25)',  _allNo.length,  nPnl, nAvg));
   stats.appendChild(cards);
 
   body.appendChild(stats);
