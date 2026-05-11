@@ -5050,7 +5050,28 @@ function tvRenderValCompare(t, mk, container, embedded) {
     renderTvValDataBody();
   }
 
+  // Global paste handler — catches Ctrl+V anywhere on page when val data tab is open
+  function _tvValPasteHandler(ev) {
+    var pane = document.getElementById('tvValDataPane');
+    if (!pane || pane.style.display === 'none') return;
+    if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+    var items = (ev.clipboardData || {}).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') >= 0) {
+        var rd = new FileReader();
+        rd.onload = function (e2) { saveValImg(e2.target.result); };
+        rd.readAsDataURL(items[i].getAsFile());
+        ev.preventDefault(); break;
+      }
+    }
+  }
+  // Remove any previous handler for this key, then register fresh
+  if (wrap._tvValPasteKey) { try { document.removeEventListener('paste', wrap._tvValPasteKey); } catch(e){} }
+  wrap._tvValPasteKey = _tvValPasteHandler;
+  document.addEventListener('paste', _tvValPasteHandler);
+
   valBox.onclick = function () { valBox.focus(); };
+  // Also keep local paste on valBox for when it's focused
   valBox.addEventListener('paste', function (ev) {
     var items = (ev.clipboardData || {}).items || [];
     for (var i = 0; i < items.length; i++) {
@@ -5087,6 +5108,8 @@ function tvRenderValCompare(t, mk, container, embedded) {
     delBtn.onclick = function () {
       if (typeof tvTradeImages !== 'undefined') delete tvTradeImages[valImgKey];
       try { localStorage.setItem('tvTradeImages', JSON.stringify(tvTradeImages || {})); } catch (er) {}
+      // Also remove from Supabase if available
+      if (typeof sbImgDelete === 'function') { try { sbImgDelete('tvTradeImages', valImgKey); } catch(er2){} }
       renderTvValDataBody();
     };
     ctrlRow.appendChild(delBtn);
