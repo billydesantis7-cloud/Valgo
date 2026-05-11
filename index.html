@@ -4761,14 +4761,15 @@ function renderTvValDataBody() {
     return (tvTradeMeta[mk] || {}).valTraded === 'yes';
   });
   var pct = bigWins.length ? Math.round((valYes.length / bigWins.length) * 100) : 0;
+  var unmarked = bigWins.length - valYes.length - bigWins.filter(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded==='no';}).length;
 
   // ── Stats bar ──
   var stats = document.createElement('div');
-  stats.style.cssText = 'display:flex;gap:24px;align-items:baseline;margin-bottom:18px;flex-wrap:wrap;';
+  stats.style.cssText = 'display:flex;gap:24px;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;';
   stats.innerHTML = '<span style="font-family:var(--display);font-size:32px;font-weight:bold;color:#42a5f5;">' + pct + '%</span>'
     + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">of ' + bigWins.length + ' wins &gt;$' + _tvVdThreshold + ' — val also traded</span>'
     + '<span style="font-family:var(--mono);font-size:13px;color:#42a5f5;font-weight:bold;">' + valYes.length + ' confirmed</span>'
-    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">' + (bigWins.length - valYes.length - bigWins.filter(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded==='no';}).length) + ' unmarked</span>';
+    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">' + unmarked + ' unmarked</span>';
   body.appendChild(stats);
 
   if (!bigWins.length) {
@@ -4776,76 +4777,180 @@ function renderTvValDataBody() {
     return;
   }
 
-  // ── Pill grid ──
-  var pillGrid = document.createElement('div');
-  pillGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;';
+  // ── View mode toggle: FOCUS | GRID ──
+  var modeRow = document.createElement('div');
+  modeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:16px;';
+  var focusBtn = document.createElement('button');
+  focusBtn.textContent = '⊡ FOCUS';
+  var gridBtn  = document.createElement('button');
+  gridBtn.textContent  = '⊞ GRID';
+  var modeBase = 'font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:all 0.12s;';
+  function setMode(m) {
+    _tvVdMode = m;
+    focusBtn.style.cssText = modeBase + (m==='focus' ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;' : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
+    gridBtn.style.cssText  = modeBase + (m==='grid'  ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;' : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
+  }
+  if (typeof _tvVdMode === 'undefined') _tvVdMode = 'focus';
+  setMode(_tvVdMode);
+  focusBtn.onclick = function(){ if(_tvVdMode!=='focus'){setMode('focus'); renderTvValDataBody();} };
+  gridBtn.onclick  = function(){ if(_tvVdMode!=='grid' ){setMode('grid');  renderTvValDataBody();} };
+  modeRow.appendChild(focusBtn);
+  modeRow.appendChild(gridBtn);
+  body.appendChild(modeRow);
 
-  bigWins.forEach(function (t) {
+  // ── GRID MODE ──────────────────────────────────────────────────────────────
+  if (_tvVdMode === 'grid') {
+    var gridWrap = document.createElement('div');
+    gridWrap.style.cssText = 'display:flex;flex-direction:column;gap:24px;';
+    bigWins.forEach(function(t) {
+      var mk = _tvMetaKey(t.date, t.symbol, t.side);
+      var vt = (tvTradeMeta[mk]||{}).valTraded||'';
+      var card = document.createElement('div');
+      card.style.cssText = 'background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;';
+
+      // Card header with Y/N
+      var ch = document.createElement('div');
+      ch.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.2);';
+      ch.innerHTML = '<span style="font-family:var(--display);font-size:13px;font-weight:bold;color:#42a5f5;letter-spacing:1px;">' + t.symbol + '</span>'
+        + '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">' + t.date.slice(5) + ' · ' + (t.side==='long'?'LONG':'SHORT') + ' ' + t.volume + ' @ $' + t.entryPrice + '</span>'
+        + '<span style="font-family:var(--display);font-size:13px;font-weight:bold;color:#26a69a;margin-left:auto;">+$' + (t.pnl||0).toFixed(0) + '</span>';
+
+      // Y/N buttons in card header
+      var ynWrap = document.createElement('div');
+      ynWrap.style.cssText = 'display:flex;gap:4px;margin-left:12px;';
+      var yB = document.createElement('button');
+      yB.textContent = 'Y';
+      yB.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 8px;border-radius:3px;cursor:pointer;border:1px solid '+(vt==='yes'?'#42a5f5':'rgba(255,255,255,0.15)')+';background:'+(vt==='yes'?'rgba(66,165,245,0.25)':'transparent')+';color:'+(vt==='yes'?'#42a5f5':'rgba(255,255,255,0.3)')+';';
+      var nB = document.createElement('button');
+      nB.textContent = 'N';
+      nB.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 8px;border-radius:3px;cursor:pointer;border:1px solid '+(vt==='no'?'#ef5350':'rgba(255,255,255,0.15)')+';background:'+(vt==='no'?'rgba(239,83,80,0.2)':'transparent')+';color:'+(vt==='no'?'#ef5350':'rgba(255,255,255,0.3)')+';';
+      yB.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='yes'?'':'yes';_saveTvTradeMeta();renderTvValDataBody();};
+      nB.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='no'?'':'no';_saveTvTradeMeta();renderTvValDataBody();};
+      ynWrap.appendChild(yB); ynWrap.appendChild(nB);
+      ch.appendChild(ynWrap);
+      card.appendChild(ch);
+
+      // Compare panel inside card
+      var cp = document.createElement('div');
+      cp.style.cssText = 'padding:14px 16px;';
+      card.appendChild(cp);
+      tvRenderValCompare(t, mk, cp, true); // true = embedded (no title bar / close btn)
+      gridWrap.appendChild(card);
+    });
+    body.appendChild(gridWrap);
+    return;
+  }
+
+  // ── FOCUS MODE ─────────────────────────────────────────────────────────────
+
+  // Pill row
+  var pillGrid = document.createElement('div');
+  pillGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;';
+  bigWins.forEach(function (t, idx) {
     var mk = _tvMetaKey(t.date, t.symbol, t.side);
     var vt = (tvTradeMeta[mk] || {}).valTraded || '';
     var isActive = _tvVdActive === mk;
-
     var pill = document.createElement('div');
-    pill.style.cssText = 'display:flex;align-items:center;gap:0;border-radius:6px;overflow:hidden;cursor:pointer;border:1px solid '
-      + (isActive ? '#42a5f5' : vt === 'yes' ? 'rgba(66,165,245,0.5)' : vt === 'no' ? 'rgba(239,83,80,0.4)' : 'rgba(255,255,255,0.15)')
-      + ';background:' + (isActive ? 'rgba(66,165,245,0.12)' : 'rgba(0,0,0,0.3)') + ';transition:all 0.12s;';
-
-    // Info section
+    pill.style.cssText = 'display:flex;align-items:stretch;border-radius:5px;overflow:hidden;cursor:pointer;border:1px solid '
+      + (isActive ? '#42a5f5' : vt==='yes' ? 'rgba(66,165,245,0.45)' : vt==='no' ? 'rgba(239,83,80,0.35)' : 'rgba(255,255,255,0.12)')
+      + ';background:' + (isActive ? 'rgba(66,165,245,0.1)' : 'rgba(0,0,0,0.3)') + ';transition:border 0.1s,background 0.1s;';
     var info = document.createElement('div');
-    info.style.cssText = 'padding:7px 11px;';
-    info.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">' + t.date.slice(5) + ' · ' + (t.side === 'long' ? 'L' : 'S') + '</div>'
-      + '<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:' + (vt === 'yes' ? '#42a5f5' : vt === 'no' ? '#ef5350' : 'var(--text)') + ';">' + t.symbol + '</div>'
-      + '<div style="font-family:var(--display);font-size:11px;color:#26a69a;font-weight:bold;">+$' + (t.pnl || 0).toFixed(0) + '</div>';
-
-    // Y/N toggle section
+    info.style.cssText = 'padding:5px 9px;';
+    info.innerHTML = '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">' + t.date.slice(5) + ' · ' + (t.side==='long'?'L':'S') + '</div>'
+      + '<div style="font-family:var(--display);font-size:12px;font-weight:bold;color:' + (vt==='yes'?'#42a5f5':vt==='no'?'#ef5350':'var(--text)') + ';">' + t.symbol + '</div>'
+      + '<div style="font-family:var(--display);font-size:10px;color:#26a69a;font-weight:bold;">+$' + (t.pnl||0).toFixed(0) + '</div>';
     var yn = document.createElement('div');
-    yn.style.cssText = 'display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.08);';
-    var yBtn = document.createElement('div');
-    yBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:6px 10px;cursor:pointer;transition:all 0.1s;'
-      + 'background:' + (vt === 'yes' ? 'rgba(66,165,245,0.3)' : 'transparent') + ';'
-      + 'color:' + (vt === 'yes' ? '#42a5f5' : 'rgba(255,255,255,0.3)') + ';border-bottom:1px solid rgba(255,255,255,0.06);';
-    yBtn.textContent = 'Y';
-    var nBtn = document.createElement('div');
-    nBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:6px 10px;cursor:pointer;transition:all 0.1s;'
-      + 'background:' + (vt === 'no' ? 'rgba(239,83,80,0.25)' : 'transparent') + ';'
-      + 'color:' + (vt === 'no' ? '#ef5350' : 'rgba(255,255,255,0.3)') + ';';
-    nBtn.textContent = 'N';
-
-    yBtn.onclick = function (ev) {
-      ev.stopPropagation();
-      if (!tvTradeMeta[mk]) tvTradeMeta[mk] = {};
-      tvTradeMeta[mk].valTraded = tvTradeMeta[mk].valTraded === 'yes' ? '' : 'yes';
-      _saveTvTradeMeta();
-      renderTvValDataBody();
-    };
-    nBtn.onclick = function (ev) {
-      ev.stopPropagation();
-      if (!tvTradeMeta[mk]) tvTradeMeta[mk] = {};
-      tvTradeMeta[mk].valTraded = tvTradeMeta[mk].valTraded === 'no' ? '' : 'no';
-      _saveTvTradeMeta();
-      renderTvValDataBody();
-    };
-
-    yn.appendChild(yBtn); yn.appendChild(nBtn);
+    yn.style.cssText = 'display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.07);';
+    var yB2 = document.createElement('div');
+    yB2.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;padding:5px 8px;cursor:pointer;flex:1;display:flex;align-items:center;background:'+(vt==='yes'?'rgba(66,165,245,0.28)':'transparent')+';color:'+(vt==='yes'?'#42a5f5':'rgba(255,255,255,0.25)')+';border-bottom:1px solid rgba(255,255,255,0.05);';
+    yB2.textContent = 'Y';
+    var nB2 = document.createElement('div');
+    nB2.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;padding:5px 8px;cursor:pointer;flex:1;display:flex;align-items:center;background:'+(vt==='no'?'rgba(239,83,80,0.22)':'transparent')+';color:'+(vt==='no'?'#ef5350':'rgba(255,255,255,0.25)')+';';
+    nB2.textContent = 'N';
+    yB2.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='yes'?'':'yes';_saveTvTradeMeta();renderTvValDataBody();};
+    nB2.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='no'?'':'no';_saveTvTradeMeta();renderTvValDataBody();};
+    yn.appendChild(yB2); yn.appendChild(nB2);
     pill.appendChild(info); pill.appendChild(yn);
-
-    pill.addEventListener('click', function () {
-      _tvVdActive = (_tvVdActive === mk) ? null : mk;
+    pill.addEventListener('click', function(){
+      _tvVdActive = (_tvVdActive===mk) ? null : mk;
+      _tvVdIdx = idx;
       renderTvValDataBody();
     });
-
     pillGrid.appendChild(pill);
   });
   body.appendChild(pillGrid);
 
-  // ── Side-by-side compare ──
+  // Nav bar (prev/next + counter) — only shown when something is active
   if (_tvVdActive) {
-    var t = bigWins.find(function (t) { return _tvMetaKey(t.date, t.symbol, t.side) === _tvVdActive; });
-    if (t) tvRenderValCompare(t, _tvVdActive, body);
+    var activeIdx = bigWins.findIndex(function(t){ return _tvMetaKey(t.date,t.symbol,t.side)===_tvVdActive; });
+    if (activeIdx < 0) activeIdx = 0;
+
+    var navBar = document.createElement('div');
+    navBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;';
+    var prevBtn = document.createElement('button');
+    prevBtn.innerHTML = '&#9664; PREV';
+    prevBtn.disabled = activeIdx === 0;
+    prevBtn.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 14px;border-radius:4px;cursor:pointer;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:'+(activeIdx===0?'rgba(255,255,255,0.2)':'var(--text)')+';';
+    var nextBtn = document.createElement('button');
+    nextBtn.innerHTML = 'NEXT &#9654;';
+    nextBtn.disabled = activeIdx === bigWins.length - 1;
+    nextBtn.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 14px;border-radius:4px;cursor:pointer;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:'+(activeIdx===bigWins.length-1?'rgba(255,255,255,0.2)':'var(--text)')+';';
+    var counter = document.createElement('span');
+    counter.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);';
+    counter.textContent = (activeIdx + 1) + ' / ' + bigWins.length;
+
+    // Y/N in nav bar for quick input without scrolling down
+    var navMk = _tvMetaKey(bigWins[activeIdx].date, bigWins[activeIdx].symbol, bigWins[activeIdx].side);
+    var navVt = (tvTradeMeta[navMk]||{}).valTraded||'';
+    var navYN = document.createElement('div');
+    navYN.style.cssText = 'display:flex;gap:4px;margin-left:8px;';
+    var nyB = document.createElement('button');
+    nyB.textContent = 'Y — val traded';
+    nyB.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:bold;padding:5px 14px;border-radius:4px;cursor:pointer;border:1px solid '+(navVt==='yes'?'#42a5f5':'rgba(255,255,255,0.2)')+';background:'+(navVt==='yes'?'rgba(66,165,245,0.22)':'transparent')+';color:'+(navVt==='yes'?'#42a5f5':'rgba(255,255,255,0.35)')+';';
+    var nnB = document.createElement('button');
+    nnB.textContent = 'N — val didn\'t';
+    nnB.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:bold;padding:5px 14px;border-radius:4px;cursor:pointer;border:1px solid '+(navVt==='no'?'#ef5350':'rgba(255,255,255,0.2)')+';background:'+(navVt==='no'?'rgba(239,83,80,0.2)':'transparent')+';color:'+(navVt==='no'?'#ef5350':'rgba(255,255,255,0.35)')+';';
+    nyB.onclick = function(){if(!tvTradeMeta[navMk])tvTradeMeta[navMk]={};tvTradeMeta[navMk].valTraded=tvTradeMeta[navMk].valTraded==='yes'?'':'yes';_saveTvTradeMeta();renderTvValDataBody();};
+    nnB.onclick = function(){if(!tvTradeMeta[navMk])tvTradeMeta[navMk]={};tvTradeMeta[navMk].valTraded=tvTradeMeta[navMk].valTraded==='no'?'':'no';_saveTvTradeMeta();renderTvValDataBody();};
+    navYN.appendChild(nyB); navYN.appendChild(nnB);
+
+    prevBtn.onclick = function(){
+      if(activeIdx > 0){ _tvVdActive = _tvMetaKey(bigWins[activeIdx-1].date,bigWins[activeIdx-1].symbol,bigWins[activeIdx-1].side); renderTvValDataBody(); }
+    };
+    nextBtn.onclick = function(){
+      if(activeIdx < bigWins.length-1){ _tvVdActive = _tvMetaKey(bigWins[activeIdx+1].date,bigWins[activeIdx+1].symbol,bigWins[activeIdx+1].side); renderTvValDataBody(); }
+    };
+
+    navBar.appendChild(prevBtn);
+    navBar.appendChild(counter);
+    navBar.appendChild(nextBtn);
+    navBar.appendChild(navYN);
+    body.appendChild(navBar);
+
+    // Keyboard nav — arrow keys
+    if (!body._tvKeyHandler) {
+      body._tvKeyHandler = function(ev){
+        if (document.getElementById('tvValDataPane') && document.getElementById('tvValDataPane').style.display === 'none') return;
+        if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+        var wins2 = (typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){return (t.pnl||0)>=_tvVdThreshold;});
+        wins2.sort(function(a,b){return(b.pnl||0)-(a.pnl||0);});
+        var ci = wins2.findIndex(function(t){return _tvMetaKey(t.date,t.symbol,t.side)===_tvVdActive;});
+        if(ev.key==='ArrowRight'&&ci<wins2.length-1){_tvVdActive=_tvMetaKey(wins2[ci+1].date,wins2[ci+1].symbol,wins2[ci+1].side);renderTvValDataBody();ev.preventDefault();}
+        if(ev.key==='ArrowLeft'&&ci>0){_tvVdActive=_tvMetaKey(wins2[ci-1].date,wins2[ci-1].symbol,wins2[ci-1].side);renderTvValDataBody();ev.preventDefault();}
+      };
+      document.addEventListener('keydown', body._tvKeyHandler);
+    }
+
+    // Show compare panel
+    var t = bigWins[activeIdx];
+    tvRenderValCompare(t, _tvVdActive, body, false);
   }
 }
 
-function tvRenderValCompare(t, mk, container) {
+var _tvVdMode = 'focus';
+var _tvVdIdx  = 0;
+
+function tvRenderValCompare(t, mk, container, embedded) {
   var sym = t.symbol.toUpperCase();
   var valExec = null;
   if (typeof executions !== 'undefined') {
@@ -4864,20 +4969,22 @@ function tvRenderValCompare(t, mk, container) {
   }
 
   var wrap = document.createElement('div');
-  wrap.style.cssText = 'background:rgba(0,0,0,0.25);border:1px solid rgba(66,165,245,0.2);border-radius:10px;padding:18px;margin-top:4px;';
+  wrap.style.cssText = embedded ? 'padding:0;' : 'background:rgba(0,0,0,0.25);border:1px solid rgba(66,165,245,0.2);border-radius:10px;padding:18px;margin-top:4px;';
 
-  // Title bar
-  var tBar = document.createElement('div');
-  tBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:16px;';
-  tBar.innerHTML = '<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:#42a5f5;letter-spacing:2px;">' + sym + ' · ' + t.date.slice(5) + '</span>'
-    + '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">' + (t.side === 'long' ? 'LONG' : 'SHORT') + ' ' + t.volume + ' @ $' + t.entryPrice + '</span>'
-    + '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:#26a69a;margin-left:auto;">+$' + (t.pnl || 0).toFixed(2) + '</span>';
-  var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;';
-  closeBtn.textContent = '✕';
-  closeBtn.onclick = function () { _tvVdActive = null; renderTvValDataBody(); };
-  tBar.appendChild(closeBtn);
-  wrap.appendChild(tBar);
+  if (!embedded) {
+    // Title bar (focus mode only)
+    var tBar = document.createElement('div');
+    tBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:16px;';
+    tBar.innerHTML = '<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:#42a5f5;letter-spacing:2px;">' + sym + ' · ' + t.date.slice(5) + '</span>'
+      + '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">' + (t.side === 'long' ? 'LONG' : 'SHORT') + ' ' + t.volume + ' @ $' + t.entryPrice + '</span>'
+      + '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:#26a69a;margin-left:auto;">+$' + (t.pnl || 0).toFixed(2) + '</span>';
+    var closeBtn = document.createElement('button');
+    closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;';
+    closeBtn.textContent = '✕';
+    closeBtn.onclick = function () { _tvVdActive = null; renderTvValDataBody(); };
+    tBar.appendChild(closeBtn);
+    wrap.appendChild(tBar);
+  }
 
   // Two-column grid
   var grid = document.createElement('div');
