@@ -4872,16 +4872,59 @@ function renderTvValDataBody() {
     var mk = _tvMetaKey(t.date, t.symbol, t.side);
     return (tvTradeMeta[mk] || {}).valTraded === 'yes';
   });
+  var valNo = bigWins.filter(function (t) {
+    var mk = _tvMetaKey(t.date, t.symbol, t.side);
+    return (tvTradeMeta[mk] || {}).valTraded === 'no';
+  });
   var pct = bigWins.length ? Math.round((valYes.length / bigWins.length) * 100) : 0;
-  var unmarked = bigWins.length - valYes.length - bigWins.filter(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded==='no';}).length;
+  var unmarked = bigWins.length - valYes.length - valNo.length;
+
+  function _sum(arr) { return arr.reduce(function(s,t){return s+(t.pnl||0);},0); }
+  function _avg(arr) { return arr.length ? _sum(arr)/arr.length : 0; }
+  function _fmt(n) { return (n>=0?'+$':'-$')+Math.abs(n).toFixed(0); }
+
+  var yPnl = _sum(valYes), nPnl = _sum(valNo);
+  var yAvg = _avg(valYes), nAvg = _avg(valNo);
 
   // ── Stats bar ──
   var stats = document.createElement('div');
-  stats.style.cssText = 'display:flex;gap:24px;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;';
-  stats.innerHTML = '<span style="font-family:var(--display);font-size:32px;font-weight:bold;color:#42a5f5;">' + pct + '%</span>'
-    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">of ' + bigWins.length + ' wins &gt;$' + _tvVdThreshold + ' — val also traded</span>'
-    + '<span style="font-family:var(--mono);font-size:13px;color:#42a5f5;font-weight:bold;">' + valYes.length + ' confirmed</span>'
-    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">' + unmarked + ' unmarked</span>';
+  stats.style.cssText = 'margin-bottom:16px;';
+
+  // Top line — % headline
+  var topLine = document.createElement('div');
+  topLine.style.cssText = 'display:flex;align-items:baseline;gap:16px;margin-bottom:12px;flex-wrap:wrap;';
+  topLine.innerHTML = '<span style="font-family:var(--display);font-size:32px;font-weight:bold;color:#42a5f5;">' + pct + '%</span>'
+    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">of ' + bigWins.length + ' qualifying trades — val also traded</span>'
+    + '<span style="font-family:var(--mono);font-size:13px;color:#42a5f5;font-weight:bold;">' + valYes.length + ' yes</span>'
+    + '<span style="font-family:var(--mono);font-size:13px;color:#ef5350;font-weight:bold;">' + valNo.length + ' no</span>'
+    + (unmarked ? '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">' + unmarked + ' unmarked</span>' : '');
+  stats.appendChild(topLine);
+
+  // PnL breakdown cards
+  var cards = document.createElement('div');
+  cards.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:560px;';
+
+  function mkCard(label, color, borderColor, count, totalPnl, avgPnl) {
+    var c = document.createElement('div');
+    c.style.cssText = 'background:rgba(0,0,0,0.25);border:1px solid ' + borderColor + ';border-radius:8px;padding:12px 16px;';
+    c.innerHTML = '<div style="font-family:var(--mono);font-size:9px;letter-spacing:1px;color:' + color + ';margin-bottom:8px;">' + label + ' &nbsp;<span style="color:var(--muted);font-size:9px;">(' + count + ' trades)</span></div>'
+      + '<div style="display:flex;gap:20px;align-items:baseline;flex-wrap:wrap;">'
+      + '<div>'
+        + '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:2px;">TOTAL P&L</div>'
+        + '<div style="font-family:var(--display);font-size:20px;font-weight:bold;color:' + (totalPnl>=0?'#26a69a':'#ef5350') + ';">' + _fmt(totalPnl) + '</div>'
+      + '</div>'
+      + '<div>'
+        + '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:2px;">AVG WIN</div>'
+        + '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:' + (avgPnl>=0?'#26a69a':'#ef5350') + ';">' + _fmt(avgPnl) + '</div>'
+      + '</div>'
+      + '</div>';
+    return c;
+  }
+
+  cards.appendChild(mkCard('VAL TRADED — YES', '#42a5f5', 'rgba(66,165,245,0.3)', valYes.length, yPnl, yAvg));
+  cards.appendChild(mkCard('VAL TRADED — NO',  '#ef5350', 'rgba(239,83,80,0.25)',  valNo.length,  nPnl, nAvg));
+  stats.appendChild(cards);
+
   body.appendChild(stats);
 
   if (!bigWins.length) {
@@ -4968,9 +5011,10 @@ function renderTvValDataBody() {
       + ';background:' + (isActive ? 'rgba(66,165,245,0.1)' : 'rgba(0,0,0,0.3)') + ';transition:border 0.1s,background 0.1s;';
     var info = document.createElement('div');
     info.style.cssText = 'padding:5px 9px;';
-    info.innerHTML = '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">' + t.date.slice(5) + ' · ' + (t.side==='long'?'L':'S') + '</div>'
+    var _multi = t._allMks && t._allMks.length > 1;
+    info.innerHTML = '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">' + t.date.slice(5) + (_multi ? ' · ×'+t._allMks.length : ' · '+(t.side==='long'?'L':'S')) + '</div>'
       + '<div style="font-family:var(--display);font-size:12px;font-weight:bold;color:' + (vt==='yes'?'#42a5f5':vt==='no'?'#ef5350':'var(--text)') + ';">' + t.symbol + '</div>'
-      + '<div style="font-family:var(--display);font-size:10px;color:#26a69a;font-weight:bold;">+$' + (t.pnl||0).toFixed(0) + '</div>';
+      + '<div style="font-family:var(--display);font-size:10px;color:#26a69a;font-weight:bold;">' + (t.pnl>=0?'+$':'-$') + Math.abs(t.pnl||0).toFixed(0) + '</div>';
     var yn = document.createElement('div');
     yn.style.cssText = 'display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.07);';
     var yB2 = document.createElement('div');
@@ -4979,8 +5023,8 @@ function renderTvValDataBody() {
     var nB2 = document.createElement('div');
     nB2.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;padding:5px 8px;cursor:pointer;flex:1;display:flex;align-items:center;background:'+(vt==='no'?'rgba(239,83,80,0.22)':'transparent')+';color:'+(vt==='no'?'#ef5350':'rgba(255,255,255,0.25)')+';';
     nB2.textContent = 'N';
-    yB2.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='yes'?'':'yes';_saveTvTradeMeta();renderTvValDataBody();};
-    nB2.onclick = function(ev){ev.stopPropagation();if(!tvTradeMeta[mk])tvTradeMeta[mk]={};tvTradeMeta[mk].valTraded=tvTradeMeta[mk].valTraded==='no'?'':'no';_saveTvTradeMeta();renderTvValDataBody();};
+    yB2.onclick = function(ev){ev.stopPropagation();var cur=(tvTradeMeta[mk]||{}).valTraded||'';var nv=cur==='yes'?'':'yes';(t._allMks||[mk]).forEach(function(k){if(!tvTradeMeta[k])tvTradeMeta[k]={};tvTradeMeta[k].valTraded=nv;});_saveTvTradeMeta();renderTvValDataBody();};
+    nB2.onclick = function(ev){ev.stopPropagation();var cur=(tvTradeMeta[mk]||{}).valTraded||'';var nv=cur==='no'?'':'no';(t._allMks||[mk]).forEach(function(k){if(!tvTradeMeta[k])tvTradeMeta[k]={};tvTradeMeta[k].valTraded=nv;});_saveTvTradeMeta();renderTvValDataBody();};
     yn.appendChild(yB2); yn.appendChild(nB2);
     pill.appendChild(info); pill.appendChild(yn);
     pill.addEventListener('click', function(){
