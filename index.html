@@ -309,8 +309,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <input type="date" id="tvTradesTo" onchange="tvSetDateFilter('custom')" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:4px;">
       <button onclick="tvSetDateFilter('clear')" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:none;border:1px solid var(--border);padding:6px 10px;border-radius:4px;cursor:pointer;">✕ CLEAR</button>
     </div>
+    <div id="tvValDataBar"></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-      <div style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2);">
+      <div style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px 64px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2);">
         <span onclick="tvTradesSort('date')" class="tv-sort-hdr" id="tvSortDate">DATE ↕</span>
         <span onclick="tvTradesSort('openTime')" class="tv-sort-hdr">OPEN</span>
         <span onclick="tvTradesSort('closeTime')" class="tv-sort-hdr">CLOSE</span>
@@ -323,6 +324,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
         <span onclick="tvTradesSort('pnlpct')" class="tv-sort-hdr" style="text-align:right;">P&L%</span>
         <span onclick="tvTradesSort('pnl')" class="tv-sort-hdr" id="tvSortPnl" style="text-align:right;">P&L ↕</span>
         <span onclick="tvTradesSort('r')" class="tv-sort-hdr" id="tvSortR" style="text-align:right;">R ↕</span>
+        <span class="tv-sort-hdr" style="opacity:0.4;">IMG</span>
+        <span class="tv-sort-hdr" style="opacity:0.4;">✏️</span>
+        <span class="tv-sort-hdr" style="color:#42a5f5;">VAL?</span>
       </div>
       <div id="tvTradesList"></div>
       <div id="tvTradesSummary" style="padding:8px 14px;border-top:1px solid var(--border);background:rgba(0,0,0,0.15);display:flex;gap:24px;"></div>
@@ -4671,6 +4675,202 @@ function tvSetDateFilter(val){
 
 function tvTradesSort(field){if(tvSortField===field)tvSortDir*=-1;else{tvSortField=field;tvSortDir=-1;}renderTvTrades();}
 
+
+// ── VAL DATA BAR ─────────────────────────────────────────────────────────────
+var _tvValBarActive=null;
+
+function tvBuildValBar(filtered){
+  var bar=document.getElementById('tvValDataBar'); if(!bar) return;
+  var bigWins=filtered.filter(function(t){return (t.pnl||0)>200;});
+  var valYes=bigWins.filter(function(t){
+    var mk=_tvMetaKey(t.date,t.symbol,t.side);
+    return (tvTradeMeta[mk]||{}).valTraded==='yes';
+  });
+  var pct=bigWins.length?Math.round((valYes.length/bigWins.length)*100):0;
+
+  var wrap=document.createElement('div');
+  wrap.style.cssText='margin-bottom:10px;background:rgba(66,165,245,0.07);border:1px solid rgba(66,165,245,0.25);border-radius:8px;overflow:hidden;';
+
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:14px;padding:10px 16px;cursor:pointer;user-select:none;';
+  hdr.innerHTML='<span style="font-family:var(--display);font-size:13px;font-weight:bold;letter-spacing:2px;color:#42a5f5;">VAL DATA</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">wins &gt;$200</span>'
+    +'<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:#42a5f5;margin-left:4px;">'+pct+'%</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">val also traded ('+valYes.length+' / '+bigWins.length+')</span>'
+    +'<span id="tvValBarChevron" style="font-size:11px;color:var(--muted);margin-left:auto;">&#9660;</span>';
+
+  var pillWrap=document.createElement('div');
+  pillWrap.id='tvValBarPills';
+  pillWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 12px;border-top:1px solid rgba(66,165,245,0.15);';
+
+  bigWins.forEach(function(t){
+    var mk=_tvMetaKey(t.date,t.symbol,t.side);
+    var vt=(tvTradeMeta[mk]||{}).valTraded||'';
+    var pill=document.createElement('span');
+    pill.style.cssText='font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:20px;cursor:pointer;transition:all 0.12s;'
+      +'border:1px solid '+(vt==='yes'?'#42a5f5':vt==='no'?'rgba(239,83,80,0.4)':'rgba(255,255,255,0.18)')+';'
+      +'background:'+(vt==='yes'?'rgba(66,165,245,0.18)':vt==='no'?'rgba(239,83,80,0.08)':'rgba(0,0,0,0.3)')+';'
+      +'color:'+(vt==='yes'?'#42a5f5':vt==='no'?'#ef5350':'var(--muted)')+';';
+    pill.textContent=t.date.slice(5)+' '+t.symbol+' +$'+(t.pnl).toFixed(0);
+    pill.title='Click to compare side-by-side';
+    pill.dataset.mk=mk;
+    pill.addEventListener('click',function(){
+      _tvValBarActive=(_tvValBarActive===mk)?null:mk;
+      tvBuildValCompare(t, mk);
+    });
+    pillWrap.appendChild(pill);
+  });
+
+  var comparePanel=document.createElement('div');
+  comparePanel.id='tvValComparePanel';
+
+  wrap.appendChild(hdr);
+  wrap.appendChild(pillWrap);
+  wrap.appendChild(comparePanel);
+
+  var collapsed=false;
+  hdr.addEventListener('click',function(){
+    collapsed=!collapsed;
+    pillWrap.style.display=collapsed?'none':'flex';
+    comparePanel.style.display=collapsed?'none':'block';
+    var ch=document.getElementById('tvValBarChevron');
+    if(ch) ch.innerHTML=collapsed?'&#9654;':'&#9660;';
+  });
+
+  bar.innerHTML='';
+  bar.appendChild(wrap);
+
+  if(_tvValBarActive){
+    var at=bigWins.find(function(t){return _tvMetaKey(t.date,t.symbol,t.side)===_tvValBarActive;});
+    if(at) tvBuildValCompare(at, _tvValBarActive);
+  }
+}
+
+function tvBuildValCompare(t, mk){
+  var panel=document.getElementById('tvValComparePanel'); if(!panel) return;
+  if(_tvValBarActive!==mk){ panel.innerHTML=''; return; }
+  var sym=t.symbol.toUpperCase();
+  var valExec=null;
+  if(typeof executions!=='undefined'){
+    valExec=executions.find(function(e){
+      var tk=(execMeta[getExecKey(e)]||{}).ticker||e.ticker||'';
+      return e.date===t.date && tk.toUpperCase().indexOf(sym)>=0;
+    });
+  }
+  var myImgKey=t.date+'_'+t.symbol+'_'+t.side;
+  var myImg=(typeof tvTradeImages!=='undefined'?tvTradeImages[myImgKey]:null)||myTradeImages[myImgKey]||null;
+  var valImgKey='valCompare__'+t.date+'__'+sym;
+  var valImgSrc=null;
+  if(typeof tvTradeImages!=='undefined' && tvTradeImages[valImgKey]) valImgSrc=tvTradeImages[valImgKey];
+  else if(valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg==='function'){
+    valImgSrc=resolveDiscordImg(valExec.image_urls[0]);
+  }
+
+  panel.style.cssText='padding:14px 16px;border-top:1px solid rgba(66,165,245,0.2);background:rgba(0,0,0,0.25);';
+  var inner=document.createElement('div');
+  inner.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:960px;';
+
+  // LEFT: my trade
+  var myCol=document.createElement('div');
+  myCol.style.cssText='display:flex;flex-direction:column;gap:8px;';
+  var myLbl=document.createElement('div');
+  myLbl.style.cssText='font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#26a69a;';
+  myLbl.textContent='MY TRADE — '+sym+' '+t.date.slice(5);
+  var pnlC=(t.pnl||0)>=0?'#26a69a':'#ef5350';
+  var myStats=document.createElement('div');
+  myStats.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
+  myStats.innerHTML='<span style="color:'+pnlC+';font-weight:bold;font-size:14px;">'+(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2)+'</span>'
+    +'<span style="margin-left:10px;">'+(t.side==='long'?'LONG':'SHORT')+' '+t.volume+' @ $'+t.entryPrice+'</span>';
+  var myImgBox=document.createElement('div');
+  myImgBox.style.cssText='background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:6px;min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;position:relative;';
+  myImgBox.title='Click to manage my chart image';
+  if(myImg){
+    var mi=document.createElement('img');
+    mi.src=myImg; mi.style.cssText='width:100%;max-height:300px;object-fit:contain;border-radius:6px;';
+    myImgBox.appendChild(mi);
+  } else {
+    myImgBox.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">📷 no chart — click to add</span>';
+  }
+  myImgBox.addEventListener('click',function(){ tvOpenTradeImgModal(myImgKey); });
+  myCol.appendChild(myLbl); myCol.appendChild(myStats); myCol.appendChild(myImgBox);
+
+  // RIGHT: val trade
+  var valCol=document.createElement('div');
+  valCol.style.cssText='display:flex;flex-direction:column;gap:8px;';
+  var valLbl=document.createElement('div');
+  valLbl.style.cssText='font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#42a5f5;';
+  valLbl.textContent='VAL — '+sym+' '+t.date.slice(5);
+  var valInfo=document.createElement('div');
+  valInfo.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
+  if(valExec){
+    var dir=(execMeta[getExecKey(valExec)]||{}).direction||valExec.direction||'';
+    valInfo.innerHTML='<span style="color:#42a5f5;font-weight:bold;">'+(dir?dir.toUpperCase():'—')+'</span>'
+      +(valExec.content?'<span style="margin-left:8px;color:rgba(255,255,255,0.45);">'+valExec.content.slice(0,80)+'</span>':'');
+  } else {
+    valInfo.innerHTML='<span style="color:rgba(255,255,255,0.28);">no matching val exec for this date/symbol</span>';
+  }
+  var valImgBox=document.createElement('div');
+  valImgBox.tabIndex=0;
+  valImgBox.style.cssText='background:rgba(0,0,0,0.35);border:2px dashed rgba(66,165,245,0.3);border-radius:6px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;gap:6px;outline:none;';
+  valImgBox.title='Click to paste or focus then Ctrl+V';
+  if(valImgSrc){
+    var vi=document.createElement('img');
+    vi.src=valImgSrc; vi.style.cssText='width:100%;max-height:300px;object-fit:contain;border-radius:4px;';
+    valImgBox.appendChild(vi);
+  } else {
+    valImgBox.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:rgba(66,165,245,0.45);">📷 no val chart</span>';
+  }
+
+  function saveValImg(dataUrl){
+    if(typeof tvTradeImages==='undefined') window.tvTradeImages={};
+    tvTradeImages[valImgKey]=dataUrl;
+    try{localStorage.setItem('tvTradeImages',JSON.stringify(tvTradeImages));}catch(er){}
+    if(typeof sbImgSave==='function') sbImgSave('tvTradeImages',valImgKey,dataUrl);
+    tvBuildValCompare(t, mk);
+  }
+
+  valImgBox.addEventListener('paste',function(ev){
+    var items=(ev.clipboardData||{}).items||[];
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image')>=0){
+        var rd=new FileReader();
+        rd.onload=function(e2){saveValImg(e2.target.result);};
+        rd.readAsDataURL(items[i].getAsFile());
+        ev.preventDefault(); break;
+      }
+    }
+  });
+
+  var ctrlRow=document.createElement('div');
+  ctrlRow.style.cssText='display:flex;gap:6px;';
+  var fileInp=document.createElement('input');
+  fileInp.type='file'; fileInp.accept='image/*'; fileInp.style.display='none';
+  fileInp.addEventListener('change',function(){
+    if(!fileInp.files[0]) return;
+    var rd=new FileReader(); rd.onload=function(e2){saveValImg(e2.target.result);}; rd.readAsDataURL(fileInp.files[0]);
+  });
+  var upBtn=document.createElement('button');
+  upBtn.style.cssText='font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(66,165,245,0.15);border:1px solid rgba(66,165,245,0.4);color:#42a5f5;';
+  upBtn.textContent='📁 UPLOAD / REPLACE';
+  upBtn.addEventListener('click',function(){fileInp.click();});
+  ctrlRow.appendChild(upBtn); ctrlRow.appendChild(fileInp);
+  if(valImgSrc){
+    var delBtn=document.createElement('button');
+    delBtn.style.cssText='font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.35);color:#ef5350;';
+    delBtn.textContent='✕ REMOVE';
+    delBtn.addEventListener('click',function(){
+      if(typeof tvTradeImages!=='undefined') delete tvTradeImages[valImgKey];
+      try{localStorage.setItem('tvTradeImages',JSON.stringify(tvTradeImages||{}));}catch(er){}
+      tvBuildValCompare(t, mk);
+    });
+    ctrlRow.appendChild(delBtn);
+  }
+
+  valCol.appendChild(valLbl); valCol.appendChild(valInfo); valCol.appendChild(valImgBox); valCol.appendChild(ctrlRow);
+  inner.appendChild(myCol); inner.appendChild(valCol);
+  panel.innerHTML=''; panel.appendChild(inner);
+}
+
 function renderTvTrades(){
   var search=(document.getElementById('tvTradesSearch')?.value||'').toUpperCase();
   var side=document.getElementById('tvTradesSide')?.value||'all';
@@ -4730,7 +4930,7 @@ function renderTvTrades(){
     var pnlPct=t.entryPrice>0&&t.volume>0?((t.pnl/(t.entryPrice*t.volume))*100):0;
     var pnlPctStr=(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%';
     var pnlDolStr=((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(2); // always $ regardless of unit
-    return '<div class="tv-trade-row" style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px;align-items:center;gap:0;padding:7px 14px;border-bottom:1px solid var(--border);">'
+    return '<div class="tv-trade-row" style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px 64px;align-items:center;gap:0;padding:7px 14px;border-bottom:1px solid var(--border);">'
       +'<span style="font-size:10px;color:var(--text);">'+t.date.slice(5)+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">'+t.openTime.slice(0,5)+'</span>'
       +'<span style="font-size:10px;color:var(--muted);">'+(t.closeTime?t.closeTime.slice(0,5):'—')+'</span>'
@@ -4773,6 +4973,21 @@ function renderTvTrades(){
       tvEditTrade(filtered[i]);
     });
   });
+  // Wire Val Y/N buttons
+  el.querySelectorAll('.tv-vb').forEach(function(btn){
+    btn.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var mk=btn.getAttribute('data-key');
+      var isY=btn.classList.contains('tv-vb-y');
+      if(!tvTradeMeta[mk]) tvTradeMeta[mk]={};
+      var prev=tvTradeMeta[mk].valTraded||'';
+      tvTradeMeta[mk].valTraded=(prev===(isY?'yes':'no'))?'':(isY?'yes':'no');
+      _saveTvTradeMeta();
+      renderTvTrades();
+    });
+  });
+  // Build Val Data bar
+  tvBuildValBar(filtered);
   var sum=document.getElementById('tvTradesSummary');
   if(sum) sum.innerHTML='<span style="font-size:10px;color:var(--muted);">'+filtered.length+' trades</span>'
     +'<span style="font-size:14px;font-weight:bold;color:'+(totalPnl>=0?'#26a69a':'#ef5350')+'">'+(totalPnl>=0?'+$':'-$')+Math.abs(totalPnl).toFixed(2)+'</span>'
