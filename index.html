@@ -129,6 +129,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <button onclick="tvTab('calendar')" id="tvTabCalendar" class="tv-tab-btn">📅 CALENDAR</button>
       <button onclick="tvTab('trades')" id="tvTabTrades" class="tv-tab-btn">📋 TRADES</button>
       <button onclick="tvTab('reports')" id="tvTabReports" class="tv-tab-btn">📊 REPORTS</button>
+      <button onclick="tvTab('valdata')" id="tvTabValdata" class="tv-tab-btn" style="color:#42a5f5;">💠 VAL DATA</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">VIEW AS</span>
@@ -309,7 +310,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <input type="date" id="tvTradesTo" onchange="tvSetDateFilter('custom')" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:4px;">
       <button onclick="tvSetDateFilter('clear')" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:none;border:1px solid var(--border);padding:6px 10px;border-radius:4px;cursor:pointer;">✕ CLEAR</button>
     </div>
-    <div id="tvValDataBar"></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
       <div style="display:grid;grid-template-columns:96px 70px 70px 72px 64px 56px 76px 76px 70px 72px 80px 80px 80px 28px 28px 64px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2);">
         <span onclick="tvTradesSort('date')" class="tv-sort-hdr" id="tvSortDate">DATE ↕</span>
@@ -332,6 +332,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
       <div id="tvTradesSummary" style="padding:8px 14px;border-top:1px solid var(--border);background:rgba(0,0,0,0.15);display:flex;gap:24px;"></div>
     </div>
   </div>
+
+  <!-- VAL DATA TAB -->
+  <div id="tvValDataPane" style="display:none;padding:24px 32px;"></div>
 
   <!-- REPORTS TAB -->
   <div id="tvReportsPane" style="display:none;padding:24px 32px;">
@@ -4024,8 +4027,8 @@ try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch
 function tvSave(){sbSave('tvTrades',JSON.stringify(tvTrades));sbSave('tvDayR',JSON.stringify(tvDayR));}
 
 function tvTab(t){
-  var panes={import:'tvImportPane',calendar:'tvCalPane',trades:'tvTradesPane',reports:'tvReportsPane'};
-  var btns={import:'tvTabImport',calendar:'tvTabCalendar',trades:'tvTabTrades',reports:'tvTabReports'};
+  var panes={import:'tvImportPane',calendar:'tvCalPane',trades:'tvTradesPane',reports:'tvReportsPane',valdata:'tvValDataPane'};
+  var btns={import:'tvTabImport',calendar:'tvTabCalendar',trades:'tvTabTrades',reports:'tvTabReports',valdata:'tvTabValdata'};
   try{localStorage.setItem('lastTvTab',t);}catch(e){}
   Object.keys(panes).forEach(function(k){
     document.getElementById(panes[k]).style.display=k===t?'block':'none';
@@ -4034,6 +4037,7 @@ function tvTab(t){
   if(t==='calendar') renderTvCal();
   if(t==='trades') renderTvTrades();
   if(t==='reports') renderTvReports();
+  if(t==='valdata') renderTvValData();
   if(t==='import') {
     renderTvRecentImports();
     if(typeof scaUpdateAccountFromRolling==='function') scaUpdateAccountFromRolling();
@@ -4676,199 +4680,315 @@ function tvSetDateFilter(val){
 function tvTradesSort(field){if(tvSortField===field)tvSortDir*=-1;else{tvSortField=field;tvSortDir=-1;}renderTvTrades();}
 
 
-// ── VAL DATA BAR ─────────────────────────────────────────────────────────────
-var _tvValBarActive=null;
 
-function tvBuildValBar(filtered){
-  var bar=document.getElementById('tvValDataBar'); if(!bar) return;
-  var bigWins=filtered.filter(function(t){return (t.pnl||0)>200;});
-  var valYes=bigWins.filter(function(t){
-    var mk=_tvMetaKey(t.date,t.symbol,t.side);
-    return (tvTradeMeta[mk]||{}).valTraded==='yes';
+// ── VAL DATA TAB ─────────────────────────────────────────────────────────────
+var _tvVdThreshold = 100;   // default min P&L
+var _tvVdActive = null;     // active compare key
+
+function renderTvValData() {
+  var el = document.getElementById('tvValDataPane');
+  if (!el) return;
+  el.innerHTML = '';
+
+  // ── Header ──
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
+  hdr.innerHTML = '<span style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:4px;color:#42a5f5;">💠 VAL DATA</span>';
+  el.appendChild(hdr);
+
+  // ── Threshold slider row ──
+  var sliderRow = document.createElement('div');
+  sliderRow.style.cssText = 'display:flex;align-items:center;gap:14px;margin-bottom:24px;background:rgba(66,165,245,0.06);border:1px solid rgba(66,165,245,0.2);border-radius:8px;padding:14px 20px;flex-wrap:wrap;';
+  var sliderLbl = document.createElement('span');
+  sliderLbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;white-space:nowrap;';
+  sliderLbl.textContent = 'SHOW WINS OVER';
+  var sliderVal = document.createElement('span');
+  sliderVal.id = 'tvVdThreshLbl';
+  sliderVal.style.cssText = 'font-family:var(--display);font-size:18px;font-weight:bold;color:#42a5f5;min-width:64px;';
+  sliderVal.textContent = '+$' + _tvVdThreshold;
+  var slider = document.createElement('input');
+  slider.type = 'range'; slider.min = '50'; slider.max = '2000'; slider.step = '50';
+  slider.value = _tvVdThreshold;
+  slider.style.cssText = 'flex:1;min-width:200px;max-width:400px;accent-color:#42a5f5;cursor:pointer;';
+  slider.oninput = function () {
+    _tvVdThreshold = parseInt(slider.value);
+    sliderVal.textContent = '+$' + _tvVdThreshold;
+    _tvVdActive = null;
+    renderTvValDataBody();
+  };
+  var steps = document.createElement('div');
+  steps.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+  [100, 150, 200, 300, 500, 1000].forEach(function (v) {
+    var b = document.createElement('button');
+    b.style.cssText = 'font-family:var(--mono);font-size:9px;padding:3px 9px;border-radius:12px;cursor:pointer;transition:all 0.1s;border:1px solid rgba(66,165,245,0.35);background:' + (_tvVdThreshold === v ? 'rgba(66,165,245,0.25)' : 'transparent') + ';color:' + (_tvVdThreshold === v ? '#42a5f5' : 'var(--muted)') + ';';
+    b.textContent = '$' + v;
+    b.onclick = function () {
+      _tvVdThreshold = v; slider.value = v;
+      sliderVal.textContent = '+$' + v;
+      _tvVdActive = null;
+      renderTvValDataBody();
+      steps.querySelectorAll('button').forEach(function(bb){
+        bb.style.background = bb===b ? 'rgba(66,165,245,0.25)' : 'transparent';
+        bb.style.color = bb===b ? '#42a5f5' : 'var(--muted)';
+        bb.style.border = '1px solid rgba(66,165,245,0.35)';
+      });
+    };
+    steps.appendChild(b);
   });
-  var pct=bigWins.length?Math.round((valYes.length/bigWins.length)*100):0;
+  sliderRow.appendChild(sliderLbl);
+  sliderRow.appendChild(sliderVal);
+  sliderRow.appendChild(slider);
+  sliderRow.appendChild(steps);
+  el.appendChild(sliderRow);
 
-  var wrap=document.createElement('div');
-  wrap.style.cssText='margin-bottom:10px;background:rgba(66,165,245,0.07);border:1px solid rgba(66,165,245,0.25);border-radius:8px;overflow:hidden;';
+  // ── Body container ──
+  var body = document.createElement('div');
+  body.id = 'tvVdBody';
+  el.appendChild(body);
+  renderTvValDataBody();
+}
 
-  var hdr=document.createElement('div');
-  hdr.style.cssText='display:flex;align-items:center;gap:14px;padding:10px 16px;cursor:pointer;user-select:none;';
-  hdr.innerHTML='<span style="font-family:var(--display);font-size:13px;font-weight:bold;letter-spacing:2px;color:#42a5f5;">VAL DATA</span>'
-    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">wins &gt;$200</span>'
-    +'<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:#42a5f5;margin-left:4px;">'+pct+'%</span>'
-    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">val also traded ('+valYes.length+' / '+bigWins.length+')</span>'
-    +'<span id="tvValBarChevron" style="font-size:11px;color:var(--muted);margin-left:auto;">&#9660;</span>';
+function renderTvValDataBody() {
+  var body = document.getElementById('tvVdBody');
+  if (!body) return;
+  body.innerHTML = '';
 
-  var pillWrap=document.createElement('div');
-  pillWrap.id='tvValBarPills';
-  pillWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 12px;border-top:1px solid rgba(66,165,245,0.15);';
+  var bigWins = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function (t) { return (t.pnl || 0) >= _tvVdThreshold; });
+  bigWins.sort(function (a, b) { return (b.pnl || 0) - (a.pnl || 0); });
 
-  bigWins.forEach(function(t){
-    var mk=_tvMetaKey(t.date,t.symbol,t.side);
-    var vt=(tvTradeMeta[mk]||{}).valTraded||'';
-    var pill=document.createElement('span');
-    pill.style.cssText='font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:20px;cursor:pointer;transition:all 0.12s;'
-      +'border:1px solid '+(vt==='yes'?'#42a5f5':vt==='no'?'rgba(239,83,80,0.4)':'rgba(255,255,255,0.18)')+';'
-      +'background:'+(vt==='yes'?'rgba(66,165,245,0.18)':vt==='no'?'rgba(239,83,80,0.08)':'rgba(0,0,0,0.3)')+';'
-      +'color:'+(vt==='yes'?'#42a5f5':vt==='no'?'#ef5350':'var(--muted)')+';';
-    pill.textContent=t.date.slice(5)+' '+t.symbol+' +$'+(t.pnl).toFixed(0);
-    pill.title='Click to compare side-by-side';
-    pill.dataset.mk=mk;
-    pill.addEventListener('click',function(){
-      _tvValBarActive=(_tvValBarActive===mk)?null:mk;
-      tvBuildValCompare(t, mk);
+  var valYes = bigWins.filter(function (t) {
+    var mk = _tvMetaKey(t.date, t.symbol, t.side);
+    return (tvTradeMeta[mk] || {}).valTraded === 'yes';
+  });
+  var pct = bigWins.length ? Math.round((valYes.length / bigWins.length) * 100) : 0;
+
+  // ── Stats bar ──
+  var stats = document.createElement('div');
+  stats.style.cssText = 'display:flex;gap:24px;align-items:baseline;margin-bottom:18px;flex-wrap:wrap;';
+  stats.innerHTML = '<span style="font-family:var(--display);font-size:32px;font-weight:bold;color:#42a5f5;">' + pct + '%</span>'
+    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">of ' + bigWins.length + ' wins &gt;$' + _tvVdThreshold + ' — val also traded</span>'
+    + '<span style="font-family:var(--mono);font-size:13px;color:#42a5f5;font-weight:bold;">' + valYes.length + ' confirmed</span>'
+    + '<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">' + (bigWins.length - valYes.length - bigWins.filter(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded==='no';}).length) + ' unmarked</span>';
+  body.appendChild(stats);
+
+  if (!bigWins.length) {
+    body.innerHTML += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px 0;">No wins above $' + _tvVdThreshold + ' found.</div>';
+    return;
+  }
+
+  // ── Pill grid ──
+  var pillGrid = document.createElement('div');
+  pillGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;';
+
+  bigWins.forEach(function (t) {
+    var mk = _tvMetaKey(t.date, t.symbol, t.side);
+    var vt = (tvTradeMeta[mk] || {}).valTraded || '';
+    var isActive = _tvVdActive === mk;
+
+    var pill = document.createElement('div');
+    pill.style.cssText = 'display:flex;align-items:center;gap:0;border-radius:6px;overflow:hidden;cursor:pointer;border:1px solid '
+      + (isActive ? '#42a5f5' : vt === 'yes' ? 'rgba(66,165,245,0.5)' : vt === 'no' ? 'rgba(239,83,80,0.4)' : 'rgba(255,255,255,0.15)')
+      + ';background:' + (isActive ? 'rgba(66,165,245,0.12)' : 'rgba(0,0,0,0.3)') + ';transition:all 0.12s;';
+
+    // Info section
+    var info = document.createElement('div');
+    info.style.cssText = 'padding:7px 11px;';
+    info.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">' + t.date.slice(5) + ' · ' + (t.side === 'long' ? 'L' : 'S') + '</div>'
+      + '<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:' + (vt === 'yes' ? '#42a5f5' : vt === 'no' ? '#ef5350' : 'var(--text)') + ';">' + t.symbol + '</div>'
+      + '<div style="font-family:var(--display);font-size:11px;color:#26a69a;font-weight:bold;">+$' + (t.pnl || 0).toFixed(0) + '</div>';
+
+    // Y/N toggle section
+    var yn = document.createElement('div');
+    yn.style.cssText = 'display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.08);';
+    var yBtn = document.createElement('div');
+    yBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:6px 10px;cursor:pointer;transition:all 0.1s;'
+      + 'background:' + (vt === 'yes' ? 'rgba(66,165,245,0.3)' : 'transparent') + ';'
+      + 'color:' + (vt === 'yes' ? '#42a5f5' : 'rgba(255,255,255,0.3)') + ';border-bottom:1px solid rgba(255,255,255,0.06);';
+    yBtn.textContent = 'Y';
+    var nBtn = document.createElement('div');
+    nBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:6px 10px;cursor:pointer;transition:all 0.1s;'
+      + 'background:' + (vt === 'no' ? 'rgba(239,83,80,0.25)' : 'transparent') + ';'
+      + 'color:' + (vt === 'no' ? '#ef5350' : 'rgba(255,255,255,0.3)') + ';';
+    nBtn.textContent = 'N';
+
+    yBtn.onclick = function (ev) {
+      ev.stopPropagation();
+      if (!tvTradeMeta[mk]) tvTradeMeta[mk] = {};
+      tvTradeMeta[mk].valTraded = tvTradeMeta[mk].valTraded === 'yes' ? '' : 'yes';
+      _saveTvTradeMeta();
+      renderTvValDataBody();
+    };
+    nBtn.onclick = function (ev) {
+      ev.stopPropagation();
+      if (!tvTradeMeta[mk]) tvTradeMeta[mk] = {};
+      tvTradeMeta[mk].valTraded = tvTradeMeta[mk].valTraded === 'no' ? '' : 'no';
+      _saveTvTradeMeta();
+      renderTvValDataBody();
+    };
+
+    yn.appendChild(yBtn); yn.appendChild(nBtn);
+    pill.appendChild(info); pill.appendChild(yn);
+
+    pill.addEventListener('click', function () {
+      _tvVdActive = (_tvVdActive === mk) ? null : mk;
+      renderTvValDataBody();
     });
-    pillWrap.appendChild(pill);
+
+    pillGrid.appendChild(pill);
   });
+  body.appendChild(pillGrid);
 
-  var comparePanel=document.createElement('div');
-  comparePanel.id='tvValComparePanel';
-
-  wrap.appendChild(hdr);
-  wrap.appendChild(pillWrap);
-  wrap.appendChild(comparePanel);
-
-  var collapsed=false;
-  hdr.addEventListener('click',function(){
-    collapsed=!collapsed;
-    pillWrap.style.display=collapsed?'none':'flex';
-    comparePanel.style.display=collapsed?'none':'block';
-    var ch=document.getElementById('tvValBarChevron');
-    if(ch) ch.innerHTML=collapsed?'&#9654;':'&#9660;';
-  });
-
-  bar.innerHTML='';
-  bar.appendChild(wrap);
-
-  if(_tvValBarActive){
-    var at=bigWins.find(function(t){return _tvMetaKey(t.date,t.symbol,t.side)===_tvValBarActive;});
-    if(at) tvBuildValCompare(at, _tvValBarActive);
+  // ── Side-by-side compare ──
+  if (_tvVdActive) {
+    var t = bigWins.find(function (t) { return _tvMetaKey(t.date, t.symbol, t.side) === _tvVdActive; });
+    if (t) tvRenderValCompare(t, _tvVdActive, body);
   }
 }
 
-function tvBuildValCompare(t, mk){
-  var panel=document.getElementById('tvValComparePanel'); if(!panel) return;
-  if(_tvValBarActive!==mk){ panel.innerHTML=''; return; }
-  var sym=t.symbol.toUpperCase();
-  var valExec=null;
-  if(typeof executions!=='undefined'){
-    valExec=executions.find(function(e){
-      var tk=(execMeta[getExecKey(e)]||{}).ticker||e.ticker||'';
-      return e.date===t.date && tk.toUpperCase().indexOf(sym)>=0;
+function tvRenderValCompare(t, mk, container) {
+  var sym = t.symbol.toUpperCase();
+  var valExec = null;
+  if (typeof executions !== 'undefined') {
+    valExec = executions.find(function (e) {
+      var tk = (execMeta[getExecKey(e)] || {}).ticker || e.ticker || '';
+      return e.date === t.date && tk.toUpperCase().indexOf(sym) >= 0;
     });
   }
-  var myImgKey=t.date+'_'+t.symbol+'_'+t.side;
-  var myImg=(typeof tvTradeImages!=='undefined'?tvTradeImages[myImgKey]:null)||myTradeImages[myImgKey]||null;
-  var valImgKey='valCompare__'+t.date+'__'+sym;
-  var valImgSrc=null;
-  if(typeof tvTradeImages!=='undefined' && tvTradeImages[valImgKey]) valImgSrc=tvTradeImages[valImgKey];
-  else if(valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg==='function'){
-    valImgSrc=resolveDiscordImg(valExec.image_urls[0]);
+  var myImgKey = t.date + '_' + t.symbol + '_' + t.side;
+  var myImg = (typeof tvTradeImages !== 'undefined' ? tvTradeImages[myImgKey] : null) || myTradeImages[myImgKey] || null;
+  var valImgKey = 'valCompare__' + t.date + '__' + sym;
+  var valImgSrc = null;
+  if (typeof tvTradeImages !== 'undefined' && tvTradeImages[valImgKey]) valImgSrc = tvTradeImages[valImgKey];
+  else if (valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg === 'function') {
+    valImgSrc = resolveDiscordImg(valExec.image_urls[0]);
   }
 
-  panel.style.cssText='padding:14px 16px;border-top:1px solid rgba(66,165,245,0.2);background:rgba(0,0,0,0.25);';
-  var inner=document.createElement('div');
-  inner.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:960px;';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'background:rgba(0,0,0,0.25);border:1px solid rgba(66,165,245,0.2);border-radius:10px;padding:18px;margin-top:4px;';
 
-  // LEFT: my trade
-  var myCol=document.createElement('div');
-  myCol.style.cssText='display:flex;flex-direction:column;gap:8px;';
-  var myLbl=document.createElement('div');
-  myLbl.style.cssText='font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#26a69a;';
-  myLbl.textContent='MY TRADE — '+sym+' '+t.date.slice(5);
-  var pnlC=(t.pnl||0)>=0?'#26a69a':'#ef5350';
-  var myStats=document.createElement('div');
-  myStats.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
-  myStats.innerHTML='<span style="color:'+pnlC+';font-weight:bold;font-size:14px;">'+(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl).toFixed(2)+'</span>'
-    +'<span style="margin-left:10px;">'+(t.side==='long'?'LONG':'SHORT')+' '+t.volume+' @ $'+t.entryPrice+'</span>';
-  var myImgBox=document.createElement('div');
-  myImgBox.style.cssText='background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:6px;min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;position:relative;';
-  myImgBox.title='Click to manage my chart image';
-  if(myImg){
-    var mi=document.createElement('img');
-    mi.src=myImg; mi.style.cssText='width:100%;max-height:300px;object-fit:contain;border-radius:6px;';
-    myImgBox.appendChild(mi);
+  // Title bar
+  var tBar = document.createElement('div');
+  tBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:16px;';
+  tBar.innerHTML = '<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:#42a5f5;letter-spacing:2px;">' + sym + ' · ' + t.date.slice(5) + '</span>'
+    + '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">' + (t.side === 'long' ? 'LONG' : 'SHORT') + ' ' + t.volume + ' @ $' + t.entryPrice + '</span>'
+    + '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:#26a69a;margin-left:auto;">+$' + (t.pnl || 0).toFixed(2) + '</span>';
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function () { _tvVdActive = null; renderTvValDataBody(); };
+  tBar.appendChild(closeBtn);
+  wrap.appendChild(tBar);
+
+  // Two-column grid
+  var grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:18px;';
+
+  // ── LEFT: My trade ──
+  var myCol = document.createElement('div');
+  myCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+  myCol.innerHTML = '<div style="font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#26a69a;">MY TRADE</div>';
+  var myBox = document.createElement('div');
+  myBox.style.cssText = 'background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:6px;min-height:160px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;';
+  myBox.title = 'Click to manage chart image';
+  if (myImg) {
+    var mi = document.createElement('img');
+    mi.src = myImg; mi.style.cssText = 'width:100%;max-height:340px;object-fit:contain;border-radius:6px;';
+    myBox.appendChild(mi);
   } else {
-    myImgBox.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">📷 no chart — click to add</span>';
+    myBox.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">📷 no chart — click to add</span>';
   }
-  myImgBox.addEventListener('click',function(){ tvOpenTradeImgModal(myImgKey); });
-  myCol.appendChild(myLbl); myCol.appendChild(myStats); myCol.appendChild(myImgBox);
+  myBox.onclick = function () { if (typeof tvOpenTradeImgModal === 'function') tvOpenTradeImgModal(myImgKey); };
+  myCol.appendChild(myBox);
 
-  // RIGHT: val trade
-  var valCol=document.createElement('div');
-  valCol.style.cssText='display:flex;flex-direction:column;gap:8px;';
-  var valLbl=document.createElement('div');
-  valLbl.style.cssText='font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#42a5f5;';
-  valLbl.textContent='VAL — '+sym+' '+t.date.slice(5);
-  var valInfo=document.createElement('div');
-  valInfo.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
-  if(valExec){
-    var dir=(execMeta[getExecKey(valExec)]||{}).direction||valExec.direction||'';
-    valInfo.innerHTML='<span style="color:#42a5f5;font-weight:bold;">'+(dir?dir.toUpperCase():'—')+'</span>'
-      +(valExec.content?'<span style="margin-left:8px;color:rgba(255,255,255,0.45);">'+valExec.content.slice(0,80)+'</span>':'');
+  // ── RIGHT: Val's trade ──
+  var valCol = document.createElement('div');
+  valCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+  var valTopRow = document.createElement('div');
+  valTopRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  valTopRow.innerHTML = '<span style="font-family:var(--display);font-size:10px;font-weight:bold;letter-spacing:2px;color:#42a5f5;">VAL\'S TRADE</span>';
+  if (valExec) {
+    var dir = (execMeta[getExecKey(valExec)] || {}).direction || valExec.direction || '';
+    var dirSpan = document.createElement('span');
+    dirSpan.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;color:' + (dir === 'long' ? '#26a69a' : dir === 'short' ? '#ef5350' : 'var(--muted)') + ';';
+    dirSpan.textContent = dir ? dir.toUpperCase() : '';
+    valTopRow.appendChild(dirSpan);
+    if (valExec.content) {
+      var noteSpan = document.createElement('span');
+      noteSpan.style.cssText = 'font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;';
+      noteSpan.textContent = valExec.content.slice(0, 80);
+      valTopRow.appendChild(noteSpan);
+    }
   } else {
-    valInfo.innerHTML='<span style="color:rgba(255,255,255,0.28);">no matching val exec for this date/symbol</span>';
+    valTopRow.innerHTML += '<span style="font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.25);">no matching val exec found</span>';
   }
-  var valImgBox=document.createElement('div');
-  valImgBox.tabIndex=0;
-  valImgBox.style.cssText='background:rgba(0,0,0,0.35);border:2px dashed rgba(66,165,245,0.3);border-radius:6px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;gap:6px;outline:none;';
-  valImgBox.title='Click to paste or focus then Ctrl+V';
-  if(valImgSrc){
-    var vi=document.createElement('img');
-    vi.src=valImgSrc; vi.style.cssText='width:100%;max-height:300px;object-fit:contain;border-radius:4px;';
-    valImgBox.appendChild(vi);
+  valCol.appendChild(valTopRow);
+
+  var valBox = document.createElement('div');
+  valBox.tabIndex = 0;
+  valBox.style.cssText = 'background:rgba(0,0,0,0.4);border:2px dashed rgba(66,165,245,0.28);border-radius:6px;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;gap:6px;outline:none;cursor:pointer;';
+  valBox.title = 'Click to focus, then Ctrl+V to paste image';
+  if (valImgSrc) {
+    var vi = document.createElement('img');
+    vi.src = valImgSrc; vi.style.cssText = 'width:100%;max-height:340px;object-fit:contain;border-radius:4px;';
+    valBox.appendChild(vi);
   } else {
-    valImgBox.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:rgba(66,165,245,0.45);">📷 no val chart</span>';
+    valBox.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:rgba(66,165,245,0.4);">📷 no val chart</span><span style="font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.2);">click to focus · Ctrl+V to paste</span>';
   }
 
-  function saveValImg(dataUrl){
-    if(typeof tvTradeImages==='undefined') window.tvTradeImages={};
-    tvTradeImages[valImgKey]=dataUrl;
-    try{localStorage.setItem('tvTradeImages',JSON.stringify(tvTradeImages));}catch(er){}
-    if(typeof sbImgSave==='function') sbImgSave('tvTradeImages',valImgKey,dataUrl);
-    tvBuildValCompare(t, mk);
+  function saveValImg(dataUrl) {
+    if (typeof tvTradeImages === 'undefined') window.tvTradeImages = {};
+    tvTradeImages[valImgKey] = dataUrl;
+    try { localStorage.setItem('tvTradeImages', JSON.stringify(tvTradeImages)); } catch (er) {}
+    if (typeof sbImgSave === 'function') sbImgSave('tvTradeImages', valImgKey, dataUrl);
+    renderTvValDataBody();
   }
 
-  valImgBox.addEventListener('paste',function(ev){
-    var items=(ev.clipboardData||{}).items||[];
-    for(var i=0;i<items.length;i++){
-      if(items[i].type.indexOf('image')>=0){
-        var rd=new FileReader();
-        rd.onload=function(e2){saveValImg(e2.target.result);};
+  valBox.onclick = function () { valBox.focus(); };
+  valBox.addEventListener('paste', function (ev) {
+    var items = (ev.clipboardData || {}).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') >= 0) {
+        var rd = new FileReader();
+        rd.onload = function (e2) { saveValImg(e2.target.result); };
         rd.readAsDataURL(items[i].getAsFile());
         ev.preventDefault(); break;
       }
     }
   });
+  valCol.appendChild(valBox);
 
-  var ctrlRow=document.createElement('div');
-  ctrlRow.style.cssText='display:flex;gap:6px;';
-  var fileInp=document.createElement('input');
-  fileInp.type='file'; fileInp.accept='image/*'; fileInp.style.display='none';
-  fileInp.addEventListener('change',function(){
-    if(!fileInp.files[0]) return;
-    var rd=new FileReader(); rd.onload=function(e2){saveValImg(e2.target.result);}; rd.readAsDataURL(fileInp.files[0]);
-  });
-  var upBtn=document.createElement('button');
-  upBtn.style.cssText='font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(66,165,245,0.15);border:1px solid rgba(66,165,245,0.4);color:#42a5f5;';
-  upBtn.textContent='📁 UPLOAD / REPLACE';
-  upBtn.addEventListener('click',function(){fileInp.click();});
-  ctrlRow.appendChild(upBtn); ctrlRow.appendChild(fileInp);
-  if(valImgSrc){
-    var delBtn=document.createElement('button');
-    delBtn.style.cssText='font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.35);color:#ef5350;';
-    delBtn.textContent='✕ REMOVE';
-    delBtn.addEventListener('click',function(){
-      if(typeof tvTradeImages!=='undefined') delete tvTradeImages[valImgKey];
-      try{localStorage.setItem('tvTradeImages',JSON.stringify(tvTradeImages||{}));}catch(er){}
-      tvBuildValCompare(t, mk);
-    });
+  // Upload / Remove controls
+  var ctrlRow = document.createElement('div');
+  ctrlRow.style.cssText = 'display:flex;gap:6px;margin-top:4px;';
+  var fileInp = document.createElement('input');
+  fileInp.type = 'file'; fileInp.accept = 'image/*'; fileInp.style.display = 'none';
+  fileInp.onchange = function () {
+    if (!fileInp.files[0]) return;
+    var rd = new FileReader();
+    rd.onload = function (e2) { saveValImg(e2.target.result); };
+    rd.readAsDataURL(fileInp.files[0]);
+  };
+  var upBtn = document.createElement('button');
+  upBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);color:#42a5f5;';
+  upBtn.textContent = '📁 UPLOAD / REPLACE';
+  upBtn.onclick = function () { fileInp.click(); };
+  ctrlRow.appendChild(fileInp); ctrlRow.appendChild(upBtn);
+  if (valImgSrc) {
+    var delBtn = document.createElement('button');
+    delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:#ef5350;';
+    delBtn.textContent = '✕ REMOVE';
+    delBtn.onclick = function () {
+      if (typeof tvTradeImages !== 'undefined') delete tvTradeImages[valImgKey];
+      try { localStorage.setItem('tvTradeImages', JSON.stringify(tvTradeImages || {})); } catch (er) {}
+      renderTvValDataBody();
+    };
     ctrlRow.appendChild(delBtn);
   }
+  valCol.appendChild(ctrlRow);
 
-  valCol.appendChild(valLbl); valCol.appendChild(valInfo); valCol.appendChild(valImgBox); valCol.appendChild(ctrlRow);
-  inner.appendChild(myCol); inner.appendChild(valCol);
-  panel.innerHTML=''; panel.appendChild(inner);
+  grid.appendChild(myCol); grid.appendChild(valCol);
+  wrap.appendChild(grid);
+  container.appendChild(wrap);
 }
 
 function renderTvTrades(){
@@ -4951,6 +5071,20 @@ function renderTvTrades(){
         return '<span class="tv-trade-img-btn" data-imgkey="'+ik2+'" data-src="'+(img2||'')+'" style="font-size:'+(img2?'14px':'13px')+';cursor:pointer;text-align:center;opacity:'+(img2?1:0.45)+';transition:opacity 0.15s;" title="'+tip+'" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='+(img2?1:0.45)+'">'+emoji+'</span>';
       })()
       +'<span class="tv-trade-edit-btn" style="font-size:12px;cursor:pointer;text-align:center;opacity:0.35;transition:opacity 0.15s;" title="Edit trade" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.35">✏️</span>'
+      +(function(){
+        var tmk2=_tvMetaKey(t.date,t.symbol,t.side);
+        var vt=(tvTradeMeta[tmk2]||{}).valTraded||'';
+        return '<span class="tv-val-col" style="display:flex;gap:2px;align-items:center;justify-content:center;">'
+          +'<span class="tv-vb tv-vb-y" data-key="'+tmk2+'" style="font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 7px;border-radius:3px;cursor:pointer;'
+          +'border:1px solid '+(vt==='yes'?'#42a5f5':'rgba(255,255,255,0.15)')+';'
+          +'background:'+(vt==='yes'?'rgba(66,165,245,0.22)':'rgba(0,0,0,0.25)')+';'
+          +'color:'+(vt==='yes'?'#42a5f5':'rgba(255,255,255,0.3)')+';">Y</span>'
+          +'<span class="tv-vb tv-vb-n" data-key="'+tmk2+'" style="font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 7px;border-radius:3px;cursor:pointer;'
+          +'border:1px solid '+(vt==='no'?'#ef5350':'rgba(255,255,255,0.15)')+';'
+          +'background:'+(vt==='no'?'rgba(239,83,80,0.2)':'rgba(0,0,0,0.25)')+';'
+          +'color:'+(vt==='no'?'#ef5350':'rgba(255,255,255,0.3)')+';">N</span>'
+          +'</span>';
+      })()
       +'</div>';
   }).join('');
   var totalPnl=filtered.reduce(function(s,t){return s+(t.pnl||0);},0);
@@ -4986,8 +5120,7 @@ function renderTvTrades(){
       renderTvTrades();
     });
   });
-  // Build Val Data bar
-  tvBuildValBar(filtered);
+
   var sum=document.getElementById('tvTradesSummary');
   if(sum) sum.innerHTML='<span style="font-size:10px;color:var(--muted);">'+filtered.length+' trades</span>'
     +'<span style="font-size:14px;font-weight:bold;color:'+(totalPnl>=0?'#26a69a':'#ef5350')+'">'+(totalPnl>=0?'+$':'-$')+Math.abs(totalPnl).toFixed(2)+'</span>'
