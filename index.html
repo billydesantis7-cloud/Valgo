@@ -794,6 +794,51 @@ async function sbImgDelete(store, imgKey) {
   } catch(e) {}
 }
 
+// Nuke all valCompare__ images from memory, localStorage, and Supabase
+async function sbNukeValCompareImages(statusCb) {
+  statusCb = statusCb || function(){};
+  // 1. Find all valCompare__ keys in memory
+  var keys = Object.keys(tvTradeImages || {}).filter(function(k){ return k.indexOf('valCompare__') === 0; });
+  statusCb('Found ' + keys.length + ' local valCompare keys — deleting...');
+
+  // 2. Wipe from memory + localStorage immediately
+  keys.forEach(function(k){ delete tvTradeImages[k]; });
+  try {
+    var stored = JSON.parse(localStorage.getItem('tvTradeImages') || '{}');
+    var lsKeys = Object.keys(stored).filter(function(k){ return k.indexOf('valCompare__') === 0; });
+    lsKeys.forEach(function(k){ delete stored[k]; });
+    localStorage.setItem('tvTradeImages', JSON.stringify(stored));
+    statusCb('Cleared ' + lsKeys.length + ' localStorage keys');
+  } catch(e) {}
+
+  // 3. Delete from Supabase — fetch all matching rows first
+  try {
+    var { data, error } = await _supa.from('valgo_images')
+      .select('img_key')
+      .eq('store', 'tvTradeImages')
+      .ilike('img_key', 'tvTradeImages::valCompare__%');
+    if (data && data.length) {
+      statusCb('Found ' + data.length + ' Supabase rows — deleting...');
+      // Delete in batches of 50
+      for (var i = 0; i < data.length; i += 50) {
+        var batch = data.slice(i, i+50).map(function(r){ return r.img_key; });
+        await _supa.from('valgo_images').delete().in('img_key', batch);
+      }
+      // Also delete from storage bucket
+      var fileNames = data.map(function(r){
+        var k = r.img_key.replace('tvTradeImages::', '');
+        return 'tvTradeImages/' + k.replace(/[^a-zA-Z0-9_\-\.]/g, '_') + '.webp';
+      });
+      for (var j = 0; j < fileNames.length; j += 50) {
+        await _supa.storage.from(SUPA_BUCKET).remove(fileNames.slice(j, j+50));
+      }
+      statusCb('Deleted ' + data.length + ' Supabase rows. All clear!');
+    } else {
+      statusCb('No Supabase rows found. Local cleared!');
+    }
+  } catch(e) { statusCb('Supabase error: ' + e.message); }
+}
+
 // Load all images for a store from Supabase into memory (paginated)
 async function sbImgLoadAll(store) {
   try {
@@ -4771,6 +4816,31 @@ function renderTvValData() {
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
   hdr.innerHTML = '<span style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:4px;color:#42a5f5;">💠 VAL DATA</span>';
+
+  // Nuke button — clears all valCompare images in case of paste bug
+  var nukeBtn = document.createElement('button');
+  nukeBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:rgba(239,83,80,0.6);margin-left:auto;';
+  nukeBtn.textContent = '🗑 CLEAR ALL VAL CHARTS';
+  nukeBtn.title = 'Deletes ALL val compare images from memory, localStorage, and Supabase. Use if images got corrupted.';
+  nukeBtn.onclick = function() {
+    if (!confirm('Delete ALL val chart images? This cannot be undone.')) return;
+    nukeBtn.disabled = true;
+    nukeBtn.textContent = 'Clearing...';
+    nukeBtn.style.color = '#ff9800';
+    sbNukeValCompareImages(function(msg) {
+      nukeBtn.textContent = msg.slice(0, 40);
+    }).then(function() {
+      nukeBtn.textContent = '✓ All val charts cleared';
+      nukeBtn.style.color = '#26a69a';
+      // Clear tombstones too so fresh pastes work
+      _tvVdDeletedKeys = {};
+      renderTvValDataBody();
+    }).catch(function(e) {
+      nukeBtn.textContent = 'Error — check console';
+      nukeBtn.disabled = false;
+    });
+  };
+  hdr.appendChild(nukeBtn);
   el.appendChild(hdr);
 
   // ── Threshold slider row ──
