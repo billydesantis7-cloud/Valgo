@@ -4682,7 +4682,26 @@ function tvTradesSort(field){if(tvSortField===field)tvSortDir*=-1;else{tvSortFie
 
 
 // ── VAL DATA TAB ─────────────────────────────────────────────────────────────
-var _tvVdThreshold = 100;   // default min P&L
+var _tvVdThreshold = 100;
+var _tvVdPasteTarget = null; // single paste target — set when a val compare panel is rendered
+
+// ONE global paste handler for the entire val data tab — never duplicated
+document.addEventListener('paste', function(ev) {
+  var pane = document.getElementById('tvValDataPane');
+  if (!pane || pane.style.display === 'none') return;
+  if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+  if (!_tvVdPasteTarget) return;
+  var items = (ev.clipboardData || {}).items || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') >= 0) {
+      var rd = new FileReader();
+      var fn = _tvVdPasteTarget; // snapshot — don't rely on closure
+      rd.onload = function(e2) { fn(e2.target.result); };
+      rd.readAsDataURL(items[i].getAsFile());
+      ev.preventDefault(); break;
+    }
+  }
+});   // default min P&L
 var _tvVdActive = null;     // active compare key
 
 function renderTvValData() {
@@ -4752,6 +4771,7 @@ function renderTvValDataBody() {
   var body = document.getElementById('tvVdBody');
   if (!body) return;
   body.innerHTML = '';
+  if (_tvVdMode === 'grid') _tvVdPasteTarget = null; // grid mode: require explicit click to set target
 
   var bigWins = (typeof tvTrades !== 'undefined' ? tvTrades : []).filter(function (t) { return (t.pnl || 0) >= _tvVdThreshold; });
   bigWins.sort(function (a, b) { return (b.pnl || 0) - (a.pnl || 0); });
@@ -5050,28 +5070,13 @@ function tvRenderValCompare(t, mk, container, embedded) {
     renderTvValDataBody();
   }
 
-  // Global paste handler — catches Ctrl+V anywhere on page when val data tab is open
-  function _tvValPasteHandler(ev) {
-    var pane = document.getElementById('tvValDataPane');
-    if (!pane || pane.style.display === 'none') return;
-    if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
-    var items = (ev.clipboardData || {}).items || [];
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') >= 0) {
-        var rd = new FileReader();
-        rd.onload = function (e2) { saveValImg(e2.target.result); };
-        rd.readAsDataURL(items[i].getAsFile());
-        ev.preventDefault(); break;
-      }
-    }
-  }
-  // Remove any previous handler for this key, then register fresh
-  if (wrap._tvValPasteKey) { try { document.removeEventListener('paste', wrap._tvValPasteKey); } catch(e){} }
-  wrap._tvValPasteKey = _tvValPasteHandler;
-  document.addEventListener('paste', _tvValPasteHandler);
+  // Register this valImgKey as the active paste target — single global handler picks it up
+  valBox.onclick = function () { _tvVdPasteTarget = saveValImg; valBox.focus(); };
+  valBox.onfocus = function () { _tvVdPasteTarget = saveValImg; };
+  valBox.onblur  = function () { /* keep target so Ctrl+V works without explicit focus */ };
+  // In focus mode (not embedded), auto-activate paste target for this panel
+  if (!embedded) _tvVdPasteTarget = saveValImg;
 
-  valBox.onclick = function () { valBox.focus(); };
-  // Also keep local paste on valBox for when it's focused
   valBox.addEventListener('paste', function (ev) {
     var items = (ev.clipboardData || {}).items || [];
     for (var i = 0; i < items.length; i++) {
@@ -5106,10 +5111,10 @@ function tvRenderValCompare(t, mk, container, embedded) {
     delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:#ef5350;';
     delBtn.textContent = '✕ REMOVE';
     delBtn.onclick = function () {
-      if (typeof tvTradeImages !== 'undefined') delete tvTradeImages[valImgKey];
+      var key = valImgKey; // capture locally — not affected by outer scope changes
+      if (typeof tvTradeImages !== 'undefined') delete tvTradeImages[key];
       try { localStorage.setItem('tvTradeImages', JSON.stringify(tvTradeImages || {})); } catch (er) {}
-      // Also remove from Supabase if available
-      if (typeof sbImgDelete === 'function') { try { sbImgDelete('tvTradeImages', valImgKey); } catch(er2){} }
+      if (typeof sbImgSave === 'function') { try { sbImgSave('tvTradeImages', key, null); } catch(er2){} }
       renderTvValDataBody();
     };
     ctrlRow.appendChild(delBtn);
