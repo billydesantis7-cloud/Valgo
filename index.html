@@ -4927,52 +4927,61 @@ function renderTvValDataBody() {
   body.innerHTML = '';
   if (_tvVdMode === 'grid') _tvVdPasteTarget = null; // grid mode: require explicit click to set target
 
-  // Build pool: wins >= threshold + optionally honorary mentions (any pnl, honorMention=yes)
-  var _allTrades = (typeof tvTrades !== 'undefined' ? tvTrades : []);
-  var bigWins = _allTrades.filter(function (t) {
-    if ((t.pnl || 0) >= _tvVdThreshold) return true;
-    if (_tvVdIncludeHM) {
-      var mk = _tvMetaKey(t.date, t.symbol, t.side);
-      if ((tvTradeMeta[mk]||{}).honorMention === 'yes') return true;
-    }
-    return false;
-  });
-  bigWins.sort(function (a, b) { return (b.pnl || 0) - (a.pnl || 0); });
-
-  var valYes = bigWins.filter(function (t) {
-    var mk = _tvMetaKey(t.date, t.symbol, t.side);
-    return (tvTradeMeta[mk] || {}).valTraded === 'yes';
-  });
-  var valNo = bigWins.filter(function (t) {
-    var mk = _tvMetaKey(t.date, t.symbol, t.side);
-    return (tvTradeMeta[mk] || {}).valTraded === 'no';
-  });
-  var pct = bigWins.length ? Math.round((valYes.length / bigWins.length) * 100) : 0;
-  var unmarked = bigWins.length - valYes.length - valNo.length;
-
   function _sum(arr) { return arr.reduce(function(s,t){return s+(t.pnl||0);},0); }
   function _avg(arr) { return arr.length ? _sum(arr)/arr.length : 0; }
   function _fmt(n) { return (n>=0?'+$':'-$')+Math.abs(n).toFixed(0); }
+  function _bv(arr){ return arr.indexOf('yes')>=0?'yes':arr.indexOf('no')>=0?'no':''; }
 
-  // Cards use ALL trades (deduped by date+symbol), not just current threshold pool
-  var _allGrouped = {};
-  _allTrades.forEach(function(t){
-    var gk=t.date+'__'+t.symbol.toUpperCase();
-    if(!_allGrouped[gk]) _allGrouped[gk]=[];
-    _allGrouped[gk].push(t);
+  var _allTrades = (typeof tvTrades !== 'undefined' ? tvTrades : []);
+
+  // ── Group ALL trades by date+symbol (dedup source of truth) ──
+  var _grouped = {};
+  _allTrades.forEach(function(t) {
+    var gk = t.date + '__' + t.symbol.toUpperCase();
+    if (!_grouped[gk]) _grouped[gk] = [];
+    _grouped[gk].push(t);
   });
-  var _allDeduped = Object.keys(_allGrouped).map(function(gk){
-    var grp=_allGrouped[gk];
-    var totalPnl=grp.reduce(function(s,t){return s+(t.pnl||0);},0);
-    var vtValues=grp.map(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded||'';});
-    function bv(arr){return arr.indexOf('yes')>=0?'yes':arr.indexOf('no')>=0?'no':'';}
-    return {pnl:totalPnl, _valTraded:bv(vtValues), _allMks:grp.map(function(t){return _tvMetaKey(t.date,t.symbol,t.side);})};
+
+  // ── Collapse each group into one composite entry ──
+  function _collapse(grp) {
+    var totalPnl = grp.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var vtVals   = grp.map(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).valTraded||'';});
+    var hmVals   = grp.map(function(t){return (tvTradeMeta[_tvMetaKey(t.date,t.symbol,t.side)]||{}).honorMention||'';});
+    var rep      = grp.slice().sort(function(a,b){return (b.pnl||0)-(a.pnl||0);})[0];
+    return {
+      date: rep.date, symbol: rep.symbol, side: rep.side,
+      volume: grp.reduce(function(s,t){return s+(t.volume||0);},0),
+      entryPrice: rep.entryPrice, exitPrice: rep.exitPrice,
+      openTime: rep.openTime, closeTime: rep.closeTime,
+      pnl: totalPnl, rMultiple: rep.rMultiple,
+      _valTraded: _bv(vtVals),
+      _honorMention: _bv(hmVals),
+      _metaKey: _tvMetaKey(rep.date, rep.symbol, rep.side),
+      _allMks: grp.map(function(t){return _tvMetaKey(t.date,t.symbol,t.side);})
+    };
+  }
+
+  // ── bigWins: qualify after collapsing (so 4× USO = 1 entry with combined P&L) ──
+  var bigWins = Object.keys(_grouped).map(function(gk){
+    return _collapse(_grouped[gk]);
+  }).filter(function(e) {
+    if (e.pnl >= _tvVdThreshold) return true;
+    if (_tvVdIncludeHM && e._honorMention === 'yes') return true;
+    return false;
   });
+  bigWins.sort(function(a,b){ return (b.pnl||0)-(a.pnl||0); });
+
+  // ── Stats cards: use ALL deduped trades (not filtered by threshold) ──
+  var _allDeduped = Object.keys(_grouped).map(function(gk){ return _collapse(_grouped[gk]); });
   var _allYes = _allDeduped.filter(function(t){return t._valTraded==='yes';});
   var _allNo  = _allDeduped.filter(function(t){return t._valTraded==='no';});
-
   var yPnl = _sum(_allYes), nPnl = _sum(_allNo);
   var yAvg = _avg(_allYes), nAvg = _avg(_allNo);
+
+  var valYes   = bigWins.filter(function(t){return t._valTraded==='yes';});
+  var valNo    = bigWins.filter(function(t){return t._valTraded==='no';});
+  var pct      = bigWins.length ? Math.round((valYes.length/bigWins.length)*100) : 0;
+  var unmarked = bigWins.length - valYes.length - valNo.length;
 
   // ── Stats bar ──
   var stats = document.createElement('div');
