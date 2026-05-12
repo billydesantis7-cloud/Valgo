@@ -5029,26 +5029,263 @@ function renderTvValDataBody() {
     return;
   }
 
-  // ── View mode toggle: FOCUS | GRID ──
+  // ── View mode toggle: FOCUS | GRID | BOOKLET ──
   var modeRow = document.createElement('div');
   modeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:16px;';
-  var focusBtn = document.createElement('button');
-  focusBtn.textContent = '⊡ FOCUS';
-  var gridBtn  = document.createElement('button');
-  gridBtn.textContent  = '⊞ GRID';
+  var focusBtn   = document.createElement('button'); focusBtn.textContent   = '⊡ FOCUS';
+  var gridBtn    = document.createElement('button'); gridBtn.textContent    = '⊞ GRID';
+  var bookletBtn = document.createElement('button'); bookletBtn.textContent = '📖 BOOKLET';
   var modeBase = 'font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:all 0.12s;';
   function setMode(m) {
     _tvVdMode = m;
-    focusBtn.style.cssText = modeBase + (m==='focus' ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;' : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
-    gridBtn.style.cssText  = modeBase + (m==='grid'  ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;' : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
+    focusBtn.style.cssText   = modeBase + (m==='focus'   ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;'   : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
+    gridBtn.style.cssText    = modeBase + (m==='grid'    ? 'background:rgba(66,165,245,0.25);border:1px solid #42a5f5;color:#42a5f5;'    : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
+    bookletBtn.style.cssText = modeBase + (m==='booklet' ? 'background:rgba(255,200,80,0.25);border:1px solid #ffc850;color:#ffc850;'    : 'background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--muted);');
   }
   if (typeof _tvVdMode === 'undefined') _tvVdMode = 'focus';
   setMode(_tvVdMode);
-  focusBtn.onclick = function(){ if(_tvVdMode!=='focus'){setMode('focus'); renderTvValDataBody();} };
-  gridBtn.onclick  = function(){ if(_tvVdMode!=='grid' ){setMode('grid');  renderTvValDataBody();} };
+  focusBtn.onclick   = function(){ if(_tvVdMode!=='focus')   { setMode('focus');   renderTvValDataBody(); } };
+  gridBtn.onclick    = function(){ if(_tvVdMode!=='grid')    { setMode('grid');    renderTvValDataBody(); } };
+  bookletBtn.onclick = function(){ if(_tvVdMode!=='booklet') { setMode('booklet'); _tvVdBookIdx=0; renderTvValDataBody(); } };
   modeRow.appendChild(focusBtn);
   modeRow.appendChild(gridBtn);
+  modeRow.appendChild(bookletBtn);
   body.appendChild(modeRow);
+
+  // ── BOOKLET MODE ─────────────────────────────────────────────────────────────
+  if (_tvVdMode === 'booklet') {
+    if (_tvVdBookIdx < 0) _tvVdBookIdx = 0;
+    if (_tvVdBookIdx >= bigWins.length) _tvVdBookIdx = bigWins.length - 1;
+    var bt = bigWins[_tvVdBookIdx];
+    var bSym = bt.symbol.toUpperCase();
+    var bImgKey = bt.date + '__' + bSym;
+    var bValImgSrc = (!_tvVdDeletedKeys[bImgKey] && tvValCharts[bImgKey]) ? tvValCharts[bImgKey] : null;
+    var bMyImgKey = bt._metaKey ? (bt.date+'_'+bt.symbol+'_'+bt.side) : null;
+    var bMyImg = bMyImgKey ? ((typeof tvTradeImages!=='undefined'?tvTradeImages[bMyImgKey]:null)||myTradeImages[bMyImgKey]||null) : null;
+    var bVt = bt._valTraded||'';
+    var bHm = bt._honorMention||'';
+
+    // ── Outer book wrapper ──
+    var book = document.createElement('div');
+    book.style.cssText = [
+      'background:linear-gradient(135deg,#f5f0e8 0%,#fffdf7 50%,#f0ebe0 100%)',
+      'border-radius:4px 14px 14px 4px',
+      'box-shadow:' + [
+        '-3px 0 8px rgba(0,0,0,0.35)',
+        '0 4px 24px rgba(0,0,0,0.5)',
+        '4px 0 12px rgba(0,0,0,0.2)',
+        'inset 4px 0 12px rgba(0,0,0,0.12)'
+      ].join(','),
+      'display:flex',
+      'flex-direction:column',
+      'max-width:960px',
+      'margin:0 auto',
+      'overflow:hidden',
+      'border:1px solid #c8b89a',
+      'position:relative'
+    ].join(';');
+
+    // Spine shadow strip on left
+    var spine = document.createElement('div');
+    spine.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:18px;background:linear-gradient(to right,rgba(0,0,0,0.18),transparent);z-index:2;pointer-events:none;border-radius:4px 0 0 4px;';
+    book.appendChild(spine);
+
+    // Center gutter line
+    var gutter = document.createElement('div');
+    gutter.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:3px;background:linear-gradient(to right,rgba(0,0,0,0.1),rgba(0,0,0,0.05),rgba(0,0,0,0.1));transform:translateX(-50%);z-index:2;pointer-events:none;';
+    book.appendChild(gutter);
+
+    // ── Page number / counter bar ──
+    var pageBar = document.createElement('div');
+    pageBar.style.cssText = 'background:rgba(0,0,0,0.06);border-bottom:1px solid rgba(0,0,0,0.1);padding:6px 20px;display:flex;align-items:center;justify-content:space-between;';
+    pageBar.innerHTML = '<span style="font-family:Georgia,serif;font-size:11px;color:#888;font-style:italic;">The Trade Journal</span>'
+      + '<span style="font-family:Georgia,serif;font-size:11px;color:#888;font-style:italic;">page ' + (_tvVdBookIdx+1) + ' of ' + bigWins.length + '</span>';
+    book.appendChild(pageBar);
+
+    // ── Two-column spread ──
+    var spread = document.createElement('div');
+    spread.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;min-height:520px;position:relative;z-index:1;';
+
+    // helper: faint tape strip
+    function tape(rot, top, left) {
+      var t = document.createElement('div');
+      t.style.cssText = 'position:absolute;width:52px;height:18px;background:rgba(255,240,150,0.55);border:1px solid rgba(200,180,80,0.3);border-radius:2px;transform:rotate('+rot+'deg);top:'+top+';left:'+left+';z-index:3;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+      return t;
+    }
+
+    // ── LEFT page: MY TRADE ──
+    var leftPage = document.createElement('div');
+    leftPage.style.cssText = 'padding:24px 22px 24px 28px;display:flex;flex-direction:column;gap:12px;position:relative;border-right:none;';
+
+    // Tape corner decorations
+    leftPage.appendChild(tape('-8deg','8px','18px'));
+    leftPage.appendChild(tape('6deg','auto','30px'));
+    leftPage.style.position = 'relative';
+
+    var myLabel = document.createElement('div');
+    myLabel.style.cssText = 'font-family:"Comic Sans MS",cursive;font-size:22px;font-weight:bold;color:#2a6496;text-align:center;margin-bottom:4px;text-shadow:1px 1px 0 rgba(0,0,0,0.08);';
+    myLabel.textContent = '📈 My Trade';
+
+    var myMeta = document.createElement('div');
+    myMeta.style.cssText = 'text-align:center;';
+    var pnlColor = (bt.pnl||0) >= 0 ? '#1a7a4a' : '#c0392b';
+    myMeta.innerHTML = '<span style="font-family:Georgia,serif;font-size:13px;color:#555;">' + bSym + ' · ' + bt.date.slice(5) + ' · ' + (bt.side==='long'?'LONG':'SHORT') + '</span><br>'
+      + '<span style="font-family:Georgia,serif;font-size:20px;font-weight:bold;color:'+pnlColor+';">' + ((bt.pnl||0)>=0?'+$':'-$') + Math.abs(bt.pnl||0).toFixed(0) + '</span>';
+
+    // Polaroid-style chart box
+    var myPolaroid = document.createElement('div');
+    myPolaroid.style.cssText = 'background:#fff;padding:8px 8px 28px;box-shadow:2px 2px 8px rgba(0,0,0,0.2),0 0 0 1px rgba(0,0,0,0.08);border-radius:2px;transform:rotate(-1.5deg);cursor:pointer;transition:transform 0.15s;flex:1;display:flex;align-items:center;justify-content:center;min-height:220px;position:relative;';
+    myPolaroid.title = 'Click to manage image';
+    myPolaroid.onmouseover = function(){ myPolaroid.style.transform='rotate(-1.5deg) scale(1.02)'; };
+    myPolaroid.onmouseout  = function(){ myPolaroid.style.transform='rotate(-1.5deg)'; };
+    if (bMyImg) {
+      var mi = document.createElement('img');
+      mi.src = bMyImg; mi.style.cssText='width:100%;height:100%;object-fit:contain;display:block;';
+      myPolaroid.appendChild(mi);
+    } else {
+      myPolaroid.innerHTML = '<div style="text-align:center;color:#bbb;font-family:Georgia,serif;font-size:12px;font-style:italic;padding:20px;">📷<br>no chart yet<br><span style='font-size:10px;'>click to add</span></div>';
+    }
+    myPolaroid.onclick = function(){ if(typeof tvOpenTradeImgModal==='function') tvOpenTradeImgModal(bt.date+'_'+bt.symbol+'_'+bt.side, bigWins.map(function(x){return {date:x.date,symbol:x.symbol,side:x.side};})); };
+
+    // Y/N sticker
+    var mySticker = document.createElement('div');
+    mySticker.style.cssText = 'display:flex;gap:6px;justify-content:center;margin-top:4px;';
+    ['yes','no'].forEach(function(v){
+      var s = document.createElement('span');
+      var isV = bVt === v;
+      s.style.cssText = 'font-family:"Comic Sans MS",cursive;font-size:11px;font-weight:bold;padding:3px 12px;border-radius:20px;cursor:pointer;border:2px solid '
+        + (v==='yes'?(isV?'#1a7a4a':'#aaa'):(isV?'#c0392b':'#aaa'))
+        + ';background:'+(v==='yes'?(isV?'#d4edda':'#f8f8f8'):(isV?'#fde8e8':'#f8f8f8'))
+        + ';color:'+(v==='yes'?(isV?'#1a7a4a':'#aaa'):(isV?'#c0392b':'#aaa'))+';';
+      s.textContent = v==='yes' ? '✓ Val traded' : '✗ Val didn't';
+      s.onclick = function(){
+        var cur = bt._valTraded;
+        var nv = cur===v?'':v;
+        (bt._allMks||[bt._metaKey]).forEach(function(k){
+          if(!tvTradeMeta[k]) tvTradeMeta[k]={};
+          tvTradeMeta[k].valTraded=nv;
+        });
+        _saveTvTradeMeta();
+        renderTvValDataBody();
+      };
+      mySticker.appendChild(s);
+    });
+
+    leftPage.appendChild(myLabel);
+    leftPage.appendChild(myMeta);
+    leftPage.appendChild(myPolaroid);
+    leftPage.appendChild(mySticker);
+
+    // ── RIGHT page: VAL'S TRADE ──
+    var rightPage = document.createElement('div');
+    rightPage.style.cssText = 'padding:24px 28px 24px 22px;display:flex;flex-direction:column;gap:12px;position:relative;background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent);';
+
+    rightPage.appendChild(tape('7deg','8px','calc(50% - 26px)'));
+
+    var valLabel = document.createElement('div');
+    valLabel.style.cssText = 'font-family:"Comic Sans MS",cursive;font-size:22px;font-weight:bold;color:#8b2252;text-align:center;margin-bottom:4px;text-shadow:1px 1px 0 rgba(0,0,0,0.08);';
+    valLabel.textContent = '🏹 Val's Trade';
+
+    var valMeta = document.createElement('div');
+    valMeta.style.cssText = 'text-align:center;';
+    valMeta.innerHTML = '<span style="font-family:Georgia,serif;font-size:13px;color:#555;">' + bSym + ' · ' + bt.date.slice(5) + '</span>';
+
+    // Val polaroid
+    var valPolaroid = document.createElement('div');
+    valPolaroid.style.cssText = 'background:#fff;padding:8px 8px 28px;box-shadow:2px 2px 8px rgba(0,0,0,0.2),0 0 0 1px rgba(0,0,0,0.08);border-radius:2px;transform:rotate(1.2deg);flex:1;display:flex;align-items:center;justify-content:center;min-height:220px;position:relative;cursor:pointer;transition:transform 0.15s;';
+    valPolaroid.title = 'Click to focus, Ctrl+V to paste';
+    valPolaroid.tabIndex = 0;
+    valPolaroid.onmouseover = function(){ valPolaroid.style.transform='rotate(1.2deg) scale(1.02)'; };
+    valPolaroid.onmouseout  = function(){ valPolaroid.style.transform='rotate(1.2deg)'; };
+    if (bValImgSrc) {
+      var vi = document.createElement('img');
+      vi.src = bValImgSrc; vi.style.cssText='width:100%;height:100%;object-fit:contain;display:block;';
+      valPolaroid.appendChild(vi);
+    } else {
+      valPolaroid.innerHTML = '<div style="text-align:center;color:#bbb;font-family:Georgia,serif;font-size:12px;font-style:italic;padding:20px;">📷<br>val's chart<br><span style='font-size:10px;'>ctrl+v to paste</span></div>';
+    }
+    valPolaroid.onclick = function(){ valPolaroid.focus(); _tvVdPasteTarget = saveBookValImg; };
+    valPolaroid.onfocus = function(){ _tvVdPasteTarget = saveBookValImg; };
+    valPolaroid.addEventListener('paste', function(ev){
+      var items=(ev.clipboardData||{}).items||[];
+      for(var i=0;i<items.length;i++){
+        if(items[i].type.indexOf('image')>=0){
+          var rd=new FileReader(); rd.onload=function(e2){saveBookValImg(e2.target.result);}; rd.readAsDataURL(items[i].getAsFile()); ev.preventDefault(); break;
+        }
+      }
+    });
+
+    function saveBookValImg(dataUrl){
+      delete _tvVdDeletedKeys[bImgKey];
+      tvValChartsPins[bImgKey]=true;
+      try{localStorage.setItem('tvValChartsPins',JSON.stringify(tvValChartsPins));}catch(e){}
+      tvValCharts[bImgKey]=dataUrl;
+      try{localStorage.setItem('tvValCharts',JSON.stringify(tvValCharts));}catch(e){}
+      sbImgSave('tvValCharts',bImgKey,dataUrl);
+      renderTvValDataBody();
+    }
+    _tvVdPasteTarget = saveBookValImg;
+
+    // val upload/remove row
+    var vCtrl = document.createElement('div');
+    vCtrl.style.cssText = 'display:flex;gap:6px;justify-content:center;margin-top:4px;';
+    var vFile = document.createElement('input'); vFile.type='file'; vFile.accept='image/*'; vFile.style.display='none';
+    vFile.onchange=function(){ if(!vFile.files[0])return; var rd=new FileReader(); rd.onload=function(e2){saveBookValImg(e2.target.result);}; rd.readAsDataURL(vFile.files[0]); };
+    var vUp=document.createElement('button');
+    vUp.style.cssText='font-family:"Comic Sans MS",cursive;font-size:10px;padding:4px 12px;border-radius:20px;cursor:pointer;background:#fff0d4;border:2px solid #e8b84b;color:#8a6000;';
+    vUp.textContent='📁 add photo';
+    vUp.onclick=function(){vFile.click();};
+    var vDel=document.createElement('button');
+    vDel.style.cssText='font-family:"Comic Sans MS",cursive;font-size:10px;padding:4px 12px;border-radius:20px;cursor:pointer;background:#fde8e8;border:2px solid #e8a0a0;color:#8a0000;';
+    vDel.textContent='✕ remove';
+    vDel.onclick=function(){
+      _tvVdDeletedKeys[bImgKey]=true;
+      tvValChartsPins[bImgKey]=true;
+      delete tvValCharts[bImgKey];
+      try{var s=JSON.parse(localStorage.getItem('tvValCharts')||'{}');delete s[bImgKey];localStorage.setItem('tvValCharts',JSON.stringify(s));}catch(e){}
+      try{localStorage.setItem('tvValChartsPins',JSON.stringify(tvValChartsPins));}catch(e){}
+      sbImgDelete('tvValCharts',bImgKey);
+      renderTvValDataBody();
+    };
+    vCtrl.appendChild(vFile); vCtrl.appendChild(vUp); vCtrl.appendChild(vDel);
+
+    rightPage.appendChild(valLabel);
+    rightPage.appendChild(valMeta);
+    rightPage.appendChild(valPolaroid);
+    rightPage.appendChild(vCtrl);
+
+    spread.appendChild(leftPage);
+    spread.appendChild(rightPage);
+    book.appendChild(spread);
+
+    // ── Bottom nav bar ──
+    var nav = document.createElement('div');
+    nav.style.cssText = 'background:rgba(0,0,0,0.07);border-top:1px solid rgba(0,0,0,0.1);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;';
+
+    var prevPg = document.createElement('button');
+    prevPg.disabled = _tvVdBookIdx <= 0;
+    prevPg.style.cssText = 'font-family:"Comic Sans MS",cursive;font-size:13px;padding:6px 18px;border-radius:20px;cursor:pointer;background:#e8f0fe;border:2px solid #4a90d9;color:'+((_tvVdBookIdx<=0)?'#aaa':'#2a6496')+';';
+    prevPg.innerHTML = '◀ prev';
+    prevPg.onclick = function(){ _tvVdBookIdx--; renderTvValDataBody(); };
+
+    var pageInfo = document.createElement('div');
+    pageInfo.style.cssText = 'font-family:Georgia,serif;font-size:12px;color:#888;font-style:italic;text-align:center;';
+    // show ticker + pnl + val status sticker
+    var statusEmoji = bVt==='yes'?'✅':bVt==='no'?'❌':'❓';
+    pageInfo.innerHTML = '<strong style="font-family:Georgia,serif;color:#444;">' + bSym + '</strong>'
+      + ' &nbsp;' + statusEmoji;
+
+    var nextPg = document.createElement('button');
+    nextPg.disabled = _tvVdBookIdx >= bigWins.length - 1;
+    nextPg.style.cssText = 'font-family:"Comic Sans MS",cursive;font-size:13px;padding:6px 18px;border-radius:20px;cursor:pointer;background:#e8f0fe;border:2px solid #4a90d9;color:'+((_tvVdBookIdx>=bigWins.length-1)?'#aaa':'#2a6496')+';';
+    nextPg.innerHTML = 'next ▶';
+    nextPg.onclick = function(){ _tvVdBookIdx++; renderTvValDataBody(); };
+
+    nav.appendChild(prevPg); nav.appendChild(pageInfo); nav.appendChild(nextPg);
+    book.appendChild(nav);
+    body.appendChild(book);
+    return;
+  }
 
   // ── GRID MODE ──────────────────────────────────────────────────────────────
   if (_tvVdMode === 'grid') {
@@ -5202,6 +5439,7 @@ function renderTvValDataBody() {
 
 var _tvVdMode = 'focus';
 var _tvVdIdx  = 0;
+var _tvVdBookIdx = 0;
 var _tvVdIncludeHM = false; // include honorary mentions on Val Data page
 
 function tvRenderValCompare(t, mk, container, embedded) {
