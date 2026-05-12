@@ -5206,17 +5206,11 @@ function tvRenderValCompare(t, mk, container, embedded) {
   }
   var myImgKey = t.date + '_' + t.symbol + '_' + t.side;
   var myImg = (typeof tvTradeImages !== 'undefined' ? tvTradeImages[myImgKey] : null) || myTradeImages[myImgKey] || null;
-  var valImgKey = t.date + '__' + sym; // base key — no prefix, lives in tvValCharts store
+  var valImgKey = t.date + '__' + sym; // base key — lives in tvValCharts store
   var valImgSrc = null;
-  var _isDeleted = _tvVdDeletedKeys[valImgKey];
-  var _isPinned  = tvValChartsPins[valImgKey]; // user has interacted — don't fall back to discord
-
-  if (!_isDeleted && tvValCharts[valImgKey]) {
-    // Priority 1: manually saved image in dedicated store
+  // Manual only — no discord auto-match fallback
+  if (!_tvVdDeletedKeys[valImgKey] && tvValCharts[valImgKey]) {
     valImgSrc = tvValCharts[valImgKey];
-  } else if (!_isDeleted && !_isPinned && valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg === 'function') {
-    // Priority 2: auto-matched discord image — only if user hasn't pinned/cleared this key
-    valImgSrc = resolveDiscordImg(valExec.image_urls[0]);
   }
 
   var wrap = document.createElement('div');
@@ -5347,10 +5341,11 @@ function tvRenderValCompare(t, mk, container, embedded) {
   upBtn.textContent = '📁 UPLOAD / REPLACE';
   upBtn.onclick = function () { fileInp.click(); };
   ctrlRow.appendChild(fileInp); ctrlRow.appendChild(upBtn);
-  if (valImgSrc) {
-    var delBtn = document.createElement('button');
-    delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:#ef5350;';
-    delBtn.textContent = '✕ REMOVE';
+  // Always show remove button so user can always clear and re-paste
+  var delBtn = document.createElement('button');
+  delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:'+(valImgSrc?'#ef5350':'rgba(239,83,80,0.3)')+';';
+  delBtn.textContent = '✕ REMOVE';
+  if (true) {
     delBtn.onclick = function () {
       var key = valImgKey; // captured
       // Tombstone so re-render immediately sees it gone
