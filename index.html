@@ -4810,6 +4810,202 @@ document.addEventListener('paste', function(ev) {
 });   // default min P&L
 var _tvVdActive = null;     // active compare key
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BOOKLET — standalone modal, completely outside all render functions
+// ══════════════════════════════════════════════════════════════════════════════
+function tvBookletOpen(trades, startIdx) {
+  var ex = document.getElementById('tvBookletModal');
+  if (ex) ex.remove();
+
+  var _idx = startIdx || 0;
+  if (_idx < 0) _idx = 0;
+  if (_idx >= trades.length) _idx = trades.length - 1;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'tvBookletModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick = function(e){ if(e.target===overlay){ document.removeEventListener('keydown', overlay._keyHandler); overlay.remove(); } };
+
+  function render() {
+    // Remove old key handler before re-rendering
+    if (overlay._keyHandler) document.removeEventListener('keydown', overlay._keyHandler);
+    overlay.innerHTML = '';
+
+    var t = trades[_idx];
+    var sym = t.symbol.toUpperCase();
+    var imgKey = t.date + '__' + sym;
+    var valImg = (!_tvVdDeletedKeys[imgKey] && tvValCharts[imgKey]) ? tvValCharts[imgKey] : null;
+    var myImgKey = t.date + '_' + t.symbol + '_' + t.side;
+    var myImg = (typeof tvTradeImages!=='undefined'?tvTradeImages[myImgKey]:null)
+              ||(typeof myTradeImages!=='undefined'?myTradeImages[myImgKey]:null)||null;
+    var vt = t._valTraded || '';
+
+    var book = document.createElement('div');
+    book.style.cssText = 'background:linear-gradient(135deg,#f5f0e8 0%,#fffdf7 50%,#f0ebe0 100%);border-radius:4px 14px 14px 4px;box-shadow:-4px 0 10px rgba(0,0,0,0.4),0 6px 32px rgba(0,0,0,0.6),inset 5px 0 14px rgba(0,0,0,0.15);display:flex;flex-direction:column;width:min(940px,95vw);max-height:90vh;overflow:hidden;border:1px solid #c8b89a;position:relative;';
+    book.onclick = function(e){ e.stopPropagation(); };
+
+    var spine = document.createElement('div');
+    spine.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:20px;background:linear-gradient(to right,rgba(0,0,0,0.22),transparent);z-index:2;pointer-events:none;border-radius:4px 0 0 4px;';
+    book.appendChild(spine);
+
+    var gutter = document.createElement('div');
+    gutter.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:4px;background:linear-gradient(to right,rgba(0,0,0,0.12),rgba(0,0,0,0.04),rgba(0,0,0,0.12));transform:translateX(-50%);z-index:2;pointer-events:none;';
+    book.appendChild(gutter);
+
+    // Top bar
+    var topBar = document.createElement('div');
+    topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 18px;background:rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.1);flex-shrink:0;';
+    topBar.innerHTML = '<span style="font-family:Georgia,serif;font-size:11px;color:#888;font-style:italic;">The Trade Journal</span>'
+      + '<span style="font-family:Georgia,serif;font-size:11px;color:#888;font-style:italic;">page ' + (_idx+1) + ' of ' + trades.length + '</span>';
+    var xBtn = document.createElement('button');
+    xBtn.textContent = 'x';
+    xBtn.style.cssText = 'background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;line-height:1;padding:0 0 0 12px;font-family:Georgia,serif;';
+    xBtn.onclick = function(){ document.removeEventListener('keydown', overlay._keyHandler); overlay.remove(); };
+    topBar.appendChild(xBtn);
+    book.appendChild(topBar);
+
+    var spread = document.createElement('div');
+    spread.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;position:relative;z-index:1;';
+
+    function mkTape(rot, top, left) {
+      var td = document.createElement('div');
+      td.style.cssText = 'position:absolute;width:54px;height:19px;background:rgba(255,240,140,0.6);border:1px solid rgba(200,180,60,0.35);border-radius:2px;transform:rotate('+rot+'deg);top:'+top+';left:'+left+';z-index:4;box-shadow:0 1px 4px rgba(0,0,0,0.12);pointer-events:none;';
+      return td;
+    }
+
+    // LEFT page
+    var left = document.createElement('div');
+    left.style.cssText = 'padding:22px 20px 18px 28px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;';
+    left.appendChild(mkTape('-9deg','10px','16px'));
+    left.appendChild(mkTape('5deg','auto','24px'));
+
+    var myH = document.createElement('div');
+    myH.style.cssText = 'font-family:"Comic Sans MS",cursive,sans-serif;font-size:20px;font-weight:bold;color:#1a5c8a;text-align:center;text-shadow:1px 1px 0 rgba(0,0,0,0.06);';
+    myH.textContent = 'My Trade';
+
+    var pnlC = (t.pnl||0)>=0 ? '#1a7a4a' : '#c0392b';
+    var myMeta = document.createElement('div');
+    myMeta.style.cssText = 'text-align:center;';
+    myMeta.innerHTML = '<span style="font-family:Georgia,serif;font-size:12px;color:#666;">'+sym+' \u00b7 '+t.date.slice(5)+' \u00b7 '+(t.side==='long'?'LONG':'SHORT')+'</span>'
+      + '<br><span style="font-family:Georgia,serif;font-size:19px;font-weight:bold;color:'+pnlC+';">'+((t.pnl||0)>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0)+'</span>';
+
+    var myPol = document.createElement('div');
+    myPol.style.cssText = 'background:#fff;padding:7px 7px 26px;box-shadow:2px 3px 10px rgba(0,0,0,0.22),0 0 0 1px rgba(0,0,0,0.07);border-radius:2px;transform:rotate(-1.8deg);flex:1;display:flex;align-items:center;justify-content:center;min-height:180px;cursor:pointer;overflow:hidden;';
+    if (myImg) {
+      var mi = document.createElement('img'); mi.src=myImg; mi.style.cssText='width:100%;height:100%;object-fit:contain;display:block;'; myPol.appendChild(mi);
+    } else {
+      myPol.innerHTML = '<div style="text-align:center;color:#ccc;font-size:11px;font-style:italic;font-family:Georgia,serif;padding:16px;">no chart yet<br><small>click to add</small></div>';
+    }
+    myPol.onclick = function(){ if(typeof tvOpenTradeImgModal==='function') tvOpenTradeImgModal(myImgKey); };
+
+    var myYN = document.createElement('div');
+    myYN.style.cssText = 'display:flex;gap:8px;justify-content:center;flex-wrap:wrap;';
+    ['yes','no'].forEach(function(v){
+      var sb = document.createElement('button'); var isV = vt===v;
+      sb.style.cssText = 'font-family:"Comic Sans MS",cursive,sans-serif;font-size:10px;font-weight:bold;padding:4px 14px;border-radius:20px;cursor:pointer;'
+        +'border:2px solid '+(v==='yes'?(isV?'#1a7a4a':'#ccc'):(isV?'#c0392b':'#ccc'))+';'
+        +'background:'+(v==='yes'?(isV?'#d4edda':'#f8f8f8'):(isV?'#fde8e8':'#f8f8f8'))+';'
+        +'color:'+(v==='yes'?(isV?'#1a7a4a':'#aaa'):(isV?'#c0392b':'#aaa'))+';';
+      sb.textContent = v==='yes' ? 'Val traded' : "Val didn't";
+      sb.onclick = function(){
+        var nv = vt===v?'':v;
+        (t._allMks||[t._metaKey]).forEach(function(mk){ if(!tvTradeMeta[mk])tvTradeMeta[mk]={}; tvTradeMeta[mk].valTraded=nv; });
+        t._valTraded=nv; _saveTvTradeMeta(); render();
+      };
+      myYN.appendChild(sb);
+    });
+
+    left.appendChild(myH); left.appendChild(myMeta); left.appendChild(myPol); left.appendChild(myYN);
+
+    // RIGHT page
+    var right = document.createElement('div');
+    right.style.cssText = 'padding:22px 28px 18px 20px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,0.18),transparent);';
+    right.appendChild(mkTape('8deg','10px','calc(50% - 27px)'));
+
+    var valH = document.createElement('div');
+    valH.style.cssText = 'font-family:"Comic Sans MS",cursive,sans-serif;font-size:20px;font-weight:bold;color:#7b1a4a;text-align:center;text-shadow:1px 1px 0 rgba(0,0,0,0.06);';
+    valH.textContent = "Val's Trade";
+
+    var valMeta = document.createElement('div');
+    valMeta.style.cssText = 'text-align:center;';
+    valMeta.innerHTML = '<span style="font-family:Georgia,serif;font-size:12px;color:#666;">'+sym+' \u00b7 '+t.date.slice(5)+'</span>';
+
+    var valPol = document.createElement('div');
+    valPol.tabIndex = 0;
+    valPol.style.cssText = 'background:#fff;padding:7px 7px 26px;box-shadow:2px 3px 10px rgba(0,0,0,0.22),0 0 0 1px rgba(0,0,0,0.07);border-radius:2px;transform:rotate(1.4deg);flex:1;display:flex;align-items:center;justify-content:center;min-height:180px;cursor:pointer;overflow:hidden;outline:none;';
+    valPol.title = 'click to focus then Ctrl+V to paste';
+    if (valImg) {
+      var vi = document.createElement('img'); vi.src=valImg; vi.style.cssText='width:100%;height:100%;object-fit:contain;display:block;'; valPol.appendChild(vi);
+    } else {
+      valPol.innerHTML = '<div style="text-align:center;color:#ccc;font-size:11px;font-style:italic;font-family:Georgia,serif;padding:16px;">no chart<br><small>ctrl+v to paste</small></div>';
+    }
+
+    function saveValImg(dataUrl) {
+      delete _tvVdDeletedKeys[imgKey]; tvValChartsPins[imgKey]=true;
+      try{localStorage.setItem('tvValChartsPins',JSON.stringify(tvValChartsPins));}catch(e){}
+      tvValCharts[imgKey]=dataUrl;
+      try{localStorage.setItem('tvValCharts',JSON.stringify(tvValCharts));}catch(e){}
+      sbImgSave('tvValCharts',imgKey,dataUrl); render();
+    }
+
+    valPol.onclick  = function(){ valPol.focus(); _tvVdPasteTarget=saveValImg; };
+    valPol.onfocus  = function(){ _tvVdPasteTarget=saveValImg; };
+    valPol.addEventListener('paste',function(ev){
+      var items=(ev.clipboardData||{}).items||[];
+      for(var pi=0;pi<items.length;pi++){
+        if(items[pi].type.indexOf('image')>=0){
+          var rd=new FileReader(); rd.onload=function(e2){saveValImg(e2.target.result);}; rd.readAsDataURL(items[pi].getAsFile()); ev.preventDefault(); break;
+        }
+      }
+    });
+    _tvVdPasteTarget = saveValImg;
+
+    var vCtrl = document.createElement('div'); vCtrl.style.cssText='display:flex;gap:6px;justify-content:center;';
+    var vFile = document.createElement('input'); vFile.type='file'; vFile.accept='image/*'; vFile.style.display='none';
+    vFile.onchange = function(){ if(!vFile.files[0])return; var rd=new FileReader(); rd.onload=function(e2){saveValImg(e2.target.result);}; rd.readAsDataURL(vFile.files[0]); };
+    var vUp=document.createElement('button'); vUp.style.cssText='font-family:"Comic Sans MS",cursive,sans-serif;font-size:10px;padding:4px 13px;border-radius:20px;cursor:pointer;background:#fff8e1;border:2px solid #f0c040;color:#7a5800;'; vUp.textContent='add photo'; vUp.onclick=function(){vFile.click();};
+    var vDel=document.createElement('button'); vDel.style.cssText='font-family:"Comic Sans MS",cursive,sans-serif;font-size:10px;padding:4px 13px;border-radius:20px;cursor:pointer;background:#fdecea;border:2px solid #e8a0a0;color:#800000;'; vDel.textContent='remove';
+    vDel.onclick=function(){
+      _tvVdDeletedKeys[imgKey]=true; tvValChartsPins[imgKey]=true; delete tvValCharts[imgKey];
+      try{var s=JSON.parse(localStorage.getItem('tvValCharts')||'{}');delete s[imgKey];localStorage.setItem('tvValCharts',JSON.stringify(s));}catch(e){}
+      try{localStorage.setItem('tvValChartsPins',JSON.stringify(tvValChartsPins));}catch(e){}
+      sbImgDelete('tvValCharts',imgKey); render();
+    };
+    vCtrl.appendChild(vFile); vCtrl.appendChild(vUp); vCtrl.appendChild(vDel);
+
+    right.appendChild(valH); right.appendChild(valMeta); right.appendChild(valPol); right.appendChild(vCtrl);
+    spread.appendChild(left); spread.appendChild(right);
+    book.appendChild(spread);
+
+    // Nav bar
+    var nav = document.createElement('div');
+    nav.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 22px;background:rgba(0,0,0,0.07);border-top:1px solid rgba(0,0,0,0.1);flex-shrink:0;';
+    var prevB=document.createElement('button'); prevB.textContent='prev'; prevB.disabled=_idx<=0;
+    prevB.style.cssText='font-family:"Comic Sans MS",cursive,sans-serif;font-size:13px;padding:6px 20px;border-radius:20px;cursor:pointer;background:#e8f0fe;border:2px solid #4a90d9;color:'+(_idx<=0?'#aaa':'#1a4c8a')+';';
+    prevB.onclick=function(){if(_idx>0){_idx--;render();}};
+    var navMid=document.createElement('div'); navMid.style.cssText='font-family:Georgia,serif;font-size:12px;color:#888;font-style:italic;text-align:center;';
+    navMid.textContent=sym+' \u2014 '+(vt==='yes'?'YES':vt==='no'?'NO':'?');
+    var nextB=document.createElement('button'); nextB.textContent='next'; nextB.disabled=_idx>=trades.length-1;
+    nextB.style.cssText='font-family:"Comic Sans MS",cursive,sans-serif;font-size:13px;padding:6px 20px;border-radius:20px;cursor:pointer;background:#e8f0fe;border:2px solid #4a90d9;color:'+(_idx>=trades.length-1?'#aaa':'#1a4c8a')+';';
+    nextB.onclick=function(){if(_idx<trades.length-1){_idx++;render();}};
+    nav.appendChild(prevB); nav.appendChild(navMid); nav.appendChild(nextB);
+    book.appendChild(nav);
+    overlay.appendChild(book);
+
+    overlay._keyHandler = function(ev){
+      if(ev.target.tagName==='INPUT'||ev.target.tagName==='TEXTAREA') return;
+      if(ev.key==='ArrowRight'&&_idx<trades.length-1){_idx++;render();ev.preventDefault();}
+      else if(ev.key==='ArrowLeft'&&_idx>0){_idx--;render();ev.preventDefault();}
+      else if(ev.key==='Escape'){document.removeEventListener('keydown',overlay._keyHandler);overlay.remove();}
+    };
+    document.addEventListener('keydown', overlay._keyHandler);
+  }
+
+  render();
+  document.body.appendChild(overlay);
+}
+
 function renderTvValData() {
   var el = document.getElementById('tvValDataPane');
   if (!el) return;
@@ -5046,8 +5242,13 @@ function renderTvValDataBody() {
   setMode(_tvVdMode);
   focusBtn.onclick = function(){ if(_tvVdMode!=='focus'){ setMode('focus'); renderTvValDataBody(); } };
   gridBtn.onclick  = function(){ if(_tvVdMode!=='grid' ){ setMode('grid');  renderTvValDataBody(); } };
+  var bookletBtn = document.createElement('button');
+  bookletBtn.textContent = 'BOOKLET';
+  bookletBtn.style.cssText = modeBase + 'background:transparent;border:1px solid rgba(255,200,80,0.45);color:rgba(255,200,80,0.8);';
+  bookletBtn.onclick = function(){ tvBookletOpen(bigWins, 0); };
   modeRow.appendChild(focusBtn);
   modeRow.appendChild(gridBtn);
+  modeRow.appendChild(bookletBtn);
   body.appendChild(modeRow);
 
 
