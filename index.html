@@ -797,46 +797,42 @@ async function sbImgDelete(store, imgKey) {
 // Nuke all valCompare__ images from memory, localStorage, and Supabase
 async function sbNukeValCompareImages(statusCb) {
   statusCb = statusCb || function(){};
-  // 1. Find all valCompare__ keys in memory
-  var keys = Object.keys(tvTradeImages || {}).filter(function(k){ return k.indexOf('valCompare__') === 0; });
-  statusCb('Found ' + keys.length + ' local valCompare keys — deleting...');
 
-  // 2. Wipe from memory + localStorage immediately
-  keys.forEach(function(k){ delete tvTradeImages[k]; });
+  // 1. Wipe tvValCharts entirely from memory + localStorage
+  var chartKeys = Object.keys(tvValCharts || {});
+  statusCb('Clearing ' + chartKeys.length + ' manual val charts...');
+  tvValCharts = {};
+  tvValChartsPins = {};
+  try { localStorage.removeItem('tvValCharts'); } catch(e) {}
+  try { localStorage.removeItem('tvValChartsPins'); } catch(e) {}
+
+  // 2. Wipe old valCompare__ keys from tvTradeImages (legacy)
+  var legacyKeys = Object.keys(tvTradeImages || {}).filter(function(k){ return k.indexOf('valCompare__') === 0; });
+  legacyKeys.forEach(function(k){ delete tvTradeImages[k]; });
   try {
     var stored = JSON.parse(localStorage.getItem('tvTradeImages') || '{}');
-    var lsKeys = Object.keys(stored).filter(function(k){ return k.indexOf('valCompare__') === 0; });
-    lsKeys.forEach(function(k){ delete stored[k]; });
+    Object.keys(stored).filter(function(k){ return k.indexOf('valCompare__') === 0; }).forEach(function(k){ delete stored[k]; });
     localStorage.setItem('tvTradeImages', JSON.stringify(stored));
-    statusCb('Cleared ' + lsKeys.length + ' localStorage keys');
   } catch(e) {}
 
-  // 3. Delete from Supabase — fetch all matching rows first
+  // 3. Delete tvValCharts store from Supabase
   try {
-    var { data, error } = await _supa.from('valgo_images')
-      .select('img_key')
-      .eq('store', 'tvTradeImages')
-      .ilike('img_key', 'tvTradeImages::valCompare__%');
+    var { data } = await _supa.from('valgo_images').select('img_key').eq('store', 'tvValCharts');
     if (data && data.length) {
-      statusCb('Found ' + data.length + ' Supabase rows — deleting...');
-      // Delete in batches of 50
+      statusCb('Deleting ' + data.length + ' Supabase val chart rows...');
       for (var i = 0; i < data.length; i += 50) {
-        var batch = data.slice(i, i+50).map(function(r){ return r.img_key; });
-        await _supa.from('valgo_images').delete().in('img_key', batch);
+        await _supa.from('valgo_images').delete().in('img_key', data.slice(i,i+50).map(function(r){return r.img_key;}));
       }
-      // Also delete from storage bucket
-      var fileNames = data.map(function(r){
-        var k = r.img_key.replace('tvTradeImages::', '');
-        return 'tvTradeImages/' + k.replace(/[^a-zA-Z0-9_\-\.]/g, '_') + '.webp';
-      });
-      for (var j = 0; j < fileNames.length; j += 50) {
-        await _supa.storage.from(SUPA_BUCKET).remove(fileNames.slice(j, j+50));
-      }
-      statusCb('Deleted ' + data.length + ' Supabase rows. All clear!');
-    } else {
-      statusCb('No Supabase rows found. Local cleared!');
     }
-  } catch(e) { statusCb('Supabase error: ' + e.message); }
+    // Also delete legacy tvTradeImages::valCompare__ rows
+    var { data: d2 } = await _supa.from('valgo_images').select('img_key').eq('store','tvTradeImages').ilike('img_key','tvTradeImages::valCompare__%');
+    if (d2 && d2.length) {
+      for (var j = 0; j < d2.length; j += 50) {
+        await _supa.from('valgo_images').delete().in('img_key', d2.slice(j,j+50).map(function(r){return r.img_key;}));
+      }
+    }
+    statusCb('All clear! ' + ((data||[]).length + (d2||[]).length) + ' Supabase rows deleted.');
+  } catch(e) { statusCb('Supabase error: ' + (e.message||e)); }
 }
 
 // Load all images for a store from Supabase into memory (paginated)
@@ -1008,6 +1004,7 @@ window.addEventListener('load', function() {
   setTimeout(async function() {
     await sbImgLoadAll('myTradeImages');
     await sbImgLoadAll('tvTradeImages');
+  await sbImgLoadAll('tvValCharts');
     await sbImgLoadAll('tvDayImages');
     if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
     if (typeof renderTvTrades === 'function') renderTvTrades();
@@ -4058,6 +4055,8 @@ var tvTrades = [];
 var tvDayR = {};
 var tvDayImages = {};
 var tvTradeImages = {};
+var tvValCharts = {}; // dedicated store for manually-pinned val compare images
+var tvValChartsPins = {}; // keys the user has explicitly interacted with (pin = never auto-fill)
 var tvUnit = 'R';
 var tvCalYear = new Date().getFullYear();
 var tvCalMonth = new Date().getMonth();
@@ -4069,6 +4068,8 @@ try{tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(e){}
 try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
+try{tvValCharts=JSON.parse(localStorage.getItem('tvValCharts')||'{}');}catch(e){}
+try{tvValChartsPins=JSON.parse(localStorage.getItem('tvValChartsPins')||'{}');}catch(e){}
 
 function tvSave(){sbSave('tvTrades',JSON.stringify(tvTrades));sbSave('tvDayR',JSON.stringify(tvDayR));}
 
@@ -4832,8 +4833,8 @@ function renderTvValData() {
     }).then(function() {
       nukeBtn.textContent = '✓ All val charts cleared';
       nukeBtn.style.color = '#26a69a';
-      // Clear tombstones too so fresh pastes work
-      _tvVdDeletedKeys = {};
+      _tvVdDeletedKeys = {}; // clear tombstones so fresh pastes work
+      // pins already cleared inside sbNukeValCompareImages
       renderTvValDataBody();
     }).catch(function(e) {
       nukeBtn.textContent = 'Error — check console';
@@ -5205,10 +5206,16 @@ function tvRenderValCompare(t, mk, container, embedded) {
   }
   var myImgKey = t.date + '_' + t.symbol + '_' + t.side;
   var myImg = (typeof tvTradeImages !== 'undefined' ? tvTradeImages[myImgKey] : null) || myTradeImages[myImgKey] || null;
-  var valImgKey = 'valCompare__' + t.date + '__' + sym;
+  var valImgKey = t.date + '__' + sym; // base key — no prefix, lives in tvValCharts store
   var valImgSrc = null;
-  if (!_tvVdDeletedKeys[valImgKey] && typeof tvTradeImages !== 'undefined' && tvTradeImages[valImgKey]) valImgSrc = tvTradeImages[valImgKey];
-  else if (!_tvVdDeletedKeys[valImgKey] && valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg === 'function') {
+  var _isDeleted = _tvVdDeletedKeys[valImgKey];
+  var _isPinned  = tvValChartsPins[valImgKey]; // user has interacted — don't fall back to discord
+
+  if (!_isDeleted && tvValCharts[valImgKey]) {
+    // Priority 1: manually saved image in dedicated store
+    valImgSrc = tvValCharts[valImgKey];
+  } else if (!_isDeleted && !_isPinned && valExec && valExec.image_urls && valExec.image_urls.length && typeof resolveDiscordImg === 'function') {
+    // Priority 2: auto-matched discord image — only if user hasn't pinned/cleared this key
     valImgSrc = resolveDiscordImg(valExec.image_urls[0]);
   }
 
@@ -5287,12 +5294,20 @@ function tvRenderValCompare(t, mk, container, embedded) {
   }
 
   function saveValImg(dataUrl) {
-    delete _tvVdDeletedKeys[valImgKey]; // clear tombstone — new image being saved
-    if (typeof tvTradeImages === 'undefined') window.tvTradeImages = {};
-    tvTradeImages[valImgKey] = dataUrl;
-    try { localStorage.setItem('tvTradeImages', JSON.stringify(tvTradeImages)); } catch (er) {}
-    if (typeof imgSave === 'function') imgSave('tvTradeImages', valImgKey, dataUrl);
-    else if (typeof sbImgSave === 'function') sbImgSave('tvTradeImages', valImgKey, dataUrl);
+    delete _tvVdDeletedKeys[valImgKey]; // clear tombstone
+    // Pin this key — suppress discord auto-fill forever for this date+symbol
+    tvValChartsPins[valImgKey] = true;
+    try { localStorage.setItem('tvValChartsPins', JSON.stringify(tvValChartsPins)); } catch(er) {}
+    // Save to dedicated tvValCharts store
+    tvValCharts[valImgKey] = dataUrl;
+    try { localStorage.setItem('tvValCharts', JSON.stringify(tvValCharts)); } catch (er) {}
+    sbImgSave('tvValCharts', valImgKey, dataUrl);
+    // Also remove any old copy from tvTradeImages to avoid confusion
+    if (tvTradeImages[valImgKey]) {
+      delete tvTradeImages[valImgKey];
+      sbImgDelete('tvTradeImages', valImgKey);
+      try { var s=JSON.parse(localStorage.getItem('tvTradeImages')||'{}'); delete s[valImgKey]; localStorage.setItem('tvTradeImages',JSON.stringify(s)); } catch(er){}
+    }
     renderTvValDataBody();
   }
 
@@ -5337,19 +5352,20 @@ function tvRenderValCompare(t, mk, container, embedded) {
     delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;padding:5px 12px;border-radius:4px;cursor:pointer;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:#ef5350;';
     delBtn.textContent = '✕ REMOVE';
     delBtn.onclick = function () {
-      var key = valImgKey; // captured — immune to outer scope changes
-      // Mark tombstone first so re-render never shows the image again
+      var key = valImgKey; // captured
+      // Tombstone so re-render immediately sees it gone
       _tvVdDeletedKeys[key] = true;
-      // Wipe from every layer synchronously so re-render sees it gone
-      if (typeof tvTradeImages !== 'undefined') delete tvTradeImages[key];
-      try {
-        var stored = JSON.parse(localStorage.getItem('tvTradeImages') || '{}');
-        delete stored[key];
-        localStorage.setItem('tvTradeImages', JSON.stringify(stored));
-      } catch (er) {}
-      // Async Supabase delete
-      if (typeof imgDelete === 'function') imgDelete('tvTradeImages', key);
-      else if (typeof sbImgDelete === 'function') sbImgDelete('tvTradeImages', key);
+      // Pin = user explicitly cleared — suppress discord auto-fill
+      tvValChartsPins[key] = true;
+      try { localStorage.setItem('tvValChartsPins', JSON.stringify(tvValChartsPins)); } catch(er) {}
+      // Wipe from tvValCharts (primary store)
+      delete tvValCharts[key];
+      try { var s=JSON.parse(localStorage.getItem('tvValCharts')||'{}'); delete s[key]; localStorage.setItem('tvValCharts',JSON.stringify(s)); } catch(er) {}
+      sbImgDelete('tvValCharts', key);
+      // Also wipe from tvTradeImages (legacy store) just in case
+      delete tvTradeImages[key];
+      try { var s2=JSON.parse(localStorage.getItem('tvTradeImages')||'{}'); delete s2[key]; localStorage.setItem('tvTradeImages',JSON.stringify(s2)); } catch(er) {}
+      sbImgDelete('tvTradeImages', key);
       renderTvValDataBody();
     };
     ctrlRow.appendChild(delBtn);
