@@ -817,21 +817,23 @@ async function sbNukeValCompareImages(statusCb) {
 
   // 3. Delete tvValCharts store from Supabase
   try {
-    var { data } = await _supa.from('valgo_images').select('img_key').eq('store', 'tvValCharts');
-    if (data && data.length) {
-      statusCb('Deleting ' + data.length + ' Supabase val chart rows...');
-      for (var i = 0; i < data.length; i += 50) {
-        await _supa.from('valgo_images').delete().in('img_key', data.slice(i,i+50).map(function(r){return r.img_key;}));
+    var _r1 = await _supa.from('valgo_images').select('img_key').eq('store', 'tvValCharts');
+    var data1 = _r1.data || [];
+    if (data1.length) {
+      statusCb('Deleting ' + data1.length + ' Supabase val chart rows...');
+      for (var i = 0; i < data1.length; i += 50) {
+        await _supa.from('valgo_images').delete().in('img_key', data1.slice(i,i+50).map(function(r){return r.img_key;}));
       }
     }
     // Also delete legacy tvTradeImages::valCompare__ rows
-    var { data: d2 } = await _supa.from('valgo_images').select('img_key').eq('store','tvTradeImages').ilike('img_key','tvTradeImages::valCompare__%');
-    if (d2 && d2.length) {
-      for (var j = 0; j < d2.length; j += 50) {
-        await _supa.from('valgo_images').delete().in('img_key', d2.slice(j,j+50).map(function(r){return r.img_key;}));
+    var _r2 = await _supa.from('valgo_images').select('img_key').eq('store','tvTradeImages').ilike('img_key','tvTradeImages::valCompare__%');
+    var data2 = _r2.data || [];
+    if (data2.length) {
+      for (var j = 0; j < data2.length; j += 50) {
+        await _supa.from('valgo_images').delete().in('img_key', data2.slice(j,j+50).map(function(r){return r.img_key;}));
       }
     }
-    statusCb('All clear! ' + ((data||[]).length + (d2||[]).length) + ' Supabase rows deleted.');
+    statusCb('All clear! ' + (data1.length + data2.length) + ' Supabase rows deleted.');
   } catch(e) { statusCb('Supabase error: ' + (e.message||e)); }
 }
 
@@ -5048,10 +5050,6 @@ function renderTvValDataBody() {
   modeRow.appendChild(gridBtn);
   body.appendChild(modeRow);
 
-
-    body.appendChild(book);
-    return;
-  }
 
   // ── GRID MODE ──────────────────────────────────────────────────────────────
   if (_tvVdMode === 'grid') {
