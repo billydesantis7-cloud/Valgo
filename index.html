@@ -11610,79 +11610,81 @@ function kinfoRenderExecErrors(){
     }
 
     var maxCount = errMap[sorted[0]].count;
+    // Compact table
+    var tbl = document.createElement('div');
+    tbl.style.cssText='border:1px solid var(--border);border-radius:6px;overflow:hidden;';
     sorted.forEach(function(err,i){
       var data = errMap[err];
-      var card = document.createElement('div');
-      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+cat.color+';border-radius:6px;margin-bottom:8px;overflow:hidden;';
+      var pct = Math.round(data.count/maxCount*100);
+      var row = document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:26px 1fr 28px;align-items:center;gap:0;border-top:'+(i>0?'1px solid rgba(255,255,255,0.05)':'none')+';cursor:pointer;user-select:none;background:transparent;transition:background 0.1s;';
+      row.onmouseover=function(){row.style.background='rgba(255,255,255,0.025)';};
+      row.onmouseout=function(){row.style.background='transparent';};
 
-      // Card header - clickable to expand
-      var cardHdr = document.createElement('div');
-      cardHdr.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;user-select:none;';
-      cardHdr.innerHTML='<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">#'+(i+1)+'</span>'
-        +'<div style="flex:1;min-width:0;">'
-          +'<div style="font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+err+'</div>'
-          +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+data.count+' occurrence'+(data.count>1?'s':'')+'</div>'
-        +'</div>'
-        +'<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">'+data.count+'×</div>'
-        +'<span class="_errChevron" style="font-size:10px;color:var(--muted);margin-left:4px;">▶</span>';
+      // Rank badge
+      var rank=document.createElement('div');
+      rank.style.cssText='font-family:var(--mono);font-size:8px;font-weight:bold;color:'+cat.color+'44;padding:8px 0 8px 8px;text-align:center;';
+      rank.textContent='#'+(i+1);
 
-      // Fill bar
-      var barWrap = document.createElement('div');
-      barWrap.style.cssText='height:3px;background:rgba(255,255,255,0.06);margin:0 12px 8px;border-radius:2px;';
-      var barFill = document.createElement('div');
-      barFill.style.cssText='height:100%;width:'+Math.round(data.count/maxCount*100)+'%;background:'+cat.color+';border-radius:2px;';
+      // Label + bar
+      var mid=document.createElement('div');
+      mid.style.cssText='padding:6px 8px 5px;min-width:0;';
+      var errLbl=document.createElement('div');
+      errLbl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;';
+      errLbl.textContent=err;
+      var barWrap=document.createElement('div');
+      barWrap.style.cssText='height:2px;background:rgba(255,255,255,0.05);border-radius:1px;';
+      var barFill=document.createElement('div');
+      barFill.style.cssText='height:100%;width:'+pct+'%;background:'+cat.color+'88;border-radius:1px;';
       barWrap.appendChild(barFill);
+      mid.appendChild(errLbl); mid.appendChild(barWrap);
 
-      // Expandable content
-      var expand = document.createElement('div');
-      expand.style.cssText='display:none;padding:0 10px 10px;';
+      // Count badge
+      var badge=document.createElement('div');
+      badge.style.cssText='font-family:var(--display);font-size:12px;font-weight:bold;color:'+cat.color+';padding:0 8px;text-align:right;';
+      badge.textContent=data.count+'×';
 
-      // Collect all images for lightbox
-      var allErrImages = [];
+      row.appendChild(rank); row.appendChild(mid); row.appendChild(badge);
+
+      // Expandable trades panel
+      var expand=document.createElement('div');
+      expand.style.cssText='display:none;grid-column:1/-1;padding:6px 10px 8px;border-top:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.2);';
+      var allErrImages=[];
       data.trades.forEach(function(t){
-        var imgKey = t.date+'_'+t.symbol+'_'+(t.side||'');
-        var imgSrc = (typeof myTradeImages!=='undefined'&&myTradeImages[imgKey]) || null;
-        if(imgSrc) allErrImages.push({src:imgSrc, label:t.symbol+' · '+t.date});
+        var ik=t.date+'_'+t.symbol+'_'+(t.side||'');
+        var src=(typeof myTradeImages!=='undefined'&&myTradeImages[ik])||null;
+        if(src) allErrImages.push({src:src,label:t.symbol+' \u00b7 '+t.date});
       });
-
-      // Trade rows with thumbnails
       data.trades.forEach(function(t){
-        var tradeRow = document.createElement('div');
-        tradeRow.style.cssText='margin-bottom:8px;';
-
-        var chip = document.createElement('div');
-        chip.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);padding:2px 0 4px;';
+        var chip=document.createElement('span');
+        chip.style.cssText='display:inline-block;font-family:var(--mono);font-size:9px;color:var(--muted);margin-right:8px;margin-bottom:4px;';
         chip.textContent=t.symbol+' '+t.date.slice(5);
-        tradeRow.appendChild(chip);
-
-        var imgKey = t.date+'_'+t.symbol+'_'+(t.side||'');
-        var imgSrc = (typeof myTradeImages!=='undefined'&&myTradeImages[imgKey]) || null;
-        if(imgSrc){
-          var imgIdx = allErrImages.findIndex(function(x){ return x.src===imgSrc; });
-          var img = document.createElement('img');
-          img.src=imgSrc;
-          img.style.cssText='width:100%;max-height:120px;object-fit:contain;background:#080c14;border-radius:3px;cursor:zoom-in;display:block;border:1px solid rgba(255,255,255,0.05);';
-          img.onclick=(function(ii,imgs){ return function(e){ e.stopPropagation(); kinfoShowErrLightbox(imgs, ii); }; })(imgIdx >= 0 ? imgIdx : 0, allErrImages);
-          tradeRow.appendChild(img);
-        }
-
-        expand.appendChild(tradeRow);
+        expand.appendChild(chip);
       });
+      if(allErrImages.length){
+        var thumbRow=document.createElement('div');
+        thumbRow.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;';
+        allErrImages.forEach(function(im,ii){
+          var th=document.createElement('img');
+          th.src=im.src;th.title=im.label;
+          th.style.cssText='height:70px;width:auto;max-width:140px;object-fit:contain;background:#080c14;border-radius:3px;cursor:zoom-in;border:1px solid rgba(255,255,255,0.05);';
+          th.onclick=(function(ii2,imgs){ return function(e){ e.stopPropagation(); kinfoShowErrLightbox(imgs,ii2); }; })(ii,allErrImages);
+          thumbRow.appendChild(th);
+        });
+        expand.appendChild(thumbRow);
+      }
 
-      var expanded = false;
-      cardHdr.onclick = function(){
-        expanded = !expanded;
-        expand.style.display = expanded ? 'block' : 'none';
-        var chev = cardHdr.querySelector('._errChevron');
-        if(chev) chev.textContent = expanded ? '▼' : '▶';
-        card.style.borderColor = expanded ? cat.color : 'var(--border)';
+      var expanded=false;
+      row.onclick=function(){
+        expanded=!expanded;
+        expand.style.display=expanded?'block':'none';
+        row.style.background=expanded?'rgba(255,255,255,0.03)':'transparent';
+        badge.style.color=expanded?'#fff':cat.color;
       };
-
-      card.appendChild(cardHdr);
-      card.appendChild(barWrap);
-      card.appendChild(expand);
-      col.appendChild(card);
+      tbl.appendChild(row);
+      tbl.appendChild(expand);
     });
+    col.appendChild(tbl);
 
     grid.appendChild(col);
   });
@@ -11930,8 +11932,11 @@ function kinfoOpenDay(date) {
   // Header with prev/next arrows
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;';
+  var _hdrPerf=(function(){try{var p=JSON.parse(localStorage.getItem('kinfo_perf_'+date)||'{}');return kinfoCalcPerfScore(p);}catch(e){return null;}})();
+  var _hdrPC=_hdrPerf===null?'#666':_hdrPerf>=80?'#4caf50':_hdrPerf>=60?'#ff9800':'#ef5350';
   hdr.innerHTML = '<button onclick="kinfoNavDay(-1)" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:#fff;font-size:16px;width:32px;height:32px;border-radius:4px;cursor:pointer;flex-shrink:0;">◀</button>'
     + '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:#fff;letter-spacing:1px;flex:1;text-align:center;">' + dayLabel + '</span>'
+    + (_hdrPerf!==null ? '<span id="_hdrPerfBadge_'+date+'" style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+_hdrPC+';background:'+_hdrPC+'22;border:1px solid '+_hdrPC+'55;border-radius:5px;padding:3px 10px;white-space:nowrap;">'+_hdrPerf+'/100</span>' : '')
     + '<button onclick="kinfoNavDay(1)" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:#fff;font-size:16px;width:32px;height:32px;border-radius:4px;cursor:pointer;flex-shrink:0;">▶</button>'
     + '<button onclick="kinfoCloseDay()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;margin-left:4px;">×</button>';
   panel.appendChild(hdr);
@@ -12100,94 +12105,6 @@ function kinfoOpenDay(date) {
   }
 
   panel.appendChild(buildDebrief());
-
-  // ── PERFORMANCE SCORE ──
-  (function(){
-    var perfKey = 'kinfo_perf_' + date;
-    function loadPerf(){ try{ return JSON.parse(localStorage.getItem(perfKey)||'{}'); }catch(e){return {};} }
-    function savePerf(p){ localStorage.setItem(perfKey, JSON.stringify(p)); }
-
-    var perfWrap = document.createElement('div');
-    perfWrap.style.cssText = 'background:var(--surface);border:1px solid rgba(200,169,110,0.3);border-radius:8px;overflow:hidden;margin-bottom:14px;';
-
-    var checks = loadPerf();
-    var curScore = kinfoCalcPerfScore(checks);
-
-    var perfHdr = document.createElement('div');
-    perfHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(200,169,110,0.07);border-bottom:1px solid rgba(200,169,110,0.15);cursor:pointer;user-select:none;';
-
-    var perfLbl = document.createElement('span');
-    perfLbl.style.cssText = 'font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--accent);font-weight:bold;';
-    perfLbl.textContent = 'PERFORMANCE SCORE';
-
-    var perfScoreEl = document.createElement('span');
-    perfScoreEl.id = '_perfScore_' + date;
-    perfScoreEl.style.cssText = 'font-family:var(--display);font-size:20px;font-weight:bold;color:'+(curScore>=80?'#4caf50':curScore>=60?'#ff9800':'#ef5350')+';';
-    perfScoreEl.textContent = curScore + '/100';
-
-    var perfChev = document.createElement('span');
-    perfChev.style.cssText = 'font-size:10px;color:var(--muted);margin-left:8px;';
-    perfChev.textContent = '▼';
-
-    perfHdr.appendChild(perfLbl); perfHdr.appendChild(perfScoreEl); perfHdr.appendChild(perfChev);
-    perfWrap.appendChild(perfHdr);
-
-    var perfBody = document.createElement('div');
-    perfBody.style.cssText = 'padding:0;';
-
-    function renderPerfBody() {
-      perfBody.innerHTML = '';
-      var ch2 = loadPerf();
-
-      PERF_SCORE_RUBRIC.forEach(function(sec) {
-        var secHdr = document.createElement('div');
-        secHdr.style.cssText = 'font-family:var(--mono);font-size:7px;letter-spacing:1px;color:var(--muted);padding:5px 14px 3px;background:rgba(0,0,0,0.2);';
-        secHdr.textContent = sec.section;
-        perfBody.appendChild(secHdr);
-
-        sec.items.forEach(function(item) {
-          var row = document.createElement('label');
-          row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 14px;border-top:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.1s;';
-          row.onmouseover = function(){ this.style.background='rgba(255,255,255,0.03)'; };
-          row.onmouseout  = function(){ this.style.background='transparent'; };
-          var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!ch2[item.key];
-          cb.style.cssText = 'width:12px;height:12px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;';
-          cb.onchange = (function(k){ return function(){
-            var p=loadPerf(); p[k]=this.checked; savePerf(p);
-            var ns=kinfoCalcPerfScore(p);
-            var se=document.getElementById('_perfScore_'+date);
-            if(se){ se.textContent=ns+'/100'; se.style.color=ns>=80?'#4caf50':ns>=60?'#ff9800':'#ef5350'; }
-          }; })(item.key);
-          var lbl = document.createElement('span'); lbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);flex:1;line-height:1.3;'; lbl.textContent=item.label;
-          var wgt = document.createElement('span'); wgt.style.cssText='font-family:var(--mono);font-size:8px;color:rgba(200,169,110,0.5);flex-shrink:0;'; wgt.textContent='+'+item.weight;
-          row.appendChild(cb); row.appendChild(lbl); row.appendChild(wgt);
-          perfBody.appendChild(row);
-        });
-      });
-
-      var totRow = document.createElement('div');
-      totRow.style.cssText='display:flex;justify-content:space-between;padding:6px 14px;background:rgba(0,0,0,0.25);border-top:1px solid rgba(255,255,255,0.06);';
-      var raw2=0; PERF_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(i){if(ch2[i.key])raw2+=i.weight;});});
-      totRow.innerHTML='<span style="font-family:var(--mono);font-size:8px;color:var(--muted);">TOTAL RAW</span>'
-        +'<span style="font-family:var(--mono);font-size:8px;color:var(--accent);font-weight:bold;">'+raw2+'/'+PERF_SCORE_MAX+'</span>';
-      perfBody.appendChild(totRow);
-    }
-
-    renderPerfBody();
-    perfWrap.appendChild(perfBody);
-
-    // Collapsible
-    var _perfOpen = curScore > 0 || true; // default open
-    perfBody.style.display = _perfOpen ? 'block' : 'none';
-    perfChev.textContent = _perfOpen ? '▼' : '▶';
-    perfHdr.onclick = function(){
-      _perfOpen = !_perfOpen;
-      perfBody.style.display = _perfOpen ? 'block' : 'none';
-      perfChev.textContent = _perfOpen ? '▼' : '▶';
-    };
-
-    panel.appendChild(perfWrap);
-  })();
 
   // 3-column grid
   var grid = document.createElement('div');
@@ -12381,6 +12298,58 @@ function kinfoOpenDay(date) {
   grid.appendChild(ttCol);
 
   panel.appendChild(grid);
+
+  // ── PERFORMANCE SCORE (below charts) ──
+  (function(){
+    var perfKey = 'kinfo_perf_' + date;
+    function loadPerf(){ try{ return JSON.parse(localStorage.getItem(perfKey)||'{}'); }catch(e){return {};} }
+    function savePerf(p){ localStorage.setItem(perfKey, JSON.stringify(p)); }
+    var checks = loadPerf();
+    var curScore = kinfoCalcPerfScore(checks);
+    var perfWrap = document.createElement('div');
+    perfWrap.style.cssText = 'background:var(--surface);border:1px solid rgba(200,169,110,0.3);border-radius:8px;overflow:hidden;margin-top:16px;';
+    var perfHdr = document.createElement('div');
+    perfHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(200,169,110,0.07);border-bottom:1px solid rgba(200,169,110,0.15);';
+    var perfLbl = document.createElement('span');
+    perfLbl.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--accent);font-weight:bold;';
+    perfLbl.textContent = 'PERFORMANCE SCORE';
+    var perfScoreEl = document.createElement('span');
+    perfScoreEl.id = '_perfScore_' + date;
+    perfScoreEl.style.cssText = 'font-family:var(--display);font-size:22px;font-weight:bold;color:'+(curScore>=80?'#4caf50':curScore>=60?'#ff9800':'#ef5350')+';';
+    perfScoreEl.textContent = curScore + '/100';
+    perfHdr.appendChild(perfLbl); perfHdr.appendChild(perfScoreEl);
+    perfWrap.appendChild(perfHdr);
+    var perfRow = document.createElement('div');
+    perfRow.style.cssText = 'display:flex;gap:0;';
+    var _allPerfItems = [];
+    PERF_SCORE_RUBRIC.forEach(function(s){ s.items.forEach(function(i){ _allPerfItems.push(i); }); });
+    _allPerfItems.forEach(function(item, idx){
+      var isChecked = !!checks[item.key];
+      var cell = document.createElement('label');
+      cell.style.cssText = 'flex:1;display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;'
+        +'border-left:'+(idx>0?'1px solid rgba(255,255,255,0.07)':'none')+';'
+        +'background:'+(isChecked?'rgba(200,169,110,0.06)':'transparent')+';transition:background 0.1s;';
+      cell.onmouseover=function(){cell.style.background='rgba(255,255,255,0.04)';};
+      cell.onmouseout=function(){cell.style.background=!!loadPerf()[item.key]?'rgba(200,169,110,0.06)':'transparent';};
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=isChecked;
+      cb.style.cssText='width:17px;height:17px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;';
+      cb.onchange=(function(k,cellRef){return function(){
+        var p=loadPerf(); p[k]=this.checked; savePerf(p);
+        cellRef.style.background=this.checked?'rgba(200,169,110,0.06)':'transparent';
+        var ns=kinfoCalcPerfScore(p);
+        var se=document.getElementById('_perfScore_'+date);
+        if(se){se.textContent=ns+'/100';se.style.color=ns>=80?'#4caf50':ns>=60?'#ff9800':'#ef5350';}
+        var hb=document.getElementById('_hdrPerfBadge_'+date);
+        if(hb){hb.textContent=ns+'/100';var nc=ns>=80?'#4caf50':ns>=60?'#ff9800':'#ef5350';hb.style.color=nc;hb.style.background=nc+'22';hb.style.borderColor=nc+'55';}
+      };})(item.key, cell);
+      var lbl=document.createElement('span'); lbl.style.cssText='font-family:var(--mono);font-size:11px;color:var(--text);flex:1;'; lbl.textContent=item.label;
+      var wgt=document.createElement('span'); wgt.style.cssText='font-family:var(--mono);font-size:9px;color:rgba(200,169,110,0.4);flex-shrink:0;'; wgt.textContent='1/3';
+      cell.appendChild(cb); cell.appendChild(lbl); cell.appendChild(wgt);
+      perfRow.appendChild(cell);
+    });
+    perfWrap.appendChild(perfRow);
+    panel.appendChild(perfWrap);
+  })();
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
