@@ -9817,6 +9817,34 @@ var EXEC_SCORE_RUBRIC = [
 ];
 var EXEC_SCORE_MAX = 25;
 
+var PERF_SCORE_RUBRIC = [
+  {section:'MENTAL / DISCIPLINE', items:[
+    {key:'p1', label:'Followed the plan — no impulsive deviations', weight:10},
+    {key:'p2', label:'Stayed patient — did not force trades', weight:8},
+    {key:'p3', label:'Managed emotions well (no revenge, no FOMO)', weight:8},
+  ]},
+  {section:'EXECUTION', items:[
+    {key:'p4', label:'Clean entries — systematic, not chased', weight:8},
+    {key:'p5', label:'Clean exits — let trades breathe, did not panic out', weight:8},
+    {key:'p6', label:'Correct sizing throughout', weight:6},
+  ]},
+  {section:'PROCESS', items:[
+    {key:'p7', label:'Reviewed pre-market watchlist / had a plan', weight:6},
+    {key:'p8', label:'Matched or outperformed Val on shared setups', weight:6},
+  ]},
+];
+var PERF_SCORE_MAX = (function(){ var t=0; PERF_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(i){t+=i.weight;});}); return t; })();
+
+function kinfoCalcPerfScore(checks){
+  var total = 0;
+  PERF_SCORE_RUBRIC.forEach(function(sec){
+    sec.items.forEach(function(item){
+      if(checks && checks[item.key]) total += item.weight;
+    });
+  });
+  return Math.round((total / PERF_SCORE_MAX) * 100);
+}
+
 function kinfoCalcExecScore(checks){
   // checks is an object {e1:true, e2:false, ...}
   var total = 0;
@@ -11057,7 +11085,127 @@ function kinfoRenderGrades() {
       monthDiv.appendChild(mTable);
     }
 
-    // Prepend month comparison at top, then insights, then breakdown
+    // ── SECTION 4: WEEK-OVER-WEEK COMPARISON ──
+    var weekDiv = document.createElement('div');
+    weekDiv.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
+    weekDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+      +'<div style="width:3px;height:18px;background:#42a5f5;border-radius:2px;"></div>'
+      +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#42a5f5;">WEEK-OVER-WEEK COMPARISON</div>'
+      +'</div>';
+
+    // Group by ISO week (YYYY-Www)
+    function getISOWeek(dateStr) {
+      var d = new Date(dateStr + 'T12:00:00');
+      var day = d.getDay() || 7;
+      d.setDate(d.getDate() + 4 - day);
+      var yearStart = new Date(d.getFullYear(), 0, 1);
+      var weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return d.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+    }
+    function weekLabel(wk) {
+      // wk = "2025-W03" — find Monday of that week
+      var yr = parseInt(wk.slice(0,4)), wn = parseInt(wk.slice(6));
+      var jan4 = new Date(yr, 0, 4);
+      var monday = new Date(jan4.getTime() + (wn - 1) * 7 * 86400000 - (jan4.getDay()||7 - 1) * 86400000);
+      var friday = new Date(monday.getTime() + 4 * 86400000);
+      var fmt = function(d2){ return d2.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+      return fmt(monday) + ' – ' + fmt(friday);
+    }
+
+    var weekGroups = {};
+    _allForMonth.forEach(function(t) {
+      if (!t.date) return;
+      var wk = getISOWeek(t.date);
+      var g = allGrades[t.key] || {};
+      if (g.disc == null && g.exec == null) return;
+      if (!weekGroups[wk]) weekGroups[wk] = [];
+      weekGroups[wk].push({t:t, g:g, key:t.key});
+    });
+
+    var weeks = Object.keys(weekGroups).sort().slice(-16); // last 16 weeks max
+    if (!weeks.length) {
+      weekDiv.innerHTML += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;">No graded trades found across weeks yet.</div>';
+    } else {
+      var wTable = document.createElement('div');
+      wTable.style.cssText = 'overflow-x:auto;';
+      var wGrid = document.createElement('div');
+      wGrid.style.cssText = 'display:grid;grid-template-columns:130px repeat(3, 1fr) repeat(3, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:560px;';
+
+      var wHdrs = ['WEEK','DISC SEL = 0','% OF TRADES','P&L (R)','SYS EXEC = 0','% OF TRADES','P&L (R)'];
+      var wHdrColors = ['var(--muted)','#f5c518','#f5c518','#f5c518','#90caf9','#90caf9','#90caf9'];
+      wHdrs.forEach(function(h, hi) {
+        var hc = document.createElement('div');
+        hc.style.cssText = 'font-family:var(--mono);font-size:8px;color:'+wHdrColors[hi]+';letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hc.textContent = h;
+        wGrid.appendChild(hc);
+      });
+      var wSubHdrs = ['', 'count', 'of graded', 'total R', 'count', 'of graded', 'total R'];
+      wSubHdrs.forEach(function(h, hi) {
+        var hc = document.createElement('div');
+        hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hc.textContent = h;
+        wGrid.appendChild(hc);
+      });
+
+      weeks.forEach(function(wk, wi) {
+        var wTrades = weekGroups[wk];
+        var total = wTrades.length;
+        var disc0Trades = wTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); });
+        var exec0Trades = wTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); });
+        var disc0 = disc0Trades.length, exec0 = exec0Trades.length;
+        var disc0Pct = total ? Math.round(disc0/total*100) : 0;
+        var exec0Pct = total ? Math.round(exec0/total*100) : 0;
+        function tradeR2(x){ var dayR=tvDayR[x.t.date]; return dayR?(x.t.pnl||0)/dayR:null; }
+        var disc0R = disc0Trades.reduce(function(s,x){ var r=tradeR2(x); return r!=null?s+r:s; }, 0);
+        var exec0R = exec0Trades.reduce(function(s,x){ var r=tradeR2(x); return r!=null?s+r:s; }, 0);
+        var isEven = wi%2===0;
+        var rowBg = isEven ? 'rgba(255,255,255,0.02)' : 'transparent';
+
+        function wCell(txt, col, bg, isFirst) {
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);background:'+bg+';'+(isFirst?'':'border-left:1px solid var(--border);');
+          c.innerHTML = '<div style="font-family:var(--mono);font-size:'+(isFirst?'8px':'14px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+col+';">'+txt+'</div>';
+          return c;
+        }
+        function wCellBar(count, pct, col) {
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+col+';">'+count+'</div>'
+            +'<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">of '+total+'</div>';
+          var bw = document.createElement('div'); bw.style.cssText='height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;';
+          var bf = document.createElement('div'); bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:2px;';
+          bw.appendChild(bf); c.appendChild(bw); return c;
+        }
+        function wCellPct(pct) {
+          var pctCol = pct >= 40 ? '#ef5350' : pct >= 20 ? '#ff9800' : '#4caf50';
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+pctCol+';">'+pct+'%</div>';
+          var bw=document.createElement('div');bw.style.cssText='height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;';
+          var bf=document.createElement('div');bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+pctCol+';border-radius:2px;';
+          bw.appendChild(bf);c.appendChild(bw); return c;
+        }
+        function wCellR(r) {
+          var rCol = r > 0 ? '#4caf50' : r < 0 ? '#ef5350' : 'var(--muted)';
+          var c = document.createElement('div');
+          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
+          c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+rCol+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
+          return c;
+        }
+        wGrid.appendChild(wCell(weekLabel(wk), 'var(--text)', rowBg, true));
+        wGrid.appendChild(wCellBar(disc0, disc0Pct, '#f5c518'));
+        wGrid.appendChild(wCellPct(disc0Pct));
+        wGrid.appendChild(wCellR(disc0R));
+        wGrid.appendChild(wCellBar(exec0, exec0Pct, '#90caf9'));
+        wGrid.appendChild(wCellPct(exec0Pct));
+        wGrid.appendChild(wCellR(exec0R));
+      });
+      wTable.appendChild(wGrid);
+      weekDiv.appendChild(wTable);
+    }
+
+    // Prepend: month + week + insights + breakdown
+    el.insertBefore(weekDiv, el.firstChild);
     el.insertBefore(monthDiv, el.firstChild);
     el.insertBefore(insightDiv, el.firstChild);
     return;
@@ -11825,20 +11973,20 @@ function kinfoOpenDay(date) {
       (db[typeKey]||[]).forEach(function(entry, ei) {
         var tag = document.createElement('div');
         var ec = entry.color||'#ef5350';
-        tag.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding:6px 8px;margin-bottom:4px;border-radius:4px;background:'+ec+'18;border:1px solid '+ec+'55;';
+        tag.style.cssText = 'display:flex;flex-direction:column;gap:2px;padding:4px 7px;margin-bottom:3px;border-radius:4px;background:'+ec+'18;border:1px solid '+ec+'44;';
         // Top row: icon + label + ticker + delete + edit
-        var topRow = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-          +'<span style="font-size:10px;color:'+ec+';">✗</span>'
-          +'<span style="font-size:11px;color:var(--text);">'+entry.label+'</span>'
-          +(entry.ticker?'<span style="font-size:12px;font-weight:bold;color:#f5c518;">'+entry.ticker+'</span>':'')
+        var topRow = '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">'
+          +'<span style="font-size:9px;color:'+ec+';flex-shrink:0;">✗</span>'
+          +'<span style="font-family:var(--mono);font-size:10px;color:var(--text);line-height:1.3;">'+entry.label+'</span>'
+          +(entry.ticker?'<span style="font-family:var(--mono);font-size:10px;font-weight:bold;color:#f5c518;">'+entry.ticker+'</span>':'')
           +'</div>';
         // WHY line
         var whyRow = entry.why
-          ? '<div style="display:flex;gap:5px;padding-left:18px;"><span style="font-size:9px;font-weight:bold;color:'+ec+';opacity:0.7;flex-shrink:0;min-width:26px;">WHY</span><span style="font-size:11px;color:rgba(255,255,255,0.7);font-style:italic;word-break:break-word;">'+entry.why+'</span></div>'
+          ? '<div style="display:flex;gap:4px;padding-left:14px;"><span style="font-family:var(--mono);font-size:8px;font-weight:bold;color:'+ec+';opacity:0.7;flex-shrink:0;min-width:22px;">WHY</span><span style="font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.65);font-style:italic;word-break:break-word;">'+entry.why+'</span></div>'
           : '';
         // FIX line
         var fixRow = entry.fix
-          ? '<div style="display:flex;gap:5px;padding-left:18px;"><span style="font-size:9px;font-weight:bold;color:rgba(38,166,154,0.9);flex-shrink:0;min-width:26px;">FIX</span><span style="font-size:11px;color:rgba(38,166,154,0.85);font-style:italic;word-break:break-word;">'+entry.fix+'</span></div>'
+          ? '<div style="display:flex;gap:4px;padding-left:14px;"><span style="font-family:var(--mono);font-size:8px;font-weight:bold;color:rgba(38,166,154,0.9);flex-shrink:0;min-width:22px;">FIX</span><span style="font-family:var(--mono);font-size:9px;color:rgba(38,166,154,0.8);font-style:italic;word-break:break-word;">'+entry.fix+'</span></div>'
           : '';
         tag.innerHTML = topRow + whyRow + fixRow
           +'<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:2px;">'
@@ -11952,6 +12100,94 @@ function kinfoOpenDay(date) {
   }
 
   panel.appendChild(buildDebrief());
+
+  // ── PERFORMANCE SCORE ──
+  (function(){
+    var perfKey = 'kinfo_perf_' + date;
+    function loadPerf(){ try{ return JSON.parse(localStorage.getItem(perfKey)||'{}'); }catch(e){return {};} }
+    function savePerf(p){ localStorage.setItem(perfKey, JSON.stringify(p)); }
+
+    var perfWrap = document.createElement('div');
+    perfWrap.style.cssText = 'background:var(--surface);border:1px solid rgba(200,169,110,0.3);border-radius:8px;overflow:hidden;margin-bottom:14px;';
+
+    var checks = loadPerf();
+    var curScore = kinfoCalcPerfScore(checks);
+
+    var perfHdr = document.createElement('div');
+    perfHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(200,169,110,0.07);border-bottom:1px solid rgba(200,169,110,0.15);cursor:pointer;user-select:none;';
+
+    var perfLbl = document.createElement('span');
+    perfLbl.style.cssText = 'font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--accent);font-weight:bold;';
+    perfLbl.textContent = 'PERFORMANCE SCORE';
+
+    var perfScoreEl = document.createElement('span');
+    perfScoreEl.id = '_perfScore_' + date;
+    perfScoreEl.style.cssText = 'font-family:var(--display);font-size:20px;font-weight:bold;color:'+(curScore>=80?'#4caf50':curScore>=60?'#ff9800':'#ef5350')+';';
+    perfScoreEl.textContent = curScore + '/100';
+
+    var perfChev = document.createElement('span');
+    perfChev.style.cssText = 'font-size:10px;color:var(--muted);margin-left:8px;';
+    perfChev.textContent = '▼';
+
+    perfHdr.appendChild(perfLbl); perfHdr.appendChild(perfScoreEl); perfHdr.appendChild(perfChev);
+    perfWrap.appendChild(perfHdr);
+
+    var perfBody = document.createElement('div');
+    perfBody.style.cssText = 'padding:0;';
+
+    function renderPerfBody() {
+      perfBody.innerHTML = '';
+      var ch2 = loadPerf();
+
+      PERF_SCORE_RUBRIC.forEach(function(sec) {
+        var secHdr = document.createElement('div');
+        secHdr.style.cssText = 'font-family:var(--mono);font-size:7px;letter-spacing:1px;color:var(--muted);padding:5px 14px 3px;background:rgba(0,0,0,0.2);';
+        secHdr.textContent = sec.section;
+        perfBody.appendChild(secHdr);
+
+        sec.items.forEach(function(item) {
+          var row = document.createElement('label');
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 14px;border-top:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.1s;';
+          row.onmouseover = function(){ this.style.background='rgba(255,255,255,0.03)'; };
+          row.onmouseout  = function(){ this.style.background='transparent'; };
+          var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!ch2[item.key];
+          cb.style.cssText = 'width:12px;height:12px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;';
+          cb.onchange = (function(k){ return function(){
+            var p=loadPerf(); p[k]=this.checked; savePerf(p);
+            var ns=kinfoCalcPerfScore(p);
+            var se=document.getElementById('_perfScore_'+date);
+            if(se){ se.textContent=ns+'/100'; se.style.color=ns>=80?'#4caf50':ns>=60?'#ff9800':'#ef5350'; }
+          }; })(item.key);
+          var lbl = document.createElement('span'); lbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);flex:1;line-height:1.3;'; lbl.textContent=item.label;
+          var wgt = document.createElement('span'); wgt.style.cssText='font-family:var(--mono);font-size:8px;color:rgba(200,169,110,0.5);flex-shrink:0;'; wgt.textContent='+'+item.weight;
+          row.appendChild(cb); row.appendChild(lbl); row.appendChild(wgt);
+          perfBody.appendChild(row);
+        });
+      });
+
+      var totRow = document.createElement('div');
+      totRow.style.cssText='display:flex;justify-content:space-between;padding:6px 14px;background:rgba(0,0,0,0.25);border-top:1px solid rgba(255,255,255,0.06);';
+      var raw2=0; PERF_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(i){if(ch2[i.key])raw2+=i.weight;});});
+      totRow.innerHTML='<span style="font-family:var(--mono);font-size:8px;color:var(--muted);">TOTAL RAW</span>'
+        +'<span style="font-family:var(--mono);font-size:8px;color:var(--accent);font-weight:bold;">'+raw2+'/'+PERF_SCORE_MAX+'</span>';
+      perfBody.appendChild(totRow);
+    }
+
+    renderPerfBody();
+    perfWrap.appendChild(perfBody);
+
+    // Collapsible
+    var _perfOpen = curScore > 0 || true; // default open
+    perfBody.style.display = _perfOpen ? 'block' : 'none';
+    perfChev.textContent = _perfOpen ? '▼' : '▶';
+    perfHdr.onclick = function(){
+      _perfOpen = !_perfOpen;
+      perfBody.style.display = _perfOpen ? 'block' : 'none';
+      perfChev.textContent = _perfOpen ? '▼' : '▶';
+    };
+
+    panel.appendChild(perfWrap);
+  })();
 
   // 3-column grid
   var grid = document.createElement('div');
