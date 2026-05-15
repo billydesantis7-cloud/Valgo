@@ -9818,19 +9818,10 @@ var EXEC_SCORE_RUBRIC = [
 var EXEC_SCORE_MAX = 25;
 
 var PERF_SCORE_RUBRIC = [
-  {section:'MENTAL / DISCIPLINE', items:[
-    {key:'p1', label:'Followed the plan — no impulsive deviations', weight:10},
-    {key:'p2', label:'Stayed patient — did not force trades', weight:8},
-    {key:'p3', label:'Managed emotions well (no revenge, no FOMO)', weight:8},
-  ]},
-  {section:'EXECUTION', items:[
-    {key:'p4', label:'Clean entries — systematic, not chased', weight:8},
-    {key:'p5', label:'Clean exits — let trades breathe, did not panic out', weight:8},
-    {key:'p6', label:'Correct sizing throughout', weight:6},
-  ]},
-  {section:'PROCESS', items:[
-    {key:'p7', label:'Reviewed pre-market watchlist / had a plan', weight:6},
-    {key:'p8', label:'Matched or outperformed Val on shared setups', weight:6},
+  {section:'PERFORMANCE', items:[
+    {key:'p1', label:'Only trade 50+', weight:33},
+    {key:'p2', label:"Didn't miss any 50+", weight:33},
+    {key:'p3', label:'System execution', weight:34},
   ]},
 ];
 var PERF_SCORE_MAX = (function(){ var t=0; PERF_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(i){t+=i.weight;});}); return t; })();
