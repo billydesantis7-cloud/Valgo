@@ -11570,10 +11570,14 @@ function kinfoRenderExecErrors(){
     var col = document.createElement('div');
     col.style.cssText='min-width:0;';
 
+    var _catSortAsc = false; // default: high→low
+
     var colHdr = document.createElement('div');
-    colHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid '+cat.color+'44;';
+    colHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid '+cat.color+'44;cursor:pointer;user-select:none;';
     colHdr.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+cat.color+';display:inline-block;flex-shrink:0;"></span>'
-      +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;color:'+cat.color+';">'+cat.label+'</span>';
+      +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;color:'+cat.color+';">'+cat.label+'</span>'
+      +'<span class="_catSortIcon" style="font-family:var(--mono);font-size:9px;color:'+cat.color+';margin-left:auto;">\u25bc</span>';
+    colHdr.title='Click to toggle sort direction';
     col.appendChild(colHdr);
 
     // Build error map counting duplicates
@@ -11600,13 +11604,19 @@ function kinfoRenderExecErrors(){
       return;
     }
 
-    var maxCount = errMap[sorted[0]].count;
-    // Compact table
-    var tbl = document.createElement('div');
-    tbl.style.cssText='border:1px solid var(--border);border-radius:6px;overflow:hidden;';
-    sorted.forEach(function(err,i){
-      var data = errMap[err];
-      var pct = Math.round(data.count/maxCount*100);
+    function buildCatTable(){
+      var existing = col.querySelector('._catTbl');
+      if(existing) existing.remove();
+      var _sorted = Object.keys(errMap).sort(function(a,b){
+        return _catSortAsc ? errMap[a].count-errMap[b].count : errMap[b].count-errMap[a].count;
+      });
+      var maxCount = _sorted.length ? errMap[_sorted[_catSortAsc?_sorted.length-1:0]].count : 1;
+      var tbl = document.createElement('div');
+      tbl.className = '_catTbl';
+      tbl.style.cssText='border:1px solid var(--border);border-radius:6px;overflow:hidden;';
+      _sorted.forEach(function(err,i){
+        var data = errMap[err];
+        var pct = Math.round(data.count/maxCount*100);
       var row = document.createElement('div');
       row.style.cssText='display:grid;grid-template-columns:26px 1fr 28px;align-items:center;gap:0;border-top:'+(i>0?'1px solid rgba(255,255,255,0.05)':'none')+';cursor:pointer;user-select:none;background:transparent;transition:background 0.1s;';
       row.onmouseover=function(){row.style.background='rgba(255,255,255,0.025)';};
@@ -11676,6 +11686,15 @@ function kinfoRenderExecErrors(){
       tbl.appendChild(expand);
     });
     col.appendChild(tbl);
+    }// end buildCatTable
+
+    colHdr.onclick = function(){
+      _catSortAsc = !_catSortAsc;
+      var icon = colHdr.querySelector('._catSortIcon');
+      if(icon) icon.textContent = _catSortAsc ? '\u25b2' : '\u25bc';
+      buildCatTable();
+    };
+    buildCatTable();
 
     grid.appendChild(col);
   });
@@ -11738,25 +11757,19 @@ function kinfoRenderExecErrors(){
     secHdr.style.cssText='display:flex;align-items:center;gap:8px;padding:12px 16px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;';
     secHdr.innerHTML='<div style="width:3px;height:16px;background:'+color+';border-radius:2px;"></div>'
       +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';">'+title+'</div>'
-      +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">click to expand/collapse</span>'
-      +'<span class="_pChev" style="font-size:11px;color:var(--muted);">\u25bc</span>';
+      +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">click cols to sort</span>'
+      +'<span class="_pChev" style="font-size:11px;color:var(--muted);margin-left:8px;">\u25bc</span>';
     wrap.appendChild(secHdr);
 
     var body=document.createElement('div');
     body.style.cssText='overflow-x:auto;';
 
-    // collect all unique errors across all periods
+    // collect all unique errors
     var allErrors=[];
     periods.forEach(function(p){
       Object.keys(periodMap[p]||{}).forEach(function(err){
         if(allErrors.indexOf(err)<0) allErrors.push(err);
       });
-    });
-    // sort by total count desc
-    allErrors.sort(function(a,b){
-      var sa=periods.reduce(function(s,p){return s+(periodMap[p]&&periodMap[p][a]?periodMap[p][a]:0);},0);
-      var sb=periods.reduce(function(s,p){return s+(periodMap[p]&&periodMap[p][b]?periodMap[p][b]:0);},0);
-      return sb-sa;
     });
 
     if(!allErrors.length){
@@ -11764,48 +11777,74 @@ function kinfoRenderExecErrors(){
       wrap.appendChild(body); return wrap;
     }
 
-    // Table: rows=errors, cols=periods
-    var tbl=document.createElement('div');
-    tbl.style.cssText='display:grid;grid-template-columns:180px repeat('+periods.length+', minmax(70px,1fr));gap:0;min-width:400px;';
+    // Sort state: null = by total, or a period key
+    var _sortCol = null; // null means sort by total across all periods
 
-    // Header row
-    var cornerCell=document.createElement('div');
-    cornerCell.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);padding:7px 10px;background:rgba(0,0,0,0.4);letter-spacing:1px;border-bottom:1px solid var(--border);';
-    cornerCell.textContent='ERROR';
-    tbl.appendChild(cornerCell);
-    periods.forEach(function(p){
-      var ph=document.createElement('div');
-      ph.style.cssText='font-family:var(--mono);font-size:8px;color:'+color+';padding:7px 8px;background:rgba(0,0,0,0.4);text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);letter-spacing:0.5px;';
-      ph.textContent=labelFn(p);
-      tbl.appendChild(ph);
-    });
+    function totalFor(err){
+      return periods.reduce(function(s,p){ return s+(periodMap[p]&&periodMap[p][err]?periodMap[p][err]:0); }, 0);
+    }
 
-    // Data rows
-    allErrors.forEach(function(err,ri){
-      var rowBg=ri%2===0?'rgba(255,255,255,0.015)':'transparent';
-      var errCell=document.createElement('div');
-      errCell.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 10px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-      errCell.title=err;
-      errCell.textContent=err;
-      tbl.appendChild(errCell);
-      periods.forEach(function(p){
-        var cnt=(periodMap[p]&&periodMap[p][err])||0;
-        // find max for this period
-        var pMax=Math.max.apply(null,allErrors.map(function(e){return (periodMap[p]&&periodMap[p][e])||0;}));
-        var cell=document.createElement('div');
-        cell.style.cssText='padding:5px 8px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);text-align:center;';
-        if(cnt>0){
-          var intensity=pMax>0?cnt/pMax:0;
-          var alpha=Math.round(intensity*0.55*100)/100;
-          cell.style.background='rgba('+(color==='#f5c518'?'245,197,24':color==='#42a5f5'?'66,165,245':'66,165,245')+','+alpha+')';
-          cell.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+(cnt===pMax&&cnt>0?color:'var(--text)')+';">'+cnt+'</div>';
-        } else {
-          cell.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.08);">\u2014</div>';
-        }
-        tbl.appendChild(cell);
+    function renderTable(){
+      body.innerHTML='';
+      // Sort errors
+      var sorted = allErrors.slice().sort(function(a,b){
+        var va = _sortCol ? ((periodMap[_sortCol]&&periodMap[_sortCol][a])||0) : totalFor(a);
+        var vb = _sortCol ? ((periodMap[_sortCol]&&periodMap[_sortCol][b])||0) : totalFor(b);
+        return vb - va;
       });
-    });
-    body.appendChild(tbl);
+
+      var tbl=document.createElement('div');
+      tbl.style.cssText='display:grid;grid-template-columns:180px repeat('+periods.length+', minmax(70px,1fr));gap:0;min-width:400px;';
+
+      // Corner header — click to sort by total
+      var cornerCell=document.createElement('div');
+      cornerCell.style.cssText='font-family:var(--mono);font-size:8px;padding:7px 10px;background:rgba(0,0,0,0.4);letter-spacing:1px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px;';
+      cornerCell.innerHTML='<span style="color:'+(_sortCol===null?color:'var(--muted)')+';">ERROR</span>'
+        +'<span style="color:'+(_sortCol===null?color:'rgba(255,255,255,0.2)')+';font-size:9px;">'+(_sortCol===null?'\u25bc':'\u25bd')+'</span>';
+      cornerCell.title='Sort by total count';
+      cornerCell.onclick=function(e){ e.stopPropagation(); _sortCol=null; renderTable(); };
+      tbl.appendChild(cornerCell);
+
+      // Period column headers — click to sort by that period
+      periods.forEach(function(p){
+        var isActive = _sortCol===p;
+        var ph=document.createElement('div');
+        ph.style.cssText='font-family:var(--mono);font-size:8px;padding:7px 8px;background:rgba(0,0,0,0.4);text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);letter-spacing:0.5px;cursor:pointer;user-select:none;';
+        ph.innerHTML='<div style="color:'+(isActive?color:'var(--muted)')+';">'+labelFn(p)+'</div>'
+          +'<div style="color:'+(isActive?color:'rgba(255,255,255,0.15)')+';font-size:9px;margin-top:1px;">'+(isActive?'\u25bc':'\u25bd')+'</div>';
+        ph.title='Sort by this period';
+        ph.onclick=(function(period){ return function(e){ e.stopPropagation(); _sortCol=(_sortCol===period)?null:period; renderTable(); }; })(p);
+        tbl.appendChild(ph);
+      });
+
+      // Data rows
+      sorted.forEach(function(err,ri){
+        var rowBg=ri%2===0?'rgba(255,255,255,0.015)':'transparent';
+        var errCell=document.createElement('div');
+        errCell.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 10px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        errCell.title=err; errCell.textContent=err;
+        tbl.appendChild(errCell);
+
+        periods.forEach(function(p){
+          var cnt=(periodMap[p]&&periodMap[p][err])||0;
+          var pMax=Math.max.apply(null,sorted.map(function(e){return (periodMap[p]&&periodMap[p][e])||0;}));
+          var cell=document.createElement('div');
+          cell.style.cssText='padding:5px 8px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);text-align:center;';
+          if(cnt>0){
+            var intensity=pMax>0?cnt/pMax:0;
+            var alpha=Math.round(intensity*0.55*100)/100;
+            cell.style.background='rgba(66,165,245,'+alpha+')';
+            cell.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+(cnt===pMax&&cnt>0?color:'var(--text)')+';">'+cnt+'</div>';
+          } else {
+            cell.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.08);">\u2014</div>';
+          }
+          tbl.appendChild(cell);
+        });
+      });
+      body.appendChild(tbl);
+    }
+
+    renderTable();
     wrap.appendChild(body);
 
     // collapsible
