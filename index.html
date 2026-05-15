@@ -12111,6 +12111,14 @@ function kinfoRender() {
       }
 
       tbl.appendChild(mkCell(d.slice(5), 'var(--muted)', false));
+      // Make date cell clickable
+      var dateCell = tbl.lastElementChild;
+      dateCell.style.cursor = 'pointer';
+      dateCell.style.color = '#90caf9';
+      dateCell.title = 'Click to open ' + d;
+      dateCell.onmouseover = function(){ dateCell.style.textDecoration='underline'; };
+      dateCell.onmouseout  = function(){ dateCell.style.textDecoration='none'; };
+      dateCell.onclick = (function(ds){ return function(){ kinfoOpenDay(ds); }; })(d);
       tbl.appendChild(mkCell(hasPerfData?perfScore+'/100':'—', perfCol, true));
       tbl.appendChild(mkCell(rHit!==null?(rHit>=0?'+':'')+rHit.toFixed(2)+'R':'—', rHitCol, true));
       tbl.appendChild(mkCell(rPot!==null?'+'+rPot.toFixed(1)+'R pot':'—', rPot?'#f5c518':'var(--muted)', true));
