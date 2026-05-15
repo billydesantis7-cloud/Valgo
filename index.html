@@ -8870,6 +8870,7 @@ function videoShowSetup(){
         <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">EQUITY CURVE</div>
         <div style="position:relative;height:160px;width:100%;"><canvas id="kinfoEquityCurve" style="display:block;"></canvas></div>
       </div>
+      <div id="kinfoPerfTable" style="margin-bottom:16px;"></div>
     </div>
     <!-- ERRORS VIEW -->
     <div id="kinfoErrorsView" style="display:none;">
@@ -12047,6 +12048,79 @@ function kinfoRender() {
     } catch(e){ console.warn('equity curve:', e); }
   }, 100);
 
+  // ── PERF / R SUMMARY TABLE ──────────────────────────────────────────────────
+  setTimeout(function(){
+    var ptEl = document.getElementById('kinfoPerfTable');
+    if(!ptEl) return;
+    ptEl.innerHTML = '';
+
+    // Only show for trading days that have data
+    var ptDays = chartDates.filter(function(d){ return d && kinfoDayPnl(d)!==null; });
+    if(!ptDays.length) return;
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;';
+
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border);';
+    hdr.innerHTML = '<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);">DAILY PERFORMANCE SUMMARY</div>';
+    wrap.appendChild(hdr);
+
+    var tbl = document.createElement('div');
+    tbl.style.cssText = 'display:grid;grid-template-columns:100px 90px 80px 90px 90px;gap:0;overflow-x:auto;';
+
+    // Header row
+    var cols = ['DATE','PERF','R HIT','R POTENTIAL','DIFFERENCE'];
+    var colColors = ['var(--muted)','var(--accent)','#26a69a','#f5c518','#90caf9'];
+    cols.forEach(function(c,i){
+      var h=document.createElement('div');
+      h.style.cssText='font-family:var(--mono);font-size:8px;color:'+colColors[i]+';padding:6px 10px;background:rgba(0,0,0,0.3);letter-spacing:1px;border-bottom:1px solid var(--border);'+(i>0?'border-left:1px solid var(--border);text-align:right;':'');
+      h.textContent=c;
+      tbl.appendChild(h);
+    });
+
+    ptDays.forEach(function(d,ri){
+      var rowBg = ri%2===0?'rgba(255,255,255,0.015)':'transparent';
+
+      // Perf score
+      var perfChecks = {}; try{ perfChecks=JSON.parse(localStorage.getItem('kinfo_perf_'+d)||'{}'); }catch(e){}
+      var perfScore = kinfoCalcPerfScore(perfChecks);
+      var hasPerfData = Object.keys(perfChecks).length > 0;
+
+      // R hit
+      var dayTrades = (typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){return t.date===d;});
+      var dayRVal = typeof tvDayR!=='undefined'?tvDayR[d]:null;
+      var rHit = (dayRVal && dayTrades.length) ? dayTrades.reduce(function(s,t){return s+(t.pnl||0);},0)/dayRVal : null;
+
+      // R potential from ttEntries for this day
+      var dayPlays = (typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){return e.date===d && e.rPotential!=null;});
+      var rPot = dayPlays.length ? dayPlays.reduce(function(s,e){return s+(e.rPotential||0);},0) : null;
+
+      // Diff
+      var diff = (rHit!==null && rPot!==null) ? rHit - rPot : null;
+
+      var perfCol = !hasPerfData?'rgba(255,255,255,0.2)':perfScore>=80?'#4caf50':perfScore>=60?'#ff9800':'#ef5350';
+      var rHitCol = rHit===null?'var(--muted)':rHit>=0?'#26a69a':'#ef5350';
+      var diffCol = diff===null?'var(--muted)':diff>=0?'#4caf50':'#ef5350';
+
+      function mkCell(txt, color, border){
+        var c=document.createElement('div');
+        c.style.cssText='font-family:var(--mono);font-size:10px;color:'+color+';padding:7px 10px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);'+(border?'border-left:1px solid rgba(255,255,255,0.04);text-align:right;':'');
+        c.textContent=txt;
+        return c;
+      }
+
+      tbl.appendChild(mkCell(d.slice(5), 'var(--muted)', false));
+      tbl.appendChild(mkCell(hasPerfData?perfScore+'/100':'—', perfCol, true));
+      tbl.appendChild(mkCell(rHit!==null?(rHit>=0?'+':'')+rHit.toFixed(2)+'R':'—', rHitCol, true));
+      tbl.appendChild(mkCell(rPot!==null?'+'+rPot.toFixed(1)+'R pot':'—', rPot?'#f5c518':'var(--muted)', true));
+      tbl.appendChild(mkCell(diff!==null?(diff>=0?'+':'')+diff.toFixed(2)+'R':'—', diffCol, true));
+    });
+
+    wrap.appendChild(tbl);
+    ptEl.appendChild(wrap);
+  }, 150);
+
   // Draw HTML star overlay
   function _drawKinfoStars() {
     var overlay = document.getElementById('kinfoStarOverlay');
@@ -12540,6 +12614,43 @@ function kinfoOpenDay(date) {
     perfWrap.appendChild(perfRow);
     panel.appendChild(perfWrap);
   })();
+
+  // ── DAY SUMMARY BAR ──────────────────────────────────────────────────────
+  (function(){
+    var dayTrades2 = (typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){return t.date===date;});
+    var dayRVal2 = typeof tvDayR!=='undefined'?tvDayR[date]:null;
+    var rHit2 = (dayRVal2&&dayTrades2.length) ? dayTrades2.reduce(function(s,t){return s+(t.pnl||0);},0)/dayRVal2 : null;
+    var dayPlays2 = (typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){return e.date===date&&e.rPotential!=null;});
+    var rPot2 = dayPlays2.length ? dayPlays2.reduce(function(s,e){return s+(e.rPotential||0);},0) : null;
+    var diff2 = (rHit2!==null&&rPot2!==null) ? rHit2-rPot2 : null;
+    var perfChecks2={}; try{perfChecks2=JSON.parse(localStorage.getItem('kinfo_perf_'+date)||'{}');}catch(e){}
+    var hasPerfData2=Object.keys(perfChecks2).length>0;
+    var perfScore2=kinfoCalcPerfScore(perfChecks2);
+
+    var bar=document.createElement('div');
+    bar.style.cssText='display:flex;align-items:center;gap:0;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:16px;flex-wrap:wrap;';
+
+    function barCell(label, val, valColor){
+      var c=document.createElement('div');
+      c.style.cssText='flex:1;min-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,0.06);';
+      c.innerHTML='<div style="font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">'+label+'</div>'
+        +'<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+valColor+';">'+val+'</div>';
+      return c;
+    }
+
+    var perfCol2=!hasPerfData2?'rgba(255,255,255,0.2)':perfScore2>=80?'#4caf50':perfScore2>=60?'#ff9800':'#ef5350';
+    var rHitCol2=rHit2===null?'var(--muted)':rHit2>=0?'#26a69a':'#ef5350';
+    var diffCol2=diff2===null?'var(--muted)':diff2>=0?'#4caf50':'#ef5350';
+
+    bar.appendChild(barCell('DATE', date.slice(5), 'var(--text)'));
+    bar.appendChild(barCell('PERF SCORE', hasPerfData2?perfScore2+'/100':'—', perfCol2));
+    bar.appendChild(barCell('R HIT', rHit2!==null?(rHit2>=0?'+':'')+rHit2.toFixed(2)+'R':'—', rHitCol2));
+    bar.appendChild(barCell('R POTENTIAL', rPot2!==null?'+'+rPot2.toFixed(1)+'R':'—', rPot2?'#f5c518':'var(--muted)'));
+    bar.appendChild(barCell('DIFFERENCE', diff2!==null?(diff2>=0?'+':'')+diff2.toFixed(2)+'R':'—', diffCol2));
+
+    panel.appendChild(bar);
+  })();
+
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
