@@ -11679,6 +11679,166 @@ function kinfoRenderExecErrors(){
 
     grid.appendChild(col);
   });
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+  function _errGetAllTrades(){
+    var allRaw=[]; try{ allRaw=JSON.parse(localStorage.getItem('tvTrades')||'[]'); }catch(e){}
+    var gr=kinfoLoadGrades();
+    var seen={}; var out=[];
+    allRaw.forEach(function(t){
+      var side=(t.side||'').toLowerCase().indexOf('short')>=0?'short':'long';
+      var key=t.date+'_'+t.symbol+'_'+side;
+      if(!seen[key]){ seen[key]=true; out.push({date:t.date,symbol:t.symbol,side:side,key:key,pnl:0}); }
+    });
+    allRaw.forEach(function(t){
+      var side=(t.side||'').toLowerCase().indexOf('short')>=0?'short':'long';
+      var key=t.date+'_'+t.symbol+'_'+side;
+      var f=out.find(function(x){return x.key===key;});
+      if(f) f.pnl+=(t.pnl||0);
+    });
+    return out.map(function(t){ return Object.assign({},t,{g:gr[t.key]||{}}); });
+  }
+
+  function _errISOWeek(ds){
+    var d=new Date(ds+'T12:00:00'); var day=d.getDay()||7;
+    d.setDate(d.getDate()+4-day);
+    var y0=new Date(d.getFullYear(),0,1);
+    return d.getFullYear()+'-W'+String(Math.ceil((((d-y0)/86400000)+1)/7)).padStart(2,'0');
+  }
+  function _errWeekLabel(wk){
+    var yr=parseInt(wk.slice(0,4)),wn=parseInt(wk.slice(6));
+    var jan4=new Date(yr,0,4);
+    var mon=new Date(jan4.getTime()+(wn-1)*7*86400000-(((jan4.getDay()||7)-1)*86400000));
+    var fri=new Date(mon.getTime()+4*86400000);
+    function f(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+    return f(mon)+' \u2013 '+f(fri);
+  }
+
+  // build per-period error maps across all categories combined
+  function _errBuildPeriodMap(tradeSet, periodFn){
+    var map={};
+    tradeSet.forEach(function(t){
+      var period=periodFn(t.date);
+      if(!map[period]) map[period]={};
+      catDefs.forEach(function(cat){
+        var tags=Array.isArray(t.g[cat.field])?t.g[cat.field]:(t.g[cat.field]?[t.g[cat.field]]:[]);
+        tags.forEach(function(tag){
+          if(!map[period][tag]) map[period][tag]=0;
+          map[period][tag]++;
+        });
+      });
+    });
+    return map;
+  }
+
+  function buildPeriodSection(title, color, periods, periodMap, labelFn){
+    var wrap=document.createElement('div');
+    wrap.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:22px;';
+    var secHdr=document.createElement('div');
+    secHdr.style.cssText='display:flex;align-items:center;gap:8px;padding:12px 16px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;';
+    secHdr.innerHTML='<div style="width:3px;height:16px;background:'+color+';border-radius:2px;"></div>'
+      +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';">'+title+'</div>'
+      +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">click to expand/collapse</span>'
+      +'<span class="_pChev" style="font-size:11px;color:var(--muted);">\u25bc</span>';
+    wrap.appendChild(secHdr);
+
+    var body=document.createElement('div');
+    body.style.cssText='overflow-x:auto;';
+
+    // collect all unique errors across all periods
+    var allErrors=[];
+    periods.forEach(function(p){
+      Object.keys(periodMap[p]||{}).forEach(function(err){
+        if(allErrors.indexOf(err)<0) allErrors.push(err);
+      });
+    });
+    // sort by total count desc
+    allErrors.sort(function(a,b){
+      var sa=periods.reduce(function(s,p){return s+(periodMap[p]&&periodMap[p][a]?periodMap[p][a]:0);},0);
+      var sb=periods.reduce(function(s,p){return s+(periodMap[p]&&periodMap[p][b]?periodMap[p][b]:0);},0);
+      return sb-sa;
+    });
+
+    if(!allErrors.length){
+      body.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:16px;">No errors recorded yet.</div>';
+      wrap.appendChild(body); return wrap;
+    }
+
+    // Table: rows=errors, cols=periods
+    var tbl=document.createElement('div');
+    tbl.style.cssText='display:grid;grid-template-columns:180px repeat('+periods.length+', minmax(70px,1fr));gap:0;min-width:400px;';
+
+    // Header row
+    var cornerCell=document.createElement('div');
+    cornerCell.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);padding:7px 10px;background:rgba(0,0,0,0.4);letter-spacing:1px;border-bottom:1px solid var(--border);';
+    cornerCell.textContent='ERROR';
+    tbl.appendChild(cornerCell);
+    periods.forEach(function(p){
+      var ph=document.createElement('div');
+      ph.style.cssText='font-family:var(--mono);font-size:8px;color:'+color+';padding:7px 8px;background:rgba(0,0,0,0.4);text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);letter-spacing:0.5px;';
+      ph.textContent=labelFn(p);
+      tbl.appendChild(ph);
+    });
+
+    // Data rows
+    allErrors.forEach(function(err,ri){
+      var rowBg=ri%2===0?'rgba(255,255,255,0.015)':'transparent';
+      var errCell=document.createElement('div');
+      errCell.style.cssText='font-family:var(--mono);font-size:10px;color:var(--text);padding:7px 10px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      errCell.title=err;
+      errCell.textContent=err;
+      tbl.appendChild(errCell);
+      periods.forEach(function(p){
+        var cnt=(periodMap[p]&&periodMap[p][err])||0;
+        // find max for this period
+        var pMax=Math.max.apply(null,allErrors.map(function(e){return (periodMap[p]&&periodMap[p][e])||0;}));
+        var cell=document.createElement('div');
+        cell.style.cssText='padding:5px 8px;background:'+rowBg+';border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);text-align:center;';
+        if(cnt>0){
+          var intensity=pMax>0?cnt/pMax:0;
+          var alpha=Math.round(intensity*0.55*100)/100;
+          cell.style.background='rgba('+(color==='#f5c518'?'245,197,24':color==='#42a5f5'?'66,165,245':'66,165,245')+','+alpha+')';
+          cell.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+(cnt===pMax&&cnt>0?color:'var(--text)')+';">'+cnt+'</div>';
+        } else {
+          cell.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.08);">\u2014</div>';
+        }
+        tbl.appendChild(cell);
+      });
+    });
+    body.appendChild(tbl);
+    wrap.appendChild(body);
+
+    // collapsible
+    var open=true;
+    body.style.display='block';
+    secHdr.onclick=function(){
+      open=!open; body.style.display=open?'block':'none';
+      var ch=secHdr.querySelector('._pChev'); if(ch) ch.textContent=open?'\u25bc':'\u25b6';
+    };
+    return wrap;
+  }
+
+  var allTrades=_errGetAllTrades().filter(function(t){ return t.date; });
+
+  // ── MONTH-OVER-MONTH ──
+  var monthMap=_errBuildPeriodMap(allTrades, function(d){return d.slice(0,7);});
+  var months=Object.keys(monthMap).sort();
+  if(months.length){
+    var momSection=buildPeriodSection('MONTH-OVER-MONTH ERROR TRENDS','#42a5f5',months,monthMap,function(mk){
+      return new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'short',year:'2-digit'}).toUpperCase();
+    });
+    el.appendChild(momSection);
+  }
+
+  // ── WEEK-OVER-WEEK ──
+  var weekMap=_errBuildPeriodMap(allTrades, _errISOWeek);
+  var weeks=Object.keys(weekMap).sort().slice(-16); // last 16 weeks
+  if(weeks.length){
+    var wowSection=buildPeriodSection('WEEK-OVER-WEEK ERROR TRENDS','#26a69a',weeks,weekMap,function(wk){
+      return _errWeekLabel(wk);
+    });
+    el.appendChild(wowSection);
+  }
 }
 
 
