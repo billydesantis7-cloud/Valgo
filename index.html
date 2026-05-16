@@ -9796,27 +9796,29 @@ var _gradeReviewTrades = [];
 
 var EXEC_SCORE_RUBRIC = [
   {section:'ENTRY', items:[
-    {key:'e1', label:"Didn't fomo chase", weight:2},
-    {key:'e2', label:"Didn't miss an entry", weight:2},
-    {key:'e3', label:'Systematic', weight:2},
-    {key:'e4', label:'Hit the correct size (not too much or too little)', weight:2},
-    {key:'e5', label:"Didn't hit new lows too early", weight:2},
-    {key:'e6', label:'Not too early', weight:1},
-    {key:'e7', label:'Not forced', weight:1},
+    {key:'e1', label:'Not forced', weight:16},
+    {key:'e2', label:"Didn't fomo chase", weight:11},
+    {key:'e3', label:'Not forced premarket', weight:11},
+    {key:'e4', label:"Didn't miss an entry", weight:10},
+    {key:'e5', label:'Systematic', weight:7},
+    {key:'e6', label:"Didn't hit new lows too early / didn't force new low", weight:7},
+    {key:'e7', label:'Not too early / not too early premarket', weight:5},
+    {key:'e8', label:'Hit the correct size (not too much or too little)', weight:5},
+    {key:'e9', label:'Kept head in the game', weight:4},
   ]},
   {section:'EXIT', items:[
-    {key:'x1', label:'Good % exits (not too much not too little)', weight:4},
-    {key:'x2', label:"Didn't get flat for no reason", weight:3},
-    {key:'x3', label:'Systematic', weight:2},
-    {key:'x4', label:'Not forced out mid range', weight:1},
+    {key:'x1', label:'Good % exits (not too much not too little)', weight:9},
+    {key:'x2', label:"Didn't get flat for no reason", weight:4},
+    {key:'x3', label:'Not forced out mid range', weight:2},
+    {key:'x4', label:'Systematic', weight:1},
   ]},
   {section:'STOP', items:[
-    {key:'s1', label:'Not forced to stop', weight:1},
-    {key:'s2', label:'Not flat for no reason', weight:1},
+    {key:'s1', label:'Not flat for no reason', weight:5},
+    {key:'s2', label:'Not forced to stop', weight:2},
     {key:'s3', label:"Didn't stop out too much %", weight:1},
   ]},
 ];
-var EXEC_SCORE_MAX = 25;
+var EXEC_SCORE_MAX = 100;
 
 var PERF_SCORE_RUBRIC = [
   {section:'PERFORMANCE', items:[
@@ -9845,7 +9847,7 @@ function kinfoCalcExecScore(checks){
       if(checks && checks[item.key]) total += item.weight;
     });
   });
-  return Math.round((total / EXEC_SCORE_MAX) * 100);
+  return total; // max is 100, so raw = /100 score
 }
 
 
@@ -10775,7 +10777,7 @@ function kinfoOpenGradeReview(trades, idx) {
           if(sd){sd.textContent=score+'/100';sd.style.color=score>=80?'#4caf50':score>=60?'#ff9800':'#ef5350';}
           var td=document.getElementById('_execTotalDisplay_'+t.key);
           var raw=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(checks[it.key])raw+=it.weight;});});
-          if(td)td.textContent=raw+'/'+EXEC_SCORE_MAX+'  →  '+score+'/100';
+          if(td)td.textContent=score+'/100';
           kinfoRenderGrades();
         }
 
@@ -10807,7 +10809,7 @@ function kinfoOpenGradeReview(trades, idx) {
         var totLbl=document.createElement('span');totLbl.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);';totLbl.textContent='TOTAL';
         var totVal=document.createElement('span');totVal.id='_execTotalDisplay_'+t.key;
         totVal.style.cssText='font-family:var(--mono);font-size:8px;color:#90caf9;font-weight:bold;';
-        totVal.textContent=raw0+'/'+EXEC_SCORE_MAX+'  →  '+cs0+'/100';
+        totVal.textContent=cs0+'/100';
         totRow.appendChild(totLbl);totRow.appendChild(totVal);
         checkDiv.appendChild(totRow);
         panel.appendChild(checkDiv);
