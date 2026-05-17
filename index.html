@@ -11161,25 +11161,23 @@ function kinfoRenderGrades() {
         } else if (_mSortCol !== null) {
           sorted.sort(function(a,b){ return _mSortAsc ? a[_mSortCol]-b[_mSortCol] : b[_mSortCol]-a[_mSortCol]; });
         }
-        // 13 columns: MONTH | DISC=0 count | DISC=0 % | DISC=0 P&L(R) | DISC=0 P&L($) | DISC=1 count | DISC=1 % | EXEC=0 count | EXEC=0 % | EXEC=0 P&L(R) | EXEC=0 P&L($) | EXEC=1 count | EXEC=1 %
+        // 12 columns: MONTH | DISC=0 count,%, R | DISC=1 count,% | EXEC=0 count,%, R | EXEC=1 count,% | TOTAL R
         var mGrid = document.createElement('div');
         mGrid.style.cssText = 'display:grid;grid-template-columns:120px repeat(3,1fr) repeat(2,1fr) repeat(3,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
 
         var colDefs = [
-          {label:'MONTH',      sub:'',          key:'sortKey', color:'var(--muted)', group:0},
-          {label:'DISC = 0',   sub:'count',     key:'disc0',   color:'#ef5350', group:1},
-          {label:'% TRADES',   sub:'of graded', key:'disc0Pct',color:'#ef5350', group:1},
-          {label:'P&L (DISC=0)',sub:'R',        key:'disc0R',  color:'#ef5350', group:1},
-          {label:'P&L (DISC=0)',sub:'$',        key:'disc0Pnl',color:'#ef5350', group:1},
-          {label:'DISC = 1',   sub:'count',     key:'disc1',   color:'#4caf50', group:2},
-          {label:'% TRADES',   sub:'of graded', key:'disc1Pct',color:'#4caf50', group:2},
-          {label:'EXEC = 0',   sub:'count',     key:'exec0',   color:'#90caf9', group:3},
-          {label:'% TRADES',   sub:'of graded', key:'exec0Pct',color:'#90caf9', group:3},
-          {label:'P&L (EXEC=0)',sub:'R',        key:'exec0R',  color:'#90caf9', group:3},
-          {label:'P&L (EXEC=0)',sub:'$',        key:'exec0Pnl',color:'#90caf9', group:3},
-          {label:'EXEC = 1',   sub:'count',     key:'exec1',   color:'#26a69a', group:4},
-          {label:'% TRADES',   sub:'of graded', key:'exec1Pct',color:'#26a69a', group:4},
-          {label:'TOTAL P&L',  sub:'$',         key:'totalPnl',color:'var(--muted)', group:0},
+          {label:'MONTH',        sub:'',          key:'sortKey', color:'var(--muted)', group:0},
+          {label:'DISC = 0',     sub:'count',     key:'disc0',   color:'#ef5350', group:1},
+          {label:'% TRADES',     sub:'of graded', key:'disc0Pct',color:'#ef5350', group:1},
+          {label:'P&L (DISC=0)', sub:'R',         key:'disc0R',  color:'#ef5350', group:1},
+          {label:'DISC = 1',     sub:'count',     key:'disc1',   color:'#4caf50', group:2},
+          {label:'% TRADES',     sub:'of graded', key:'disc1Pct',color:'#4caf50', group:2},
+          {label:'EXEC = 0',     sub:'count',     key:'exec0',   color:'#90caf9', group:3},
+          {label:'% TRADES',     sub:'of graded', key:'exec0Pct',color:'#90caf9', group:3},
+          {label:'P&L (EXEC=0)', sub:'R',         key:'exec0R',  color:'#90caf9', group:3},
+          {label:'EXEC = 1',     sub:'count',     key:'exec1',   color:'#26a69a', group:4},
+          {label:'% TRADES',     sub:'of graded', key:'exec1Pct',color:'#26a69a', group:4},
+          {label:'TOTAL R',      sub:'R',         key:'totalR',  color:'var(--muted)', group:0},
         ];
         var groupBg = ['','rgba(239,83,80,0.04)','rgba(76,175,80,0.04)','rgba(66,165,245,0.04)','rgba(38,166,154,0.04)',''];
 
@@ -11338,16 +11336,14 @@ function kinfoRenderGrades() {
           {label:'DISC = 0',     sub:'count',     key:'disc0',   color:'#ef5350', group:1},
           {label:'% TRADES',     sub:'of graded', key:'disc0Pct',color:'#ef5350', group:1},
           {label:'P&L (DISC=0)', sub:'R',         key:'disc0R',  color:'#ef5350', group:1},
-          {label:'P&L (DISC=0)', sub:'$',         key:'disc0Pnl',color:'#ef5350', group:1},
           {label:'DISC = 1',     sub:'count',     key:'disc1',   color:'#4caf50', group:2},
           {label:'% TRADES',     sub:'of graded', key:'disc1Pct',color:'#4caf50', group:2},
           {label:'EXEC = 0',     sub:'count',     key:'exec0',   color:'#90caf9', group:3},
           {label:'% TRADES',     sub:'of graded', key:'exec0Pct',color:'#90caf9', group:3},
           {label:'P&L (EXEC=0)', sub:'R',         key:'exec0R',  color:'#90caf9', group:3},
-          {label:'P&L (EXEC=0)', sub:'$',         key:'exec0Pnl',color:'#90caf9', group:3},
           {label:'EXEC = 1',     sub:'count',     key:'exec1',   color:'#26a69a', group:4},
           {label:'% TRADES',     sub:'of graded', key:'exec1Pct',color:'#26a69a', group:4},
-          {label:'TOTAL P&L',    sub:'$',         key:'totalPnl',color:'var(--muted)', group:0},
+          {label:'TOTAL R',      sub:'R',         key:'totalR',  color:'var(--muted)', group:0},
         ];
         var wGrid = document.createElement('div');
         wGrid.style.cssText = 'display:grid;grid-template-columns:140px repeat(3,1fr) repeat(2,1fr) repeat(3,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
