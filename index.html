@@ -8866,11 +8866,6 @@ function videoShowSetup(){
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="position:relative;height:290px;width:100%;"><canvas id="kinfoChart" style="display:block;"></canvas><div id="kinfoStarOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></div></div>
       </div>
-      <div id="kinfoEquityCurveWrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">EQUITY CURVE</div>
-        <div style="position:relative;height:160px;width:100%;"><canvas id="kinfoEquityCurve" style="display:block;"></canvas></div>
-      </div>
-      <div id="kinfoPerfTable" style="margin-bottom:16px;"></div>
     </div>
     <!-- ERRORS VIEW -->
     <div id="kinfoErrorsView" style="display:none;">
@@ -8882,6 +8877,12 @@ function videoShowSetup(){
     </div>
     <!-- DAY PANEL — shown over either view -->
     <div id="kinfoDayPanel" style="display:none;"></div>
+    <!-- EQUITY CURVE + DAILY SUMMARY — always below day panel -->
+    <div id="kinfoEquityCurveWrap" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;margin-bottom:16px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;">EQUITY CURVE</div>
+      <div style="position:relative;height:160px;width:100%;"><canvas id="kinfoEquityCurve" style="display:block;"></canvas></div>
+    </div>
+    <div id="kinfoPerfTable" style="margin-bottom:16px;"></div>
   </div>
 </div>
 
