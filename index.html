@@ -11163,7 +11163,7 @@ function kinfoRenderGrades() {
         }
         // 13 columns: MONTH | DISC=0 count | DISC=0 % | DISC=0 P&L(R) | DISC=0 P&L($) | DISC=1 count | DISC=1 % | EXEC=0 count | EXEC=0 % | EXEC=0 P&L(R) | EXEC=0 P&L($) | EXEC=1 count | EXEC=1 %
         var mGrid = document.createElement('div');
-        mGrid.style.cssText = 'display:grid;grid-template-columns:110px repeat(4,1fr) repeat(2,1fr) repeat(4,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
+        mGrid.style.cssText = 'display:grid;grid-template-columns:120px repeat(3,1fr) repeat(2,1fr) repeat(3,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
 
         var colDefs = [
           {label:'MONTH',      sub:'',          key:'sortKey', color:'var(--muted)', group:0},
@@ -11350,7 +11350,7 @@ function kinfoRenderGrades() {
           {label:'TOTAL P&L',    sub:'$',         key:'totalPnl',color:'var(--muted)', group:0},
         ];
         var wGrid = document.createElement('div');
-        wGrid.style.cssText = 'display:grid;grid-template-columns:130px repeat(4,1fr) repeat(2,1fr) repeat(4,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
+        wGrid.style.cssText = 'display:grid;grid-template-columns:140px repeat(3,1fr) repeat(2,1fr) repeat(3,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
         var groupBg = ['','rgba(239,83,80,0.04)','rgba(76,175,80,0.04)','rgba(66,165,245,0.04)','rgba(38,166,154,0.04)',''];
 
         wColDefs.forEach(function(col,hi){
@@ -11371,8 +11371,8 @@ function kinfoRenderGrades() {
           var rowBg=wi%2===0?'rgba(255,255,255,0.02)':'transparent';
           function cell(txt,color,hi,isFirst){
             var c=document.createElement('div');
-            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);background:'+rowBg+';'+(hi>0?'border-left:1px solid rgba(255,255,255,0.04);':'');
-            c.innerHTML='<div style="font-family:'+(isFirst?'var(--mono)':'var(--display)')+';font-size:'+(isFirst?'8px':'13px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+color+';">'+txt+'</div>';
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);background:'+rowBg+';'+(hi>0?'border-left:1px solid rgba(255,255,255,0.04);':'')+'overflow:hidden;';
+            c.innerHTML='<div style="font-family:'+(isFirst?'var(--mono)':'var(--display)')+';font-size:'+(isFirst?'8px':'13px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+color+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+txt+'</div>';
             return c;
           }
           function cellBar(count,pct,col,hi){
