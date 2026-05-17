@@ -11130,17 +11130,24 @@ function kinfoRenderGrades() {
       var mRows = months.map(function(mk) {
         var mTrades = monthGroups[mk];
         var total = mTrades.length;
-        var disc0Trades = mTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); });
-        var exec0Trades = mTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); });
-        function tradeR(x){ var dayR=tvDayR[x.t.date]; return dayR?(x.t.pnl||0)/dayR:null; }
-        var disc0R = disc0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
-        var exec0R = exec0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
+        function hasGrade(x,field,val){ var v=x.g[field]; return v===val||(Array.isArray(v)&&v.indexOf(val)>=0); }
+        var disc0T = mTrades.filter(function(x){return hasGrade(x,'disc',0);});
+        var disc1T = mTrades.filter(function(x){return hasGrade(x,'disc',1);});
+        var exec0T = mTrades.filter(function(x){return hasGrade(x,'exec',0);});
+        var exec1T = mTrades.filter(function(x){return hasGrade(x,'exec',1);});
+        function tradeR(x){ var dr=tvDayR[x.t.date]; return dr?(x.t.pnl||0)/dr:null; }
+        function sumR(arr){ return arr.reduce(function(s,x){var r=tradeR(x);return r!=null?s+r:s;},0); }
+        function sumPnl(arr){ return arr.reduce(function(s,x){return s+(x.t.pnl||0);},0); }
+        var allPnl = mTrades.reduce(function(s,x){return s+(x.t.pnl||0);},0);
         return {
-          mk: mk,
-          label: new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase(),
-          total: total,
-          disc0: disc0Trades.length, disc0Pct: total?Math.round(disc0Trades.length/total*100):0, disc0R: disc0R,
-          exec0: exec0Trades.length, exec0Pct: total?Math.round(exec0Trades.length/total*100):0, exec0R: exec0R
+          mk:mk, sortKey:mk,
+          label:new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase(),
+          total:total,
+          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T), disc0Pnl:sumPnl(disc0T),
+          disc1:disc1T.length, disc1Pct:total?Math.round(disc1T.length/total*100):0,
+          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T), exec0Pnl:sumPnl(exec0T),
+          exec1:exec1T.length, exec1Pct:total?Math.round(exec1T.length/total*100):0,
+          totalPnl:allPnl
         };
       });
 
@@ -11151,88 +11158,108 @@ function kinfoRenderGrades() {
       function buildMGrid() {
         mTable.innerHTML = '';
         var sorted = mRows.slice();
-        if (_mSortCol !== null) {
+        if (_mSortCol === 'sortKey') {
+          sorted.sort(function(a,b){ return _mSortAsc ? a.sortKey.localeCompare(b.sortKey) : b.sortKey.localeCompare(a.sortKey); });
+        } else if (_mSortCol !== null) {
           sorted.sort(function(a,b){ return _mSortAsc ? a[_mSortCol]-b[_mSortCol] : b[_mSortCol]-a[_mSortCol]; });
         }
+        // 13 columns: MONTH | DISC=0 count | DISC=0 % | DISC=0 P&L(R) | DISC=0 P&L($) | DISC=1 count | DISC=1 % | EXEC=0 count | EXEC=0 % | EXEC=0 P&L(R) | EXEC=0 P&L($) | EXEC=1 count | EXEC=1 %
         var mGrid = document.createElement('div');
-        mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(3, 1fr) repeat(3, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:560px;';
+        mGrid.style.cssText = 'display:grid;grid-template-columns:110px repeat(4,1fr) repeat(2,1fr) repeat(4,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
 
-        // Sortable header builder
         var colDefs = [
-          {label:'MONTH', key:null, color:'var(--muted)'},
-          {label:'DISC SEL = 0', key:'disc0', color:'#f5c518'},
-          {label:'% OF TRADES', key:'disc0Pct', color:'#f5c518'},
-          {label:'P&L (R)', key:'disc0R', color:'#f5c518'},
-          {label:'SYS EXEC = 0', key:'exec0', color:'#90caf9'},
-          {label:'% OF TRADES', key:'exec0Pct', color:'#90caf9'},
-          {label:'P&L (R)', key:'exec0R', color:'#90caf9'},
+          {label:'MONTH',      sub:'',          key:'sortKey', color:'var(--muted)', group:0},
+          {label:'DISC = 0',   sub:'count',     key:'disc0',   color:'#ef5350', group:1},
+          {label:'% TRADES',   sub:'of graded', key:'disc0Pct',color:'#ef5350', group:1},
+          {label:'P&L (DISC=0)',sub:'R',        key:'disc0R',  color:'#ef5350', group:1},
+          {label:'P&L (DISC=0)',sub:'$',        key:'disc0Pnl',color:'#ef5350', group:1},
+          {label:'DISC = 1',   sub:'count',     key:'disc1',   color:'#4caf50', group:2},
+          {label:'% TRADES',   sub:'of graded', key:'disc1Pct',color:'#4caf50', group:2},
+          {label:'EXEC = 0',   sub:'count',     key:'exec0',   color:'#90caf9', group:3},
+          {label:'% TRADES',   sub:'of graded', key:'exec0Pct',color:'#90caf9', group:3},
+          {label:'P&L (EXEC=0)',sub:'R',        key:'exec0R',  color:'#90caf9', group:3},
+          {label:'P&L (EXEC=0)',sub:'$',        key:'exec0Pnl',color:'#90caf9', group:3},
+          {label:'EXEC = 1',   sub:'count',     key:'exec1',   color:'#26a69a', group:4},
+          {label:'% TRADES',   sub:'of graded', key:'exec1Pct',color:'#26a69a', group:4},
+          {label:'TOTAL P&L',  sub:'$',         key:'totalPnl',color:'var(--muted)', group:0},
         ];
-        colDefs.forEach(function(col, hi) {
+        var groupBg = ['','rgba(239,83,80,0.04)','rgba(76,175,80,0.04)','rgba(66,165,245,0.04)','rgba(38,166,154,0.04)',''];
+
+        function mkHdr(col, hi) {
           var hc = document.createElement('div');
-          hc.style.cssText = 'font-family:var(--mono);font-size:8px;letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'')+(col.key?'cursor:pointer;user-select:none;':'');
-          var isActive = _mSortCol === col.key && col.key !== null;
-          hc.innerHTML = '<span style="color:'+(isActive?col.color:'var(--muted)')+';">'+col.label+'</span>'
-            +(col.key ? '<span style="color:'+(isActive?col.color:'rgba(255,255,255,0.2)')+';margin-left:4px;font-size:9px;">'+(isActive?(_mSortAsc?'\u25b2':'\u25bc'):'\u25bd')+'</span>' : '');
-          if (col.key) {
-            hc.onclick = (function(k){ return function(){
-              if (_mSortCol===k) { if (!_mSortAsc) _mSortAsc=true; else { _mSortCol=null; _mSortAsc=false; } }
-              else { _mSortCol=k; _mSortAsc=false; }
-              buildMGrid();
-            }; })(col.key);
-          }
-          mGrid.appendChild(hc);
-        });
-        var subHdrs = ['', 'count', 'of graded', 'total R', 'count', 'of graded', 'total R'];
-        subHdrs.forEach(function(h, hi) {
-          var hc = document.createElement('div');
-          hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
-          hc.textContent = h;
-          mGrid.appendChild(hc);
-        });
+          var isActive = _mSortCol===col.key;
+          var bg = groupBg[col.group]||'';
+          hc.style.cssText='font-family:var(--mono);font-size:8px;letter-spacing:0.5px;padding:6px 8px;background:rgba(0,0,0,0.35);'+(bg?'background:'+bg+';':'')+'border-bottom:1px solid var(--border);cursor:pointer;user-select:none;'+(hi>0?'border-left:1px solid var(--border);':'');
+          hc.innerHTML='<div style="color:'+(isActive?col.color:'rgba(255,255,255,0.4)')+';">'+col.label+'</div>'
+            +'<div style="color:rgba(255,255,255,0.2);font-size:7px;margin-top:1px;">'+col.sub+(col.key?'  '+(isActive?(_mSortAsc?'\u25b2':'\u25bc'):'\u25bd'):'')+'</div>';
+          hc.onclick=(function(k){return function(){
+            if(_mSortCol===k){if(!_mSortAsc)_mSortAsc=true;else{_mSortCol=null;_mSortAsc=false;}}
+            else{_mSortCol=k;_mSortAsc=(k==='sortKey'?false:false);}
+            buildMGrid();
+          };})(col.key);
+          return hc;
+        }
+        colDefs.forEach(function(col,hi){ mGrid.appendChild(mkHdr(col,hi)); });
 
         sorted.forEach(function(row, mi) {
-          var rowBg = mi%2===0 ? 'rgba(255,255,255,0.02)' : 'transparent';
-          function mCell(txt, col, isFirst) {
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:10px;border-top:1px solid var(--border);background:'+rowBg+';'+(isFirst?'':'border-left:1px solid var(--border);');
-            c.innerHTML = '<div style="font-family:var(--mono);font-size:'+(isFirst?'9px':'14px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+col+';">'+txt+'</div>';
+          var rowBg = mi%2===0?'rgba(255,255,255,0.02)':'transparent';
+          function cell(txt,color,hi,isFirst,bold){
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);background:'+rowBg+';'+(hi>0?'border-left:1px solid rgba(255,255,255,0.04);':'');
+            c.innerHTML='<div style="font-family:'+(isFirst?'var(--mono)':'var(--display)')+';font-size:'+(isFirst?'9px':'13px')+';font-weight:'+(bold?'bold':'normal')+';color:'+color+';">'+txt+'</div>';
             return c;
           }
-          function mCellBar(count, pct, col) {
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+col+';">'+count+'</div>'
-              +'<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">of '+row.total+' graded</div>';
-            c.appendChild(fillBar(pct, col));
+          function cellBar(count,pct,col,hi){
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+col+';">'+count+'</div>'
+              +'<div style="font-family:var(--mono);font-size:7px;color:var(--muted);">of '+row.total+'</div>';
+            var bw=document.createElement('div');bw.style.cssText='height:2px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:3px;';
+            var bf=document.createElement('div');bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:1px;';
+            bw.appendChild(bf);c.appendChild(bw);return c;
+          }
+          function cellPct(pct,hi,positiveGood){
+            var pc=positiveGood?(pct>=60?'#4caf50':pct>=30?'#ff9800':'#ef5350'):(pct>=40?'#ef5350':pct>=20?'#ff9800':'#4caf50');
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+pc+';">'+pct+'%</div>';
+            var bw=document.createElement('div');bw.style.cssText='height:2px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:3px;';
+            var bf=document.createElement('div');bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+pc+';border-radius:1px;';
+            bw.appendChild(bf);c.appendChild(bw);return c;
+          }
+          function cellR(r,hi){
+            var rc=r>0?'#4caf50':r<0?'#ef5350':'var(--muted)';
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+rc+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
             return c;
           }
-          function mCellPct(pct) {
-            var pctCol = pct>=40?'#ef5350':pct>=20?'#ff9800':'#4caf50';
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+pctCol+';">'+pct+'%</div>';
-            c.appendChild(fillBar(pct, pctCol));
+          function cellDollar(pnl,hi){
+            var dc=pnl>0?'#4caf50':pnl<0?'#ef5350':'var(--muted)';
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+dc+';">'+(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(0)+'</div>';
             return c;
           }
-          function mCellR(r) {
-            var rCol = r>0?'#4caf50':r<0?'#ef5350':'var(--muted)';
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+rCol+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
-            return c;
-          }
-          mGrid.appendChild(mCell(row.label, 'var(--text)', true));
-          mGrid.appendChild(mCellBar(row.disc0, row.disc0Pct, '#f5c518'));
-          mGrid.appendChild(mCellPct(row.disc0Pct));
-          mGrid.appendChild(mCellR(row.disc0R));
-          mGrid.appendChild(mCellBar(row.exec0, row.exec0Pct, '#90caf9'));
-          mGrid.appendChild(mCellPct(row.exec0Pct));
-          mGrid.appendChild(mCellR(row.exec0R));
+          mGrid.appendChild(cell(row.label,'var(--text)',0,true,false));
+          mGrid.appendChild(cellBar(row.disc0,row.disc0Pct,'#ef5350',1));
+          mGrid.appendChild(cellPct(row.disc0Pct,2,false));
+          mGrid.appendChild(cellR(row.disc0R,3));
+          mGrid.appendChild(cellDollar(row.disc0Pnl,4));
+          mGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',5));
+          mGrid.appendChild(cellPct(row.disc1Pct,6,true));
+          mGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',7));
+          mGrid.appendChild(cellPct(row.exec0Pct,8,false));
+          mGrid.appendChild(cellR(row.exec0R,9));
+          mGrid.appendChild(cellDollar(row.exec0Pnl,10));
+          mGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',11));
+          mGrid.appendChild(cellPct(row.exec1Pct,12,true));
+          mGrid.appendChild(cellDollar(row.totalPnl,13));
         });
         mTable.appendChild(mGrid);
       }
       buildMGrid();
-      monthDiv.innerHTML += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:8px;">click column headers to sort \u25bd</div>';
+      monthDiv.innerHTML += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:8px;">click any column header to sort \u25bd · click MONTH to restore date order</div>';
       monthDiv.appendChild(mTable);
     }
 
@@ -11281,15 +11308,22 @@ function kinfoRenderGrades() {
       var wRows = weeks.map(function(wk) {
         var wTrades = weekGroups[wk];
         var total = wTrades.length;
-        var disc0Trades = wTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); });
-        var exec0Trades = wTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); });
-        function tradeR2(x){ var dayR=tvDayR[x.t.date]; return dayR?(x.t.pnl||0)/dayR:null; }
-        var disc0R = disc0Trades.reduce(function(s,x){ var r=tradeR2(x); return r!=null?s+r:s; }, 0);
-        var exec0R = exec0Trades.reduce(function(s,x){ var r=tradeR2(x); return r!=null?s+r:s; }, 0);
+        function hasGrade(x,field,val){ var v=x.g[field]; return v===val||(Array.isArray(v)&&v.indexOf(val)>=0); }
+        var disc0T = wTrades.filter(function(x){return hasGrade(x,'disc',0);});
+        var disc1T = wTrades.filter(function(x){return hasGrade(x,'disc',1);});
+        var exec0T = wTrades.filter(function(x){return hasGrade(x,'exec',0);});
+        var exec1T = wTrades.filter(function(x){return hasGrade(x,'exec',1);});
+        function tradeR2(x){ var dr=tvDayR[x.t.date]; return dr?(x.t.pnl||0)/dr:null; }
+        function sumR(arr){ return arr.reduce(function(s,x){var r=tradeR2(x);return r!=null?s+r:s;},0); }
+        function sumPnl(arr){ return arr.reduce(function(s,x){return s+(x.t.pnl||0);},0); }
+        var allPnl = wTrades.reduce(function(s,x){return s+(x.t.pnl||0);},0);
         return {
-          wk: wk, label: weekLabel(wk), total: total,
-          disc0: disc0Trades.length, disc0Pct: total?Math.round(disc0Trades.length/total*100):0, disc0R: disc0R,
-          exec0: exec0Trades.length, exec0Pct: total?Math.round(exec0Trades.length/total*100):0, exec0R: exec0R
+          wk:wk, sortKey:wk, label:weekLabel(wk), total:total,
+          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T), disc0Pnl:sumPnl(disc0T),
+          disc1:disc1T.length, disc1Pct:total?Math.round(disc1T.length/total*100):0,
+          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T), exec0Pnl:sumPnl(exec0T),
+          exec1:exec1T.length, exec1Pct:total?Math.round(exec1T.length/total*100):0,
+          totalPnl:allPnl
         };
       });
 
@@ -11300,89 +11334,104 @@ function kinfoRenderGrades() {
       function buildWGrid() {
         wTable.innerHTML = '';
         var sorted = wRows.slice();
-        if (_wSortCol !== null) {
+        if (_wSortCol === 'sortKey') {
+          sorted.sort(function(a,b){ return _wSortAsc ? a.sortKey.localeCompare(b.sortKey) : b.sortKey.localeCompare(a.sortKey); });
+        } else if (_wSortCol !== null) {
           sorted.sort(function(a,b){ return _wSortAsc ? a[_wSortCol]-b[_wSortCol] : b[_wSortCol]-a[_wSortCol]; });
         }
-        var wGrid = document.createElement('div');
-        wGrid.style.cssText = 'display:grid;grid-template-columns:130px repeat(3, 1fr) repeat(3, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:560px;';
-
-        var colDefs = [
-          {label:'WEEK', key:null, color:'var(--muted)'},
-          {label:'DISC SEL = 0', key:'disc0', color:'#f5c518'},
-          {label:'% OF TRADES', key:'disc0Pct', color:'#f5c518'},
-          {label:'P&L (R)', key:'disc0R', color:'#f5c518'},
-          {label:'SYS EXEC = 0', key:'exec0', color:'#90caf9'},
-          {label:'% OF TRADES', key:'exec0Pct', color:'#90caf9'},
-          {label:'P&L (R)', key:'exec0R', color:'#90caf9'},
+        var wColDefs = [
+          {label:'WEEK',         sub:'',          key:'sortKey', color:'var(--muted)', group:0},
+          {label:'DISC = 0',     sub:'count',     key:'disc0',   color:'#ef5350', group:1},
+          {label:'% TRADES',     sub:'of graded', key:'disc0Pct',color:'#ef5350', group:1},
+          {label:'P&L (DISC=0)', sub:'R',         key:'disc0R',  color:'#ef5350', group:1},
+          {label:'P&L (DISC=0)', sub:'$',         key:'disc0Pnl',color:'#ef5350', group:1},
+          {label:'DISC = 1',     sub:'count',     key:'disc1',   color:'#4caf50', group:2},
+          {label:'% TRADES',     sub:'of graded', key:'disc1Pct',color:'#4caf50', group:2},
+          {label:'EXEC = 0',     sub:'count',     key:'exec0',   color:'#90caf9', group:3},
+          {label:'% TRADES',     sub:'of graded', key:'exec0Pct',color:'#90caf9', group:3},
+          {label:'P&L (EXEC=0)', sub:'R',         key:'exec0R',  color:'#90caf9', group:3},
+          {label:'P&L (EXEC=0)', sub:'$',         key:'exec0Pnl',color:'#90caf9', group:3},
+          {label:'EXEC = 1',     sub:'count',     key:'exec1',   color:'#26a69a', group:4},
+          {label:'% TRADES',     sub:'of graded', key:'exec1Pct',color:'#26a69a', group:4},
+          {label:'TOTAL P&L',    sub:'$',         key:'totalPnl',color:'var(--muted)', group:0},
         ];
-        colDefs.forEach(function(col, hi) {
-          var hc = document.createElement('div');
-          hc.style.cssText = 'font-family:var(--mono);font-size:8px;letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'')+(col.key?'cursor:pointer;user-select:none;':'');
-          var isActive = _wSortCol===col.key && col.key!==null;
-          hc.innerHTML = '<span style="color:'+(isActive?col.color:'var(--muted)')+';">'+col.label+'</span>'
-            +(col.key?'<span style="color:'+(isActive?col.color:'rgba(255,255,255,0.2)')+';margin-left:4px;font-size:9px;">'+(isActive?(_wSortAsc?'\u25b2':'\u25bc'):'\u25bd')+'</span>':'');
-          if (col.key) {
-            hc.onclick = (function(k){ return function(){
-              if (_wSortCol===k){ if(!_wSortAsc) _wSortAsc=true; else { _wSortCol=null; _wSortAsc=false; } }
-              else { _wSortCol=k; _wSortAsc=false; }
-              buildWGrid();
-            }; })(col.key);
-          }
-          wGrid.appendChild(hc);
-        });
-        var wSubHdrs = ['', 'count', 'of graded', 'total R', 'count', 'of graded', 'total R'];
-        wSubHdrs.forEach(function(h, hi) {
-          var hc = document.createElement('div');
-          hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
-          hc.textContent = h;
+        var wGrid = document.createElement('div');
+        wGrid.style.cssText = 'display:grid;grid-template-columns:130px repeat(4,1fr) repeat(2,1fr) repeat(4,1fr) repeat(2,1fr) 80px;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:900px;';
+        var groupBg = ['','rgba(239,83,80,0.04)','rgba(76,175,80,0.04)','rgba(66,165,245,0.04)','rgba(38,166,154,0.04)',''];
+
+        wColDefs.forEach(function(col,hi){
+          var isActive=_wSortCol===col.key;
+          var hc=document.createElement('div');
+          hc.style.cssText='font-family:var(--mono);font-size:8px;letter-spacing:0.5px;padding:6px 8px;background:'+(groupBg[col.group]||'rgba(0,0,0,0.35)')+';border-bottom:1px solid var(--border);cursor:pointer;user-select:none;'+(hi>0?'border-left:1px solid var(--border);':'');
+          hc.innerHTML='<div style="color:'+(isActive?col.color:'rgba(255,255,255,0.4)')+';">'+col.label+'</div>'
+            +'<div style="color:rgba(255,255,255,0.2);font-size:7px;margin-top:1px;">'+col.sub+'  '+(isActive?(_wSortAsc?'\u25b2':'\u25bc'):'\u25bd')+'</div>';
+          hc.onclick=(function(k){return function(){
+            if(_wSortCol===k){if(!_wSortAsc)_wSortAsc=true;else{_wSortCol=null;_wSortAsc=false;}}
+            else{_wSortCol=k;_wSortAsc=false;}
+            buildWGrid();
+          };})(col.key);
           wGrid.appendChild(hc);
         });
 
-        sorted.forEach(function(row, wi) {
-          var rowBg = wi%2===0 ? 'rgba(255,255,255,0.02)' : 'transparent';
-          function wCell(txt, col, isFirst) {
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);background:'+rowBg+';'+(isFirst?'':'border-left:1px solid var(--border);');
-            c.innerHTML = '<div style="font-family:var(--mono);font-size:'+(isFirst?'8px':'14px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+col+';">'+txt+'</div>';
+        sorted.forEach(function(row,wi){
+          var rowBg=wi%2===0?'rgba(255,255,255,0.02)':'transparent';
+          function cell(txt,color,hi,isFirst){
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);background:'+rowBg+';'+(hi>0?'border-left:1px solid rgba(255,255,255,0.04);':'');
+            c.innerHTML='<div style="font-family:'+(isFirst?'var(--mono)':'var(--display)')+';font-size:'+(isFirst?'8px':'13px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+color+';">'+txt+'</div>';
             return c;
           }
-          function wCellBar(count, pct, col) {
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+col+';">'+count+'</div>'
-              +'<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">of '+row.total+'</div>';
-            var bw=document.createElement('div'); bw.style.cssText='height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;';
-            var bf=document.createElement('div'); bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:2px;';
-            bw.appendChild(bf); c.appendChild(bw); return c;
+          function cellBar(count,pct,col,hi){
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+col+';">'+count+'</div>'
+              +'<div style="font-family:var(--mono);font-size:7px;color:var(--muted);">of '+row.total+'</div>';
+            var bw=document.createElement('div');bw.style.cssText='height:2px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:3px;';
+            var bf=document.createElement('div');bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:1px;';
+            bw.appendChild(bf);c.appendChild(bw);return c;
           }
-          function wCellPct(pct) {
-            var pctCol = pct>=40?'#ef5350':pct>=20?'#ff9800':'#4caf50';
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+pctCol+';">'+pct+'%</div>';
-            var bw=document.createElement('div'); bw.style.cssText='height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;';
-            var bf=document.createElement('div'); bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+pctCol+';border-radius:2px;';
-            bw.appendChild(bf); c.appendChild(bw); return c;
+          function cellPct(pct,hi,positiveGood){
+            var pc=positiveGood?(pct>=60?'#4caf50':pct>=30?'#ff9800':'#ef5350'):(pct>=40?'#ef5350':pct>=20?'#ff9800':'#4caf50');
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+pc+';">'+pct+'%</div>';
+            var bw=document.createElement('div');bw.style.cssText='height:2px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:3px;';
+            var bf=document.createElement('div');bf.style.cssText='height:100%;width:'+Math.max(2,pct)+'%;background:'+pc+';border-radius:1px;';
+            bw.appendChild(bf);c.appendChild(bw);return c;
           }
-          function wCellR(r) {
-            var rCol = r>0?'#4caf50':r<0?'#ef5350':'var(--muted)';
-            var c = document.createElement('div');
-            c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-            c.innerHTML = '<div style="font-family:var(--display);font-size:15px;font-weight:bold;color:'+rCol+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
+          function cellR(r,hi){
+            var rc=r>0?'#4caf50':r<0?'#ef5350':'var(--muted)';
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+rc+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
             return c;
           }
-          wGrid.appendChild(wCell(row.label, 'var(--text)', true));
-          wGrid.appendChild(wCellBar(row.disc0, row.disc0Pct, '#f5c518'));
-          wGrid.appendChild(wCellPct(row.disc0Pct));
-          wGrid.appendChild(wCellR(row.disc0R));
-          wGrid.appendChild(wCellBar(row.exec0, row.exec0Pct, '#90caf9'));
-          wGrid.appendChild(wCellPct(row.exec0Pct));
-          wGrid.appendChild(wCellR(row.exec0R));
+          function cellDollar(pnl,hi){
+            var dc=pnl>0?'#4caf50':pnl<0?'#ef5350':'var(--muted)';
+            var c=document.createElement('div');
+            c.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.04);border-left:1px solid rgba(255,255,255,0.04);background:'+rowBg+';';
+            c.innerHTML='<div style="font-family:var(--display);font-size:13px;font-weight:bold;color:'+dc+';">'+(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(0)+'</div>';
+            return c;
+          }
+          wGrid.appendChild(cell(row.label,'var(--text)',0,true));
+          wGrid.appendChild(cellBar(row.disc0,row.disc0Pct,'#ef5350',1));
+          wGrid.appendChild(cellPct(row.disc0Pct,2,false));
+          wGrid.appendChild(cellR(row.disc0R,3));
+          wGrid.appendChild(cellDollar(row.disc0Pnl,4));
+          wGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',5));
+          wGrid.appendChild(cellPct(row.disc1Pct,6,true));
+          wGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',7));
+          wGrid.appendChild(cellPct(row.exec0Pct,8,false));
+          wGrid.appendChild(cellR(row.exec0R,9));
+          wGrid.appendChild(cellDollar(row.exec0Pnl,10));
+          wGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',11));
+          wGrid.appendChild(cellPct(row.exec1Pct,12,true));
+          wGrid.appendChild(cellDollar(row.totalPnl,13));
         });
         wTable.appendChild(wGrid);
       }
       buildWGrid();
-      weekDiv.innerHTML += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:8px;">click column headers to sort \u25bd</div>';
+      weekDiv.innerHTML += '<div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-bottom:8px;">click any column header to sort \u25bd · click WEEK to restore date order</div>';
       weekDiv.appendChild(wTable);
     }
 
