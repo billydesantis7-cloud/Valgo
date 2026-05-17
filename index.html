@@ -11137,17 +11137,15 @@ function kinfoRenderGrades() {
         var exec1T = mTrades.filter(function(x){return hasGrade(x,'exec',1);});
         function tradeR(x){ var dr=tvDayR[x.t.date]; return dr?(x.t.pnl||0)/dr:null; }
         function sumR(arr){ return arr.reduce(function(s,x){var r=tradeR(x);return r!=null?s+r:s;},0); }
-        function sumPnl(arr){ return arr.reduce(function(s,x){return s+(x.t.pnl||0);},0); }
-        var allPnl = mTrades.reduce(function(s,x){return s+(x.t.pnl||0);},0);
         return {
           mk:mk, sortKey:mk,
           label:new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase(),
           total:total,
-          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T), disc0Pnl:sumPnl(disc0T),
+          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T),
           disc1:disc1T.length, disc1Pct:total?Math.round(disc1T.length/total*100):0,
-          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T), exec0Pnl:sumPnl(exec0T),
+          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T),
           exec1:exec1T.length, exec1Pct:total?Math.round(exec1T.length/total*100):0,
-          totalPnl:allPnl
+          totalR:sumR(mTrades)
         };
       });
 
@@ -11245,16 +11243,14 @@ function kinfoRenderGrades() {
           mGrid.appendChild(cellBar(row.disc0,row.disc0Pct,'#ef5350',1));
           mGrid.appendChild(cellPct(row.disc0Pct,2,false));
           mGrid.appendChild(cellR(row.disc0R,3));
-          mGrid.appendChild(cellDollar(row.disc0Pnl,4));
-          mGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',5));
-          mGrid.appendChild(cellPct(row.disc1Pct,6,true));
-          mGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',7));
-          mGrid.appendChild(cellPct(row.exec0Pct,8,false));
-          mGrid.appendChild(cellR(row.exec0R,9));
-          mGrid.appendChild(cellDollar(row.exec0Pnl,10));
-          mGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',11));
-          mGrid.appendChild(cellPct(row.exec1Pct,12,true));
-          mGrid.appendChild(cellDollar(row.totalPnl,13));
+          mGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',4));
+          mGrid.appendChild(cellPct(row.disc1Pct,5,true));
+          mGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',6));
+          mGrid.appendChild(cellPct(row.exec0Pct,7,false));
+          mGrid.appendChild(cellR(row.exec0R,8));
+          mGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',9));
+          mGrid.appendChild(cellPct(row.exec1Pct,10,true));
+          mGrid.appendChild(cellR(row.totalR,11));
         });
         mTable.appendChild(mGrid);
       }
@@ -11315,15 +11311,13 @@ function kinfoRenderGrades() {
         var exec1T = wTrades.filter(function(x){return hasGrade(x,'exec',1);});
         function tradeR2(x){ var dr=tvDayR[x.t.date]; return dr?(x.t.pnl||0)/dr:null; }
         function sumR(arr){ return arr.reduce(function(s,x){var r=tradeR2(x);return r!=null?s+r:s;},0); }
-        function sumPnl(arr){ return arr.reduce(function(s,x){return s+(x.t.pnl||0);},0); }
-        var allPnl = wTrades.reduce(function(s,x){return s+(x.t.pnl||0);},0);
         return {
           wk:wk, sortKey:wk, label:weekLabel(wk), total:total,
-          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T), disc0Pnl:sumPnl(disc0T),
+          disc0:disc0T.length, disc0Pct:total?Math.round(disc0T.length/total*100):0, disc0R:sumR(disc0T),
           disc1:disc1T.length, disc1Pct:total?Math.round(disc1T.length/total*100):0,
-          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T), exec0Pnl:sumPnl(exec0T),
+          exec0:exec0T.length, exec0Pct:total?Math.round(exec0T.length/total*100):0, exec0R:sumR(exec0T),
           exec1:exec1T.length, exec1Pct:total?Math.round(exec1T.length/total*100):0,
-          totalPnl:allPnl
+          totalR:sumR(wTrades)
         };
       });
 
@@ -11417,16 +11411,14 @@ function kinfoRenderGrades() {
           wGrid.appendChild(cellBar(row.disc0,row.disc0Pct,'#ef5350',1));
           wGrid.appendChild(cellPct(row.disc0Pct,2,false));
           wGrid.appendChild(cellR(row.disc0R,3));
-          wGrid.appendChild(cellDollar(row.disc0Pnl,4));
-          wGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',5));
-          wGrid.appendChild(cellPct(row.disc1Pct,6,true));
-          wGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',7));
-          wGrid.appendChild(cellPct(row.exec0Pct,8,false));
-          wGrid.appendChild(cellR(row.exec0R,9));
-          wGrid.appendChild(cellDollar(row.exec0Pnl,10));
-          wGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',11));
-          wGrid.appendChild(cellPct(row.exec1Pct,12,true));
-          wGrid.appendChild(cellDollar(row.totalPnl,13));
+          wGrid.appendChild(cellBar(row.disc1,row.disc1Pct,'#4caf50',4));
+          wGrid.appendChild(cellPct(row.disc1Pct,5,true));
+          wGrid.appendChild(cellBar(row.exec0,row.exec0Pct,'#90caf9',6));
+          wGrid.appendChild(cellPct(row.exec0Pct,7,false));
+          wGrid.appendChild(cellR(row.exec0R,8));
+          wGrid.appendChild(cellBar(row.exec1,row.exec1Pct,'#26a69a',9));
+          wGrid.appendChild(cellPct(row.exec1Pct,10,true));
+          wGrid.appendChild(cellR(row.totalR,11));
         });
         wTable.appendChild(wGrid);
       }
