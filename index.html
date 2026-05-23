@@ -9084,7 +9084,7 @@ function ttShowWhyPage(){
     tableWrap.style.cssText='border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);';
 
     var hdrHtml='<div style="display:grid;'+WM_COL+';gap:0;background:rgba(0,0,0,0.6);padding:4px 8px;">';
-    ['DATE','TICKER','EDG','NOTES','BT','VT','WHY MISSED','WHERE WAS IT ON RADAR FROM','DID VAL BASICALLY ALERT IT'].forEach(function(l,i){
+    ['DATE','TICKER','EDG','NOTES','BT','VT','WHY I MISSED','WHERE WAS IT ON RADAR FROM','DID VAL BASICALLY ALERT IT'].forEach(function(l,i){
       hdrHtml+='<span style="font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;'+(i>=4&&i<=5?'text-align:center;':'')+'">'  +l+'</span>';
     });
     hdrHtml+='</div>';
@@ -9111,7 +9111,7 @@ function ttShowWhyPage(){
       var whyCell=document.createElement('span');
       whyCell.style.cssText='cursor:pointer;display:block;padding:0 2px;line-height:1.4;';
       var whyTags=ttGetWhyTags(e.id);
-      whyCell.innerHTML=whyTags.length?whyTags.map(function(t){return '<span style="display:inline-block;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:2px;padding:0 3px;margin:1px;font-size:7px;color:#fff;">'+t+'</span>';}).join(''):'<span style="color:rgba(255,255,255,0.2);font-size:8px;">+ why</span>';
+      whyCell.innerHTML=whyTags.length?whyTags.map(function(t){return '<span style="display:inline-block;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:2px;padding:0 3px;margin:1px;font-size:7px;color:#fff;">'+t+'</span>';}).join(''):'<span style="color:rgba(255,255,255,0.55);font-size:8px;border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:1px 5px;">+ why</span>';
       whyCell.onclick=(function(cell,id){ return function(e){ e.stopPropagation(); ttShowWhyInput(cell,id); }; })(whyCell,e.id);
       row.appendChild(whyCell);
 
@@ -9136,8 +9136,8 @@ function ttShowWhyPage(){
 
     function renderCell(){
       cell.innerHTML=tags.length?tags.map(function(t){
-        return '<span style="display:inline-block;background:rgba('+hexToRgb(color)+',0.12);border:1px solid rgba('+hexToRgb(color)+',0.35);border-radius:2px;padding:0 3px;margin:1px;font-size:7px;color:'+color+';">'+t+'</span>';
-      }).join(''):'<span style="color:rgba(255,255,255,0.2);font-size:8px;">+ tag</span>';
+        return '<span style="display:inline-block;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:2px;padding:0 3px;margin:1px;font-size:7px;color:#fff;">'+t+'</span>';
+      }).join(''):'<span style="color:rgba(255,255,255,0.55);font-size:8px;border:1px solid rgba(255,255,255,0.2);border-radius:3px;padding:1px 5px;">+ tag</span>';
     }
 
     cell.onclick=function(ev){
@@ -9159,7 +9159,7 @@ function ttShowWhyPage(){
           var chips=document.createElement('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;';
           tags.forEach(function(tag,i){
             var chip=document.createElement('span');
-            chip.style.cssText='display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;background:rgba('+hexToRgb(color)+',0.15);border:1px solid rgba('+hexToRgb(color)+',0.4);color:'+color+';padding:2px 5px;border-radius:3px;';
+            chip.style.cssText='display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:2px 5px;border-radius:3px;';
             var t=document.createElement('span'); t.textContent=tag; chip.appendChild(t);
             var x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;opacity:0.7;';
             x.onmousedown=(function(ii){return function(e){e.preventDefault();tags.splice(ii,1);saveFn(id,tags.length?tags:null);renderCell();renderPopup();};})(i);
