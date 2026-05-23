@@ -8978,7 +8978,7 @@ function ttShowWhyPage(){
   page.id='_ttWhyPage';
   page.style.cssText='position:fixed;inset:0;z-index:9998;background:#0a0d12;overflow-y:auto;padding:20px;';
 
-  var _wmMinEdge=50, _wmRange='all', _wmFrom='', _wmTo='';
+  var _wmMinEdge=50, _wmRange='all', _wmFrom='', _wmTo='', _wmView='list';
 
   function getFilteredEntries(){
     var now=new Date(), from=null;
@@ -9076,9 +9076,25 @@ function ttShowWhyPage(){
       clearBtn.textContent='✕'; clearBtn.onclick=function(){ _wmFrom=''; _wmTo=''; _wmRange='all'; buildPage(); };
       filterBar.appendChild(clearBtn);
     }
-    wrap.appendChild(filterBar);
+    // LIST / GRID toggle
+    var toggleBar=document.createElement('div');
+    toggleBar.style.cssText='display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:14px;';
+    ['LIST','GRID'].forEach(function(v){
+      var btn=document.createElement('button');
+      var active=_wmView===v.toLowerCase();
+      btn.style.cssText='font-family:var(--mono);font-size:10px;padding:5px 16px;border:none;cursor:pointer;letter-spacing:1px;background:'+(active?'var(--accent)':'transparent')+';color:'+(active?'var(--bg)':'var(--muted)')+';';
+      btn.textContent=v;
+      btn.onclick=(function(vv){ return function(){ _wmView=vv; buildPage(); }; })(v.toLowerCase());
+      toggleBar.appendChild(btn);
+    });
+    wrap.appendChild(toggleBar);
 
-    // Table
+    if(_wmView==='grid'){
+      buildGridView(wrap, allEntries);
+      return;
+    }
+
+    // Table (LIST view)
     var WM_COL='grid-template-columns:38px 56px 26px 1fr 28px 28px 90px 120px 120px';
     var tableWrap=document.createElement('div');
     tableWrap.style.cssText='border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);';
@@ -9129,6 +9145,144 @@ function ttShowWhyPage(){
     wrap.appendChild(tableWrap);
   }
 
+  function buildGridView(wrap, entries){
+    // Helper: get week key and month key
+    function weekOf(d){ var dt=new Date(d+'T12:00:00'), day=dt.getDay(), diff=day===0?-6:1-day; dt.setDate(dt.getDate()+diff); return dt.toISOString().slice(0,10); }
+    function monthOf(d){ return d?d.slice(0,7):''; }
+
+    // Build tag frequency maps with week/month breakdowns
+    function buildTagStats(getTagsFn){
+      var total={}, byWeek={}, byMonth={};
+      entries.forEach(function(e){
+        var tags=getTagsFn(e.id);
+        var wk=weekOf(e.date), mo=monthOf(e.date);
+        tags.forEach(function(t){
+          total[t]=(total[t]||0)+1;
+          if(!byWeek[t]) byWeek[t]={};
+          byWeek[t][wk]=(byWeek[t][wk]||0)+1;
+          if(!byMonth[t]) byMonth[t]={};
+          byMonth[t][mo]=(byMonth[t][mo]||0)+1;
+        });
+      });
+      return {total:total,byWeek:byWeek,byMonth:byMonth};
+    }
+
+    // Get recent weeks/months for trend columns
+    var allWeeks=[],allMonths=[];
+    entries.forEach(function(e){
+      var wk=weekOf(e.date),mo=monthOf(e.date);
+      if(allWeeks.indexOf(wk)<0) allWeeks.push(wk);
+      if(allMonths.indexOf(mo)<0) allMonths.push(mo);
+    });
+    allWeeks.sort(); allMonths.sort();
+    var recentWeeks=allWeeks.slice(-4), recentMonths=allMonths.slice(-3);
+
+    var sections=[
+      {label:'WHY I MISSED', color:'#fff', getTagsFn:function(id){ return ttGetWhyTags(id); }},
+      {label:'WHERE WAS IT ON RADAR FROM', color:'#90caf9', getTagsFn:function(id){ var v=ttRadarData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
+      {label:'DID VAL BASICALLY ALERT IT', color:'#4caf50', getTagsFn:function(id){ var v=ttValData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
+    ];
+
+    sections.forEach(function(sec){
+      var stats=buildTagStats(sec.getTagsFn);
+      var sorted=Object.keys(stats.total).sort(function(a,b){ return stats.total[b]-stats.total[a]; });
+      var totalTagged=entries.filter(function(e){ return sec.getTagsFn(e.id).length>0; }).length;
+
+      var secDiv=document.createElement('div');
+      secDiv.style.cssText='margin-bottom:28px;';
+
+      var secHdr=document.createElement('div');
+      secHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid rgba(255,255,255,0.08);';
+      secHdr.innerHTML='<span style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+sec.color+';">'+sec.label+'</span>'
+        +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique tags · '+totalTagged+' / '+entries.length+' trades tagged ('+(entries.length?Math.round(totalTagged/entries.length*100):0)+'%)</span>';
+      secDiv.appendChild(secHdr);
+
+      if(!sorted.length){
+        var empty=document.createElement('div');
+        empty.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);padding:10px 0;';
+        empty.textContent='No tags recorded yet.';
+        secDiv.appendChild(empty);
+        wrap.appendChild(secDiv);
+        return;
+      }
+
+      sorted.forEach(function(tag,ti){
+        var card=document.createElement('div');
+        card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+sec.color+';border-radius:8px;margin-bottom:8px;overflow:hidden;';
+
+        var cardHdr=document.createElement('div');
+        cardHdr.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;';
+        var pct=entries.length?Math.round(stats.total[tag]/entries.length*100):0;
+        cardHdr.innerHTML='<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:'+sec.color+';">#'+(ti+1)+'</span>'
+          +'<span style="font-family:var(--mono);font-size:11px;font-weight:bold;color:#fff;flex:1;">'+tag+'</span>'
+          +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+stats.total[tag]+'× &nbsp; '+pct+'% of trades</span>'
+          +'<span class="_wmChevron" style="color:var(--muted);font-size:10px;margin-left:6px;">▶</span>';
+
+        // Bar
+        var barWrap=document.createElement('div');
+        barWrap.style.cssText='height:3px;background:rgba(255,255,255,0.06);margin:0 14px 8px;border-radius:2px;';
+        var barFill=document.createElement('div');
+        barFill.style.cssText='height:100%;width:'+Math.round(stats.total[tag]/stats.total[sorted[0]]*100)+'%;background:'+sec.color+';border-radius:2px;';
+        barWrap.appendChild(barFill);
+
+        // Trend row
+        var trendRow=document.createElement('div');
+        trendRow.style.cssText='display:flex;gap:0;padding:0 14px 10px;flex-wrap:wrap;gap:4px;';
+
+        // Weekly trend
+        recentWeeks.forEach(function(wk){
+          var cnt=stats.byWeek[tag]&&stats.byWeek[tag][wk]||0;
+          var wLabel='W'+wk.slice(5,7)+'/'+wk.slice(8,10);
+          var chip=document.createElement('span');
+          chip.style.cssText='font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:'+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.15)':'rgba(255,255,255,0.04)')+';border:1px solid '+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.3)':'rgba(255,255,255,0.08)')+';color:'+(cnt>0?sec.color:'var(--muted)')+';';
+          chip.textContent=wLabel+' '+cnt+'×';
+          trendRow.appendChild(chip);
+        });
+
+        // Month divider
+        var mdiv=document.createElement('span'); mdiv.style.cssText='color:var(--border);font-size:10px;align-self:center;'; mdiv.textContent='|'; trendRow.appendChild(mdiv);
+
+        // Monthly trend
+        recentMonths.forEach(function(mo){
+          var cnt=stats.byMonth[tag]&&stats.byMonth[tag][mo]||0;
+          var mLabel=mo.slice(0,4).slice(2)+'/'+mo.slice(5,7);
+          var chip=document.createElement('span');
+          chip.style.cssText='font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:'+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.15)':'rgba(255,255,255,0.04)')+';border:1px solid '+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.3)':'rgba(255,255,255,0.08)')+';color:'+(cnt>0?sec.color:'var(--muted)')+';';
+          chip.textContent=mLabel+' '+cnt+'×';
+          trendRow.appendChild(chip);
+        });
+
+        // Expand panel — trades with this tag
+        var expandPanel=document.createElement('div');
+        expandPanel.style.cssText='display:none;padding:0 14px 12px;';
+        var tradesWithTag=entries.filter(function(e){ return sec.getTagsFn(e.id).indexOf(tag)>=0; });
+        tradesWithTag.forEach(function(e){
+          var pair=ttEdgeColorBg(e.edge);
+          var chip2=document.createElement('span');
+          chip2.style.cssText='display:inline-block;font-family:var(--mono);font-size:8px;background:'+pair[1]+';color:'+pair[0]+';padding:2px 6px;border-radius:3px;margin:2px;border:1px solid rgba(0,0,0,0.2);';
+          chip2.textContent=e.ticker+' '+e.date.slice(5).replace('-','/')+(e.edge?' '+e.edge:'');
+          expandPanel.appendChild(chip2);
+        });
+
+        var expanded=false;
+        cardHdr.onclick=function(){
+          expanded=!expanded;
+          expandPanel.style.display=expanded?'block':'none';
+          var chev=cardHdr.querySelector('._wmChevron');
+          if(chev) chev.textContent=expanded?'▼':'▶';
+        };
+
+        card.appendChild(cardHdr);
+        card.appendChild(barWrap);
+        card.appendChild(trendRow);
+        card.appendChild(expandPanel);
+        secDiv.appendChild(card);
+      });
+
+      wrap.appendChild(secDiv);
+    });
+  }
+
   function makeTagCell(id, store, allStore, saveFn, allCounts, color, onUpdate){
     var tags=getTagsFor(store,id).slice();
     var cell=document.createElement('span');
@@ -9149,7 +9303,9 @@ function ttShowWhyPage(){
       popup.id='_ttTagPopup';
       var popW=230;
       var leftPos=Math.min(rect.left, window.innerWidth-popW-8);
-      popup.style.cssText='position:fixed;left:'+leftPos+'px;top:'+(rect.bottom+2)+'px;z-index:9999;background:var(--surface);border:1px solid '+color+';border-radius:6px;padding:8px;width:'+popW+'px;box-shadow:0 4px 12px rgba(0,0,0,0.6);';
+      var spaceBelow=window.innerHeight-rect.bottom;
+      var topPos=spaceBelow<180?(rect.top-182):(rect.bottom+2);
+      popup.style.cssText='position:fixed;left:'+leftPos+'px;top:'+topPos+'px;z-index:9999;background:var(--surface);border:1px solid '+color+';border-radius:6px;padding:8px;width:'+popW+'px;box-shadow:0 4px 12px rgba(0,0,0,0.6);max-height:200px;overflow-y:auto;';
 
       var dd=document.createElement('div'); dd.style.cssText='margin-top:4px;';
 
