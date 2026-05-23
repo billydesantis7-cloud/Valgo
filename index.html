@@ -10286,23 +10286,15 @@ function kinfoRenderGrades() {
     el.appendChild(buildBreakdown('DISCRETION SELECTION', '#f5c518', 'disc'));
     el.appendChild(buildBreakdown('SYSTEM / ALGO EXECUTION', '#90caf9', 'exec'));
 
-    // ── SECTION 3: MONTHLY COMPARISON ──
+    // ── SECTION 3: PERIOD COMPARISON (WEEKLY + MONTHLY) ──
     var monthDiv = document.createElement('div');
     monthDiv.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
-    monthDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
-      +'<div style="width:3px;height:18px;background:#c8a96e;border-radius:2px;"></div>'
-      +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#c8a96e;">MONTH-OVER-MONTH COMPARISON</div>'
-      +'</div>';
 
-    // Group ALL tvTrades by month, with grades
-    var monthGroups = {};
-    // allTvTrades is already grouped per ticker per day from kinfoGetGradeTrades
-    // For month comparison we need ALL months, so re-fetch without date filter
-    var _allForMonth = (function(){
+    // Build grouped data — deduped per ticker per day, with grades
+    var _allForPeriod = (function(){
       var all = [];
       try {
         var raw = JSON.parse(localStorage.getItem('tvTrades')||'[]');
-        var dayRaw = JSON.parse(localStorage.getItem('tvDayR')||'{}');
         var seen = {};
         raw.forEach(function(t){
           if(!t.date||!t.symbol) return;
@@ -10320,109 +10312,206 @@ function kinfoRenderGrades() {
       } catch(e){}
       return all;
     })();
-    _allForMonth.forEach(function(t) {
-      if (!t.date) return;
-      var mk = t.date.slice(0,7);
-      var g = allGrades[t.key] || {};
-      if (g.disc == null && g.exec == null) return;
-      if (!monthGroups[mk]) monthGroups[mk] = [];
-      monthGroups[mk].push({t:t, g:g, key:t.key});
-    });
 
-    var months = Object.keys(monthGroups).sort();
-    if (!months.length) {
-      monthDiv.innerHTML += '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;">No graded trades found across months yet.</div>';
-    } else {
-      // Table: rows = month, cols = total / disc0 / disc0% / exec0 / exec0%
-      var mTable = document.createElement('div');
-      mTable.style.cssText = 'overflow-x:auto;';
-      var mGrid = document.createElement('div');
-      mGrid.style.cssText = 'display:grid;grid-template-columns:90px repeat(3, 1fr) repeat(3, 1fr);gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:560px;';
+    function hasZeroGrade(g,field){ var v=g[field]; return v===0||(Array.isArray(v)&&v.indexOf(0)>=0); }
+    function hasOneGrade(g,field){ var v=g[field]; return v===1||(Array.isArray(v)&&v.indexOf(1)>=0); }
+    function tradeRVal(t){ var dayR=tvDayR[t.date]; return dayR?(t.pnl||0)/dayR:null; }
 
-      // Header
-      var mHdrs = ['MONTH','DISCRETION SEL = 0','% OF TRADES','P&L (R)','SYSTEM EXEC = 0','% OF TRADES','P&L (R)'];
-      var mHdrColors = ['var(--muted)','#f5c518','#f5c518','#f5c518','#90caf9','#90caf9','#90caf9'];
-      mHdrs.forEach(function(h, hi) {
-        var hc = document.createElement('div');
-        hc.style.cssText = 'font-family:var(--mono);font-size:8px;color:'+mHdrColors[hi]+';letter-spacing:1px;padding:7px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'');
-        hc.textContent = h;
-        mGrid.appendChild(hc);
-      });
-
-      // Sub-header: total graded
-      var subHdrs = ['', 'count', 'of graded', 'total R', 'count', 'of graded', 'total R'];
-      subHdrs.forEach(function(h, hi) {
-        var hc = document.createElement('div');
-        hc.style.cssText = 'font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.25);letter-spacing:1px;padding:3px 10px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);'+(hi>0?'border-left:1px solid var(--border);':'');
-        hc.textContent = h;
-        mGrid.appendChild(hc);
-      });
-
-      months.forEach(function(mk, mi) {
-        var mTrades = monthGroups[mk];
-        var total = mTrades.length;
-        var disc0Trades = mTrades.filter(function(x){ var d=x.g.disc; return d===0||(Array.isArray(d)&&d.indexOf(0)>=0); });
-        var exec0Trades = mTrades.filter(function(x){ var e=x.g.exec; return e===0||(Array.isArray(e)&&e.indexOf(0)>=0); });
-        var disc0 = disc0Trades.length;
-        var exec0 = exec0Trades.length;
-        var disc0Pct = total ? Math.round(disc0/total*100) : 0;
-        var exec0Pct = total ? Math.round(exec0/total*100) : 0;
-        // P&L in R for disc=0 and exec=0 trades
-        function tradeR(x){ var dayR=tvDayR[x.t.date]; return dayR?(x.t.pnl||0)/dayR:null; }
-        var disc0R = disc0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
-        var exec0R = exec0Trades.reduce(function(s,x){ var r=tradeR(x); return r!=null?s+r:s; }, 0);
-        var monthLabel = new Date(mk+'-15T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}).toUpperCase();
-        var isEven = mi%2===0;
-        var rowBg = isEven ? 'rgba(255,255,255,0.02)' : 'transparent';
-
-        function mCell(txt, col, bg, isFirst) {
-          var c = document.createElement('div');
-          c.style.cssText = 'padding:10px;border-top:1px solid var(--border);background:'+bg+';'+(isFirst?'':'border-left:1px solid var(--border);');
-          c.innerHTML = '<div style="font-family:var(--mono);font-size:'+(isFirst?'9px':'14px')+';font-weight:'+(isFirst?'normal':'bold')+';color:'+col+';">'+txt+'</div>';
-          return c;
-        }
-        function mCellWithBar(count, pct, col, total) {
-          var c = document.createElement('div');
-          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+col+';">'+count+'</div>'
-            +'<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">of '+total+' graded</div>';
-          c.appendChild(fillBar(pct, col));
-          return c;
-        }
-        function mCellPct(pct, col) {
-          var pctCol = pct >= 40 ? '#ef5350' : pct >= 20 ? '#ff9800' : '#4caf50';
-          var c = document.createElement('div');
-          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+pctCol+';">'+pct+'%</div>';
-          c.appendChild(fillBar(pct, pctCol));
-          return c;
-        }
-
-        function mCellR(r, col) {
-          var rCol = r > 0 ? '#4caf50' : r < 0 ? '#ef5350' : 'var(--muted)';
-          var c = document.createElement('div');
-          c.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+rowBg+';';
-          c.innerHTML = '<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+rCol+';">'+(r>0?'+':'')+r.toFixed(2)+'R</div>';
-          return c;
-        }
-        mGrid.appendChild(mCell(monthLabel, 'var(--text)', rowBg, true));
-        mGrid.appendChild(mCellWithBar(disc0, disc0Pct, '#f5c518', total));
-        mGrid.appendChild(mCellPct(disc0Pct, '#f5c518'));
-        mGrid.appendChild(mCellR(disc0R, '#f5c518'));
-        mGrid.appendChild(mCellWithBar(exec0, exec0Pct, '#90caf9', total));
-        mGrid.appendChild(mCellPct(exec0Pct, '#90caf9'));
-        mGrid.appendChild(mCellR(exec0R, '#90caf9'));
-      });
-      mTable.appendChild(mGrid);
-      monthDiv.appendChild(mTable);
+    // Group by week and month
+    function weekOf(dateStr){
+      var d=new Date(dateStr+'T12:00:00'), day=d.getDay(), diff=day===0?-6:1-day;
+      d.setDate(d.getDate()+diff);
+      return d.toISOString().slice(0,10);
     }
 
-    // Prepend month comparison at top, then insights, then breakdown
+    var weekGroups={}, monthGroups2={};
+    _allForPeriod.forEach(function(t){
+      if(!t.date) return;
+      var g=allGrades[t.key]||{};
+      if(g.disc==null&&g.exec==null) return;
+      var wk=weekOf(t.date), mo=t.date.slice(0,7);
+      if(!weekGroups[wk]) weekGroups[wk]=[];
+      weekGroups[wk].push({t:t,g:g});
+      if(!monthGroups2[mo]) monthGroups2[mo]=[];
+      monthGroups2[mo].push({t:t,g:g});
+    });
+
+    // Compute stats for a group of trades
+    function calcStats(trades){
+      var total=trades.length;
+      if(!total) return null;
+      var d0=trades.filter(function(x){return hasZeroGrade(x.g,'disc');});
+      var d1=trades.filter(function(x){return hasOneGrade(x.g,'disc');});
+      var e0=trades.filter(function(x){return hasZeroGrade(x.g,'exec');});
+      var e1=trades.filter(function(x){return hasOneGrade(x.g,'exec');});
+      function sumR(arr){ return arr.reduce(function(s,x){var r=tradeRVal(x.t);return r!=null?s+r:s;},0); }
+      return {
+        total:total,
+        d0:d0.length, d0pct:Math.round(d0.length/total*100), d0R:sumR(d0),
+        d1:d1.length, d1pct:Math.round(d1.length/total*100), d1R:sumR(d1),
+        e0:e0.length, e0pct:Math.round(e0.length/total*100), e0R:sumR(e0),
+        e1:e1.length, e1pct:Math.round(e1.length/total*100), e1R:sumR(e1),
+      };
+    }
+
+    // Build sortable comparison table
+    var _pMode='weekly', _pSort='period', _pSortDir=1;
+
+    var mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function formatPeriodLabel(key, mode){
+      if(mode==='monthly'){
+        return mNames[parseInt(key.slice(5,7))-1]+' '+key.slice(0,4);
+      } else {
+        var d=new Date(key+'T12:00:00');
+        var end=new Date(d); end.setDate(d.getDate()+4);
+        return (d.getMonth()+1)+'/'+d.getDate()+' – '+(end.getMonth()+1)+'/'+end.getDate()+'/'+String(d.getFullYear()).slice(2);
+      }
+    }
+
+    function renderPeriodTable(){
+      monthDiv.innerHTML='';
+      // Header bar
+      var hbar=document.createElement('div');
+      hbar.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;';
+      hbar.innerHTML='<div style="width:3px;height:18px;background:#c8a96e;border-radius:2px;flex-shrink:0;"></div>'
+        +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#c8a96e;">PERIOD COMPARISON</div>';
+
+      // WEEKLY / MONTHLY toggle
+      var toggle=document.createElement('div');
+      toggle.style.cssText='display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-left:8px;';
+      ['weekly','monthly'].forEach(function(m){
+        var btn=document.createElement('button');
+        var active=_pMode===m;
+        btn.style.cssText='font-family:var(--mono);font-size:9px;padding:4px 12px;border:none;cursor:pointer;letter-spacing:1px;background:'+(active?'var(--accent)':'transparent')+';color:'+(active?'var(--bg)':'var(--muted)')+';';
+        btn.textContent=m.toUpperCase();
+        btn.onclick=(function(mm){ return function(){ _pMode=mm; _pSort='period'; _pSortDir=1; renderPeriodTable(); }; })(m);
+        toggle.appendChild(btn);
+      });
+      hbar.appendChild(toggle);
+      monthDiv.appendChild(hbar);
+
+      var groups=_pMode==='weekly'?weekGroups:monthGroups2;
+      var keys=Object.keys(groups).sort();
+      if(!keys.length){
+        monthDiv.innerHTML+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;">No graded trades found yet.</div>';
+        return;
+      }
+
+      // Build rows data
+      var rows=keys.map(function(k){ return {key:k,stats:calcStats(groups[k])}; }).filter(function(r){return r.stats;});
+
+      // Sort
+      rows.sort(function(a,b){
+        var d=_pSortDir;
+        var s=_pSort;
+        if(s==='period') return d*a.key.localeCompare(b.key);
+        if(s==='d0') return d*(a.stats.d0-b.stats.d0);
+        if(s==='d0pct') return d*(a.stats.d0pct-b.stats.d0pct);
+        if(s==='d0R') return d*(a.stats.d0R-b.stats.d0R);
+        if(s==='d1') return d*(a.stats.d1-b.stats.d1);
+        if(s==='d1pct') return d*(a.stats.d1pct-b.stats.d1pct);
+        if(s==='d1R') return d*(a.stats.d1R-b.stats.d1R);
+        if(s==='e0') return d*(a.stats.e0-b.stats.e0);
+        if(s==='e0pct') return d*(a.stats.e0pct-b.stats.e0pct);
+        if(s==='e0R') return d*(a.stats.e0R-b.stats.e0R);
+        if(s==='e1') return d*(a.stats.e1-b.stats.e1);
+        if(s==='e1pct') return d*(a.stats.e1pct-b.stats.e1pct);
+        if(s==='e1R') return d*(a.stats.e1R-b.stats.e1R);
+        return 0;
+      });
+
+      var PCOLS='110px repeat(3,60px) 6px repeat(3,60px) 6px repeat(3,60px) 6px repeat(3,60px)';
+      var wrap=document.createElement('div'); wrap.style.cssText='overflow-x:auto;';
+      var grid=document.createElement('div');
+      grid.style.cssText='display:grid;grid-template-columns:'+PCOLS+';border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:700px;';
+
+      function sortHdr(key,label,color){
+        var el=document.createElement('div');
+        var isActive=_pSort===key;
+        el.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActive?color:'rgba(255,255,255,0.4)')+';letter-spacing:1px;padding:5px 6px;cursor:pointer;user-select:none;text-align:center;border-left:1px solid var(--border);';
+        el.textContent=label+(isActive?(_pSortDir===1?' ▲':' ▼'):'');
+        el.onclick=function(){ if(_pSort===key) _pSortDir*=-1; else{_pSort=key;_pSortDir=-1;} renderPeriodTable(); };
+        return el;
+      }
+
+      // Period header
+      var ph=document.createElement('div');
+      var isActiveP=_pSort==='period';
+      ph.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActiveP?'var(--accent)':'rgba(255,255,255,0.4)')+';letter-spacing:1px;padding:5px 8px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.35);';
+      ph.textContent=(_pMode==='weekly'?'WEEK':'MONTH')+(isActiveP?(_pSortDir===1?' ▲':' ▼'):'');
+      ph.onclick=function(){ if(_pSort==='period') _pSortDir*=-1; else{_pSort='period';_pSortDir=1;} renderPeriodTable(); };
+      grid.appendChild(ph);
+
+      // Group headers
+      [
+        {label:'DISC SEL = 0', color:'#f5c518', keys:['d0','d0pct','d0R'], labels:['COUNT','%','P&L(R)']},
+        {label:'DISC SEL = 1', color:'#4caf50', keys:['d1','d1pct','d1R'], labels:['COUNT','%','P&L(R)']},
+        {label:'SYS EXEC = 0', color:'#90caf9', keys:['e0','e0pct','e0R'], labels:['COUNT','%','P&L(R)']},
+        {label:'SYS EXEC = 1', color:'#26a69a', keys:['e1','e1pct','e1R'], labels:['COUNT','%','P&L(R)']},
+      ].forEach(function(grp){
+        // Divider spacer
+        var sp=document.createElement('div'); sp.style.cssText='background:rgba(0,0,0,0.35);'; grid.appendChild(sp);
+        grp.keys.forEach(function(k,ki){
+          var h=sortHdr(k,grp.labels[ki],grp.color);
+          h.style.background='rgba(0,0,0,0.35)';
+          if(ki===0) h.style.borderLeft='2px solid '+grp.color+'44';
+          grid.appendChild(h);
+        });
+      });
+
+      // Data rows
+      rows.forEach(function(row,ri){
+        var s=row.stats;
+        var isEven=ri%2===0;
+        var bg=isEven?'rgba(255,255,255,0.02)':'transparent';
+
+        var pl=document.createElement('div');
+        pl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);padding:7px 8px;border-top:1px solid var(--border);background:'+bg+';white-space:nowrap;';
+        pl.textContent=formatPeriodLabel(row.key,_pMode);
+        grid.appendChild(pl);
+
+        function addCell(val,isR,groupColor,isFirst){
+          var c=document.createElement('div');
+          var col=isR?(val>0?'#4caf50':val<0?'#ef5350':'var(--muted)'):groupColor;
+          c.style.cssText='font-family:var(--display);font-size:12px;font-weight:bold;color:'+col+';padding:6px;border-top:1px solid var(--border);text-align:center;background:'+bg+';border-left:'+(isFirst?'2px solid '+groupColor+'44':'1px solid rgba(255,255,255,0.05)')+';';
+          c.textContent=isR?((val>0?'+':'')+val.toFixed(1)+'R'):(typeof val==='number'&&!isR&&val.toString().indexOf('%')<0?val:val);
+          grid.appendChild(c);
+        }
+        function addSpacer(){
+          var c=document.createElement('div'); c.style.cssText='background:'+bg+';border-top:1px solid var(--border);'; grid.appendChild(c);
+        }
+
+        var groups2=[
+          {vals:[s.d0,s.d0pct+'%',s.d0R],color:'#f5c518',isR:[false,false,true]},
+          {vals:[s.d1,s.d1pct+'%',s.d1R],color:'#4caf50',isR:[false,false,true]},
+          {vals:[s.e0,s.e0pct+'%',s.e0R],color:'#90caf9',isR:[false,false,true]},
+          {vals:[s.e1,s.e1pct+'%',s.e1R],color:'#26a69a',isR:[false,false,true]},
+        ];
+        groups2.forEach(function(grp){
+          addSpacer();
+          grp.vals.forEach(function(v,vi){
+            var c=document.createElement('div');
+            var col=grp.isR[vi]?(typeof v==='number'&&v>0?'#4caf50':typeof v==='number'&&v<0?'#ef5350':'var(--muted)'):grp.color;
+            var txt=grp.isR[vi]?((v>0?'+':'')+v.toFixed(1)+'R'):v;
+            c.style.cssText='font-family:var(--display);font-size:11px;font-weight:bold;color:'+col+';padding:6px 4px;border-top:1px solid var(--border);text-align:center;background:'+bg+';border-left:'+(vi===0?'2px solid '+grp.color+'44':'1px solid rgba(255,255,255,0.05)')+';';
+            c.textContent=txt;
+            grid.appendChild(c);
+          });
+        });
+      });
+
+      wrap.appendChild(grid);
+      monthDiv.appendChild(wrap);
+    }
+
+    renderPeriodTable();
+
+    // Prepend at top, then insights, then breakdown
     el.insertBefore(monthDiv, el.firstChild);
     el.insertBefore(insightDiv, el.firstChild);
     return;
   }
-
   // ── TRADES VIEW ──
   var COLS = '90px 90px 65px 120px 72px 120px 72px 110px 40px';
   var hdr = document.createElement('div');
