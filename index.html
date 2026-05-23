@@ -9423,72 +9423,100 @@ function ttShowWhyPage(){
       secWrap.appendChild(tbl);
       wrap.appendChild(secWrap);
 
-      // Trend table (week over week + month over month)
       if(!sorted.length) return;
-      var trendWrap=document.createElement('div');
-      trendWrap.style.cssText='margin-top:8px;margin-bottom:4px;';
 
-      var trendHdr=document.createElement('div');
-      trendHdr.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:4px 0 6px;';
-      trendHdr.textContent='TREND — WEEK OVER WEEK & MONTH OVER MONTH';
-      trendWrap.appendChild(trendHdr);
+      function makeTrendTable(label, periods, getCount, colorFn){
+        var tWrap=document.createElement('div');
+        tWrap.style.cssText='margin-top:10px;margin-bottom:16px;';
 
-      var trendTbl=document.createElement('div');
-      trendTbl.style.cssText='overflow-x:auto;';
+        var tLbl=document.createElement('div');
+        tLbl.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:2px;padding:3px 0 5px;';
+        tLbl.textContent=label;
+        tWrap.appendChild(tLbl);
 
-      var wCols='1fr '+recentWeeks.map(function(){return '40px';}).join(' ')+' 8px '+recentMonths.map(function(){return '46px';}).join(' ');
-      var tHdr=document.createElement('div');
-      tHdr.style.cssText='display:grid;grid-template-columns:'+wCols+';background:rgba(0,0,0,0.4);padding:3px 8px;border-radius:4px 4px 0 0;border:1px solid rgba(255,255,255,0.06);border-bottom:none;min-width:400px;';
-      var blankHdr=document.createElement('span'); blankHdr.textContent=''; tHdr.appendChild(blankHdr);
-      recentWeeks.forEach(function(wk){
-        var s=document.createElement('span');
-        s.style.cssText='font-family:var(--mono);font-size:7px;color:var(--muted);text-align:center;';
-        s.textContent='W'+wk.slice(5,7)+'/'+wk.slice(8,10);
-        tHdr.appendChild(s);
-      });
-      var divHdr=document.createElement('span'); divHdr.textContent=''; tHdr.appendChild(divHdr);
-      recentMonths.forEach(function(mo){
-        var s=document.createElement('span');
-        var mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        var mIdx=parseInt(mo.slice(5,7))-1;
-        s.style.cssText='font-family:var(--mono);font-size:7px;color:var(--muted);text-align:center;';
-        s.textContent=mNames[mIdx]+" '"+mo.slice(2,4);
-        tHdr.appendChild(s);
-      });
-      trendTbl.appendChild(tHdr);
+        var _tSort='tag', _tSortDir=-1;
 
-      sorted.slice(0,8).forEach(function(tag,i){
-        var tRow=document.createElement('div');
-        tRow.style.cssText='display:grid;grid-template-columns:'+wCols+';padding:3px 8px;border:1px solid rgba(255,255,255,0.05);border-top:none;background:'+(i%2===0?'transparent':'rgba(255,255,255,0.02)')+';min-width:400px;align-items:center;';
+        var tDiv=document.createElement('div');
+        tDiv.style.cssText='overflow-x:auto;border:1px solid rgba(255,255,255,0.07);border-radius:6px;overflow:hidden;';
 
-        var tnCell=document.createElement('span');
-        tnCell.style.cssText='font-family:var(--mono);font-size:8px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-        tnCell.textContent=tag;
-        tRow.appendChild(tnCell);
+        function renderTrend(){
+          tDiv.innerHTML='';
+          var TCOLS='1fr '+periods.map(function(){return '42px';}).join(' ');
+          var hRow=document.createElement('div');
+          hRow.style.cssText='display:grid;grid-template-columns:'+TCOLS+';background:rgba(0,0,0,0.45);padding:4px 8px;';
 
-        recentWeeks.forEach(function(wk){
-          var cnt=weekMap[tag]&&weekMap[tag][wk]||0;
-          var cell=document.createElement('span');
-          cell.style.cssText='font-family:var(--mono);font-size:9px;color:'+(cnt>0?sec.color:'rgba(255,255,255,0.15)')+';text-align:center;font-weight:'+(cnt>0?'bold':'normal')+';';
-          cell.textContent=cnt>0?cnt:'·';
-          tRow.appendChild(cell);
-        });
+          // Reason sort header
+          var rh=document.createElement('span');
+          var isActive=_tSort==='tag';
+          rh.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActive?'var(--accent)':'var(--muted)')+';letter-spacing:1px;cursor:pointer;user-select:none;';
+          rh.textContent='REASON'+(isActive?(_tSortDir===1?' ▲':' ▼'):'');
+          rh.onclick=function(){ if(_tSort==='tag') _tSortDir*=-1; else{_tSort='tag';_tSortDir=-1;} renderTrend(); };
+          hRow.appendChild(rh);
 
-        var divCell=document.createElement('span'); divCell.style.cssText='border-left:1px solid rgba(255,255,255,0.08);height:100%;'; tRow.appendChild(divCell);
+          // Period headers - each sortable
+          periods.forEach(function(p,pi){
+            var ph=document.createElement('span');
+            var isActiveP=_tSort===('p'+pi);
+            ph.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActiveP?'var(--accent)':'var(--muted)')+';text-align:center;cursor:pointer;user-select:none;';
+            ph.textContent=colorFn(p)+(isActiveP?(_tSortDir===1?' ▲':' ▼'):'');
+            ph.onclick=(function(ppi){ return function(){ if(_tSort==='p'+ppi) _tSortDir*=-1; else{_tSort='p'+ppi;_tSortDir=-1;} renderTrend(); }; })(pi);
+            hRow.appendChild(ph);
+          });
+          tDiv.appendChild(hRow);
 
-        recentMonths.forEach(function(mo){
-          var cnt=monthMap[tag]&&monthMap[tag][mo]||0;
-          var cell=document.createElement('span');
-          cell.style.cssText='font-family:var(--mono);font-size:9px;color:'+(cnt>0?sec.color:'rgba(255,255,255,0.15)')+';text-align:center;font-weight:'+(cnt>0?'bold':'normal')+';';
-          cell.textContent=cnt>0?cnt:'·';
-          tRow.appendChild(cell);
-        });
+          // Sort tags
+          var displayTags=sorted.slice().sort(function(a,b){
+            if(_tSort==='tag') return _tSortDir*a.localeCompare(b);
+            var pi=parseInt(_tSort.slice(1));
+            var ca=getCount(a,periods[pi]), cb=getCount(b,periods[pi]);
+            return _tSortDir*(cb-ca);
+          });
 
-        trendTbl.appendChild(tRow);
-      });
+          displayTags.forEach(function(tag,i){
+            var dRow=document.createElement('div');
+            var rowBg=i%2===0?'transparent':'rgba(255,255,255,0.02)';
+            dRow.style.cssText='display:grid;grid-template-columns:'+TCOLS+';padding:3px 8px;border-top:1px solid rgba(255,255,255,0.04);background:'+rowBg+';align-items:center;';
 
-      trendWrap.appendChild(trendTbl);
-      wrap.appendChild(trendWrap);
+            var tagCell=document.createElement('span');
+            tagCell.style.cssText='font-family:var(--mono);font-size:8px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            tagCell.textContent=tag;
+            dRow.appendChild(tagCell);
+
+            periods.forEach(function(p){
+              var cnt=getCount(tag,p);
+              var cell=document.createElement('span');
+              cell.style.cssText='font-family:var(--mono);font-size:9px;color:'+(cnt>0?sec.color:'rgba(255,255,255,0.13)')+';text-align:center;font-weight:'+(cnt>0?'bold':'normal')+';';
+              cell.textContent=cnt>0?cnt:'·';
+              dRow.appendChild(cell);
+            });
+            tDiv.appendChild(dRow);
+          });
+        }
+
+        renderTrend();
+        tWrap.appendChild(tDiv);
+        return tWrap;
+      }
+
+      var mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+      // WEEK OVER WEEK table
+      wrap.appendChild(makeTrendTable(
+        '↗ WEEK OVER WEEK',
+        recentWeeks,
+        function(tag,wk){ return weekMap[tag]&&weekMap[tag][wk]||0; },
+        function(wk){ return 'W'+wk.slice(5,7)+'/'+wk.slice(8,10); }
+      ));
+
+      // MONTH OVER MONTH table
+      wrap.appendChild(makeTrendTable(
+        '📅 MONTH OVER MONTH',
+        recentMonths,
+        function(tag,mo){ return monthMap[tag]&&monthMap[tag][mo]||0; },
+        function(mo){ return mNames[parseInt(mo.slice(5,7))-1]+" '"+mo.slice(2,4); }
+      ));
+
+      wrap.appendChild(secWrap);
     });
   }
 
