@@ -9368,9 +9368,9 @@ function ttShowWhyPage(){
 
         var displaySorted=sorted.slice().sort(function(a,b){
           if(_secSort==='reason') return _secSortDir*a.localeCompare(b);
-          if(_secSort==='count') return _secSortDir*(tagMap[b]-tagMap[a]);
+          if(_secSort==='count') return _secSortDir*(tagMap[a]-tagMap[b]);
           var pa=total?tagMap[a]/total:0, pb=total?tagMap[b]/total:0;
-          return _secSortDir*(pb-pa);
+          return _secSortDir*(pa-pb);
         });
 
         displaySorted.forEach(function(tag,i){
@@ -9469,7 +9469,7 @@ function ttShowWhyPage(){
             if(_tSort==='tag') return _tSortDir*a.localeCompare(b);
             var pi=parseInt(_tSort.slice(1));
             var ca=getCount(a,periods[pi]), cb=getCount(b,periods[pi]);
-            return _tSortDir*(cb-ca);
+            return _tSortDir*(ca-cb);
           });
 
           displayTags.forEach(function(tag,i){
