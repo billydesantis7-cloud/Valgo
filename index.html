@@ -9076,6 +9076,8 @@ function ttShowWhyPage(){
       clearBtn.textContent='✕'; clearBtn.onclick=function(){ _wmFrom=''; _wmTo=''; _wmRange='all'; buildPage(); };
       filterBar.appendChild(clearBtn);
     }
+    wrap.appendChild(filterBar);
+
     // LIST / GRID toggle
     var toggleBar=document.createElement('div');
     toggleBar.style.cssText='display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;margin-bottom:14px;';
@@ -9146,28 +9148,9 @@ function ttShowWhyPage(){
   }
 
   function buildGridView(wrap, entries){
-    // Helper: get week key and month key
-    function weekOf(d){ var dt=new Date(d+'T12:00:00'), day=dt.getDay(), diff=day===0?-6:1-day; dt.setDate(dt.getDate()+diff); return dt.toISOString().slice(0,10); }
+    function weekOf(d){ var dt=new Date(d+'T12:00:00'),day=dt.getDay(),diff=day===0?-6:1-day; dt.setDate(dt.getDate()+diff); return dt.toISOString().slice(0,10); }
     function monthOf(d){ return d?d.slice(0,7):''; }
 
-    // Build tag frequency maps with week/month breakdowns
-    function buildTagStats(getTagsFn){
-      var total={}, byWeek={}, byMonth={};
-      entries.forEach(function(e){
-        var tags=getTagsFn(e.id);
-        var wk=weekOf(e.date), mo=monthOf(e.date);
-        tags.forEach(function(t){
-          total[t]=(total[t]||0)+1;
-          if(!byWeek[t]) byWeek[t]={};
-          byWeek[t][wk]=(byWeek[t][wk]||0)+1;
-          if(!byMonth[t]) byMonth[t]={};
-          byMonth[t][mo]=(byMonth[t][mo]||0)+1;
-        });
-      });
-      return {total:total,byWeek:byWeek,byMonth:byMonth};
-    }
-
-    // Get recent weeks/months for trend columns
     var allWeeks=[],allMonths=[];
     entries.forEach(function(e){
       var wk=weekOf(e.date),mo=monthOf(e.date);
@@ -9175,113 +9158,188 @@ function ttShowWhyPage(){
       if(allMonths.indexOf(mo)<0) allMonths.push(mo);
     });
     allWeeks.sort(); allMonths.sort();
-    var recentWeeks=allWeeks.slice(-4), recentMonths=allMonths.slice(-3);
+    var recentWeeks=allWeeks.slice(-5), recentMonths=allMonths.slice(-4);
 
     var sections=[
-      {label:'WHY I MISSED', color:'#fff', getTagsFn:function(id){ return ttGetWhyTags(id); }},
-      {label:'WHERE WAS IT ON RADAR FROM', color:'#90caf9', getTagsFn:function(id){ var v=ttRadarData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
-      {label:'DID VAL BASICALLY ALERT IT', color:'#4caf50', getTagsFn:function(id){ var v=ttValData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
+      {label:'WHY I MISSED', color:'#fff',
+       getTagsFn:function(id){ return ttGetWhyTags(id); }},
+      {label:'WHERE WAS IT ON RADAR FROM', color:'#90caf9',
+       getTagsFn:function(id){ var v=ttRadarData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
+      {label:'DID VAL BASICALLY ALERT IT', color:'#4caf50',
+       getTagsFn:function(id){ var v=ttValData[id]; return Array.isArray(v)?v:(v?[v]:[]); }},
     ];
 
     sections.forEach(function(sec){
-      var stats=buildTagStats(sec.getTagsFn);
-      var sorted=Object.keys(stats.total).sort(function(a,b){ return stats.total[b]-stats.total[a]; });
-      var totalTagged=entries.filter(function(e){ return sec.getTagsFn(e.id).length>0; }).length;
+      var tagMap={}, weekMap={}, monthMap={};
+      entries.forEach(function(e){
+        var tags=sec.getTagsFn(e.id);
+        var wk=weekOf(e.date), mo=monthOf(e.date);
+        tags.forEach(function(t){
+          tagMap[t]=(tagMap[t]||0)+1;
+          if(!weekMap[t]) weekMap[t]={}; weekMap[t][wk]=(weekMap[t][wk]||0)+1;
+          if(!monthMap[t]) monthMap[t]={}; monthMap[t][mo]=(monthMap[t][mo]||0)+1;
+        });
+      });
+      var sorted=Object.keys(tagMap).sort(function(a,b){return tagMap[b]-tagMap[a];});
+      var total=entries.length;
 
-      var secDiv=document.createElement('div');
-      secDiv.style.cssText='margin-bottom:28px;';
+      var secWrap=document.createElement('div');
+      secWrap.style.cssText='margin-bottom:20px;';
 
-      var secHdr=document.createElement('div');
-      secHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid rgba(255,255,255,0.08);';
-      secHdr.innerHTML='<span style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+sec.color+';">'+sec.label+'</span>'
-        +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+sorted.length+' unique tags · '+totalTagged+' / '+entries.length+' trades tagged ('+(entries.length?Math.round(totalTagged/entries.length*100):0)+'%)</span>';
-      secDiv.appendChild(secHdr);
+      // Section header
+      var sh=document.createElement('div');
+      sh.style.cssText='font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:2px;color:'+sec.color+';padding:6px 10px;background:rgba(0,0,0,0.4);border-radius:6px 6px 0 0;border:1px solid rgba(255,255,255,0.08);border-bottom:none;';
+      sh.textContent=sec.label;
+      secWrap.appendChild(sh);
+
+      // Main table
+      var tbl=document.createElement('div');
+      tbl.style.cssText='border:1px solid rgba(255,255,255,0.08);border-radius:0 0 6px 6px;overflow:hidden;';
+
+      // Header row
+      var COLS='1fr 50px 60px';
+      var hdrRow=document.createElement('div');
+      hdrRow.style.cssText='display:grid;grid-template-columns:'+COLS+';background:rgba(0,0,0,0.5);padding:4px 10px;';
+      ['REASON','COUNT','% OF ALL'].forEach(function(h){
+        var s=document.createElement('span');
+        s.style.cssText='font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px;text-align:right;';
+        if(h==='REASON') s.style.textAlign='left';
+        s.textContent=h;
+        hdrRow.appendChild(s);
+      });
+      tbl.appendChild(hdrRow);
 
       if(!sorted.length){
         var empty=document.createElement('div');
-        empty.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);padding:10px 0;';
-        empty.textContent='No tags recorded yet.';
-        secDiv.appendChild(empty);
-        wrap.appendChild(secDiv);
-        return;
+        empty.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);padding:8px 10px;';
+        empty.textContent='No data yet.';
+        tbl.appendChild(empty);
       }
 
-      sorted.forEach(function(tag,ti){
-        var card=document.createElement('div');
-        card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+sec.color+';border-radius:8px;margin-bottom:8px;overflow:hidden;';
+      sorted.forEach(function(tag,i){
+        var cnt=tagMap[tag];
+        var pct=total?Math.round(cnt/total*100):0;
+        var row=document.createElement('div');
+        row.style.cssText='display:grid;grid-template-columns:'+COLS+';padding:4px 10px;border-top:1px solid rgba(255,255,255,0.05);background:'+(i%2===0?'transparent':'rgba(255,255,255,0.02)')+';align-items:center;cursor:pointer;';
+        row.onmouseover=function(){this.style.background='rgba(255,255,255,0.05)';};
+        row.onmouseout=function(){this.style.background=i%2===0?'transparent':'rgba(255,255,255,0.02)';};
 
-        var cardHdr=document.createElement('div');
-        cardHdr.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;';
-        var pct=entries.length?Math.round(stats.total[tag]/entries.length*100):0;
-        cardHdr.innerHTML='<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:'+sec.color+';">#'+(ti+1)+'</span>'
-          +'<span style="font-family:var(--mono);font-size:11px;font-weight:bold;color:#fff;flex:1;">'+tag+'</span>'
-          +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+stats.total[tag]+'× &nbsp; '+pct+'% of trades</span>'
-          +'<span class="_wmChevron" style="color:var(--muted);font-size:10px;margin-left:6px;">▶</span>';
-
-        // Bar
-        var barWrap=document.createElement('div');
-        barWrap.style.cssText='height:3px;background:rgba(255,255,255,0.06);margin:0 14px 8px;border-radius:2px;';
+        var nameCell=document.createElement('div');
+        nameCell.style.cssText='font-family:var(--mono);font-size:9px;color:#fff;display:flex;align-items:center;gap:6px;';
+        // Mini bar
+        var barBg=document.createElement('div');
+        barBg.style.cssText='height:4px;width:60px;background:rgba(255,255,255,0.07);border-radius:2px;flex-shrink:0;';
         var barFill=document.createElement('div');
-        barFill.style.cssText='height:100%;width:'+Math.round(stats.total[tag]/stats.total[sorted[0]]*100)+'%;background:'+sec.color+';border-radius:2px;';
-        barWrap.appendChild(barFill);
+        barFill.style.cssText='height:100%;width:'+Math.round(cnt/tagMap[sorted[0]]*100)+'%;background:'+sec.color+';border-radius:2px;';
+        barBg.appendChild(barFill);
+        nameCell.appendChild(barBg);
+        var nameTxt=document.createElement('span'); nameTxt.textContent=tag;
+        nameCell.appendChild(nameTxt);
 
-        // Trend row
-        var trendRow=document.createElement('div');
-        trendRow.style.cssText='display:flex;gap:0;padding:0 14px 10px;flex-wrap:wrap;gap:4px;';
+        var cntCell=document.createElement('div');
+        cntCell.style.cssText='font-family:var(--display);font-size:12px;font-weight:bold;color:'+sec.color+';text-align:right;';
+        cntCell.textContent=cnt+'×';
 
-        // Weekly trend
-        recentWeeks.forEach(function(wk){
-          var cnt=stats.byWeek[tag]&&stats.byWeek[tag][wk]||0;
-          var wLabel='W'+wk.slice(5,7)+'/'+wk.slice(8,10);
-          var chip=document.createElement('span');
-          chip.style.cssText='font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:'+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.15)':'rgba(255,255,255,0.04)')+';border:1px solid '+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.3)':'rgba(255,255,255,0.08)')+';color:'+(cnt>0?sec.color:'var(--muted)')+';';
-          chip.textContent=wLabel+' '+cnt+'×';
-          trendRow.appendChild(chip);
-        });
+        var pctCell=document.createElement('div');
+        pctCell.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;';
+        pctCell.textContent=pct+'%';
 
-        // Month divider
-        var mdiv=document.createElement('span'); mdiv.style.cssText='color:var(--border);font-size:10px;align-self:center;'; mdiv.textContent='|'; trendRow.appendChild(mdiv);
+        row.appendChild(nameCell); row.appendChild(cntCell); row.appendChild(pctCell);
 
-        // Monthly trend
-        recentMonths.forEach(function(mo){
-          var cnt=stats.byMonth[tag]&&stats.byMonth[tag][mo]||0;
-          var mLabel=mo.slice(0,4).slice(2)+'/'+mo.slice(5,7);
-          var chip=document.createElement('span');
-          chip.style.cssText='font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:'+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.15)':'rgba(255,255,255,0.04)')+';border:1px solid '+(cnt>0?'rgba('+hexToRgb(sec.color)+',0.3)':'rgba(255,255,255,0.08)')+';color:'+(cnt>0?sec.color:'var(--muted)')+';';
-          chip.textContent=mLabel+' '+cnt+'×';
-          trendRow.appendChild(chip);
-        });
-
-        // Expand panel — trades with this tag
-        var expandPanel=document.createElement('div');
-        expandPanel.style.cssText='display:none;padding:0 14px 12px;';
-        var tradesWithTag=entries.filter(function(e){ return sec.getTagsFn(e.id).indexOf(tag)>=0; });
-        tradesWithTag.forEach(function(e){
+        // Expandable trades
+        var expDiv=document.createElement('div');
+        expDiv.style.cssText='display:none;grid-column:1/4;padding:4px 0 6px 66px;flex-wrap:wrap;gap:3px;';
+        entries.filter(function(e){ return sec.getTagsFn(e.id).indexOf(tag)>=0; }).forEach(function(e){
           var pair=ttEdgeColorBg(e.edge);
-          var chip2=document.createElement('span');
-          chip2.style.cssText='display:inline-block;font-family:var(--mono);font-size:8px;background:'+pair[1]+';color:'+pair[0]+';padding:2px 6px;border-radius:3px;margin:2px;border:1px solid rgba(0,0,0,0.2);';
-          chip2.textContent=e.ticker+' '+e.date.slice(5).replace('-','/')+(e.edge?' '+e.edge:'');
-          expandPanel.appendChild(chip2);
+          var chip=document.createElement('span');
+          chip.style.cssText='display:inline-block;font-family:var(--mono);font-size:8px;background:'+pair[1]+';color:'+pair[0]+';padding:1px 5px;border-radius:3px;margin:1px;';
+          chip.textContent=e.ticker+' '+e.date.slice(5).replace('-','/')+(e.edge?' '+e.edge:'');
+          expDiv.appendChild(chip);
         });
-
         var expanded=false;
-        cardHdr.onclick=function(){
+        row.onclick=function(){
           expanded=!expanded;
-          expandPanel.style.display=expanded?'block':'none';
-          var chev=cardHdr.querySelector('._wmChevron');
-          if(chev) chev.textContent=expanded?'▼':'▶';
+          expDiv.style.display=expanded?'flex':'none';
         };
 
-        card.appendChild(cardHdr);
-        card.appendChild(barWrap);
-        card.appendChild(trendRow);
-        card.appendChild(expandPanel);
-        secDiv.appendChild(card);
+        var rowWrap=document.createElement('div');
+        rowWrap.style.cssText='display:grid;grid-template-columns:'+COLS+';align-items:center;';
+        // can't nest grid rows — just append row then expDiv
+        tbl.appendChild(row);
+        tbl.appendChild(expDiv);
+        return;
       });
 
-      wrap.appendChild(secDiv);
+      secWrap.appendChild(tbl);
+      wrap.appendChild(secWrap);
+
+      // Trend table (week over week + month over month)
+      if(!sorted.length) return;
+      var trendWrap=document.createElement('div');
+      trendWrap.style.cssText='margin-top:8px;margin-bottom:4px;';
+
+      var trendHdr=document.createElement('div');
+      trendHdr.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:4px 0 6px;';
+      trendHdr.textContent='TREND — WEEK OVER WEEK & MONTH OVER MONTH';
+      trendWrap.appendChild(trendHdr);
+
+      var trendTbl=document.createElement('div');
+      trendTbl.style.cssText='overflow-x:auto;';
+
+      var wCols='1fr '+recentWeeks.map(function(){return '40px';}).join(' ')+' 8px '+recentMonths.map(function(){return '46px';}).join(' ');
+      var tHdr=document.createElement('div');
+      tHdr.style.cssText='display:grid;grid-template-columns:'+wCols+';background:rgba(0,0,0,0.4);padding:3px 8px;border-radius:4px 4px 0 0;border:1px solid rgba(255,255,255,0.06);border-bottom:none;min-width:400px;';
+      var blankHdr=document.createElement('span'); blankHdr.textContent=''; tHdr.appendChild(blankHdr);
+      recentWeeks.forEach(function(wk){
+        var s=document.createElement('span');
+        s.style.cssText='font-family:var(--mono);font-size:7px;color:var(--muted);text-align:center;';
+        s.textContent=wk.slice(5,7)+'/'+wk.slice(8,10);
+        tHdr.appendChild(s);
+      });
+      var divHdr=document.createElement('span'); divHdr.textContent=''; tHdr.appendChild(divHdr);
+      recentMonths.forEach(function(mo){
+        var s=document.createElement('span');
+        s.style.cssText='font-family:var(--mono);font-size:7px;color:var(--muted);text-align:center;';
+        s.textContent=mo.slice(2,4)+'/'+mo.slice(5,7);
+        tHdr.appendChild(s);
+      });
+      trendTbl.appendChild(tHdr);
+
+      sorted.slice(0,8).forEach(function(tag,i){
+        var tRow=document.createElement('div');
+        tRow.style.cssText='display:grid;grid-template-columns:'+wCols+';padding:3px 8px;border:1px solid rgba(255,255,255,0.05);border-top:none;background:'+(i%2===0?'transparent':'rgba(255,255,255,0.02)')+';min-width:400px;align-items:center;';
+
+        var tnCell=document.createElement('span');
+        tnCell.style.cssText='font-family:var(--mono);font-size:8px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        tnCell.textContent=tag;
+        tRow.appendChild(tnCell);
+
+        recentWeeks.forEach(function(wk){
+          var cnt=weekMap[tag]&&weekMap[tag][wk]||0;
+          var cell=document.createElement('span');
+          cell.style.cssText='font-family:var(--mono);font-size:9px;color:'+(cnt>0?sec.color:'rgba(255,255,255,0.15)')+';text-align:center;font-weight:'+(cnt>0?'bold':'normal')+';';
+          cell.textContent=cnt>0?cnt+'×':'·';
+          tRow.appendChild(cell);
+        });
+
+        var divCell=document.createElement('span'); divCell.style.cssText='border-left:1px solid rgba(255,255,255,0.08);height:100%;'; tRow.appendChild(divCell);
+
+        recentMonths.forEach(function(mo){
+          var cnt=monthMap[tag]&&monthMap[tag][mo]||0;
+          var cell=document.createElement('span');
+          cell.style.cssText='font-family:var(--mono);font-size:9px;color:'+(cnt>0?sec.color:'rgba(255,255,255,0.15)')+';text-align:center;font-weight:'+(cnt>0?'bold':'normal')+';';
+          cell.textContent=cnt>0?cnt+'×':'·';
+          tRow.appendChild(cell);
+        });
+
+        trendTbl.appendChild(tRow);
+      });
+
+      trendWrap.appendChild(trendTbl);
+      wrap.appendChild(trendWrap);
     });
   }
+
 
   function makeTagCell(id, store, allStore, saveFn, allCounts, color, onUpdate){
     var tags=getTagsFor(store,id).slice();
