@@ -10345,21 +10345,16 @@ function kinfoRenderGrades() {
       var e0=trades.filter(function(x){return hasZeroGrade(x.g,'exec');});
       var e1=trades.filter(function(x){return hasOneGrade(x.g,'exec');});
       function sumR(arr){ return arr.reduce(function(s,x){var r=tradeRVal(x.t);return r!=null?s+r:s;},0); }
-      // Get actual period P&L in R from ALL tvTrades (same as WRR stats)
-      // trades[0].t.date gives us the period — find the period key and sum all tvTrades for it
-      var periodTrades=(typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){
+      // Get actual period R using same method as WRR stats page:
+      // sum each trade's pnl/dayR individually (matching renderTvWrr logic)
+      var allPeriodTrades=(typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){
         return trades.some(function(x){ return x.t.date===t.date; });
       });
-      var periodPnl=periodTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-      // Get R value — find any dayR for this period
-      var periodR=null;
-      for(var pi=0;pi<trades.length;pi++){
-        var dr=tvDayR[trades[pi].t.date];
-        if(dr){periodR=dr;break;}
-      }
-      var totalR=periodR?periodPnl/periodR:0;
+      var totalR=allPeriodTrades.reduce(function(s,t){
+        var dr=tvDayR[t.date]; return dr?s+(t.pnl||0)/dr:s;
+      },0);
       return {
-        total:total, totalR:totalR, totalPnl:periodPnl,
+        total:total, totalR:totalR,
         d0:d0.length, d0pct:Math.round(d0.length/total*100), d0R:sumR(d0),
         d1:d1.length, d1pct:Math.round(d1.length/total*100), d1R:sumR(d1),
         e0:e0.length, e0pct:Math.round(e0.length/total*100), e0R:sumR(e0),
