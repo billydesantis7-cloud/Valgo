@@ -10337,7 +10337,7 @@ function kinfoRenderGrades() {
     });
 
     // Compute stats for a group of trades
-    function calcStats(trades){
+    function calcStats(trades, periodKey, mode){
       var total=trades.length;
       if(!total) return null;
       var d0=trades.filter(function(x){return hasZeroGrade(x.g,'disc');});
@@ -10345,10 +10345,12 @@ function kinfoRenderGrades() {
       var e0=trades.filter(function(x){return hasZeroGrade(x.g,'exec');});
       var e1=trades.filter(function(x){return hasOneGrade(x.g,'exec');});
       function sumR(arr){ return arr.reduce(function(s,x){var r=tradeRVal(x.t);return r!=null?s+r:s;},0); }
-      // Get actual period R using same method as WRR stats page:
-      // sum each trade's pnl/dayR individually (matching renderTvWrr logic)
-      var allPeriodTrades=(typeof tvTrades!=='undefined'?tvTrades:[]).filter(function(t){
-        return trades.some(function(x){ return x.t.date===t.date; });
+      // Get actual period R from ALL tvTrades for this period (same as WRR stats)
+      var allTV=(typeof tvTrades!=='undefined'?tvTrades:[]);
+      var allPeriodTrades=allTV.filter(function(t){
+        if(!t.date) return false;
+        if(mode==='weekly') return weekOf(t.date)===periodKey;
+        return t.date.slice(0,7)===periodKey;
       });
       var totalR=allPeriodTrades.reduce(function(s,t){
         var dr=tvDayR[t.date]; return dr?s+(t.pnl||0)/dr:s;
@@ -10406,7 +10408,7 @@ function kinfoRenderGrades() {
         return;
       }
 
-      var rows=keys.map(function(k){ return {key:k,stats:calcStats(groups[k])}; }).filter(function(r){return r.stats;});
+      var rows=keys.map(function(k){ return {key:k,stats:calcStats(groups[k],k,_pMode)}; }).filter(function(r){return r.stats;});
       rows.sort(function(a,b){
         var d=_pSortDir, s=_pSort;
         if(s==='period') return d*a.key.localeCompare(b.key);
