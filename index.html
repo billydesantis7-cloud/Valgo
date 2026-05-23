@@ -10424,10 +10424,10 @@ function kinfoRenderGrades() {
       tbl.style.cssText='width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;min-width:760px;';
 
       var COL_GROUPS=[
-        {label:'DISC SEL = 0', color:'#f5c518', skeys:['d0pct'], slabels:['%']},
-        {label:'DISC SEL = 1', color:'#4caf50', skeys:['d1pct'], slabels:['%']},
-        {label:'SYS EXEC = 0', color:'#90caf9', skeys:['e0pct'], slabels:['%']},
-        {label:'SYS EXEC = 1', color:'#26a69a', skeys:['e1pct'], slabels:['%']},
+        {label:'DISC SEL = 0', color:'#f5c518', skeys:['d0','d0pct'], slabels:['COUNT','%']},
+        {label:'DISC SEL = 1', color:'#4caf50', skeys:['d1','d1pct'], slabels:['COUNT','%']},
+        {label:'SYS EXEC = 0', color:'#90caf9', skeys:['e0','e0pct'], slabels:['COUNT','%']},
+        {label:'SYS EXEC = 1', color:'#26a69a', skeys:['e1','e1pct'], slabels:['COUNT','%']},
       ];
 
       function mkTh(txt, key, color, extra){
@@ -10450,7 +10450,7 @@ function kinfoRenderGrades() {
 
       COL_GROUPS.forEach(function(grp){
         var th=document.createElement('th');
-        th.colSpan=1;
+        th.colSpan=2;
         th.style.cssText='padding:5px 8px;background:rgba(0,0,0,0.4);border-bottom:none;border-left:2px solid '+grp.color+'55;border-right:1px solid rgba(255,255,255,0.06);font-size:8px;letter-spacing:1px;color:'+grp.color+';text-align:center;';
         th.textContent=grp.label;
         tr0.appendChild(th);
@@ -10489,7 +10489,8 @@ function kinfoRenderGrades() {
 
         COL_GROUPS.forEach(function(grp){
           var vals=[
-            {v:s[grp.skeys[0]]+'%', isR:false},
+            {v:s[grp.skeys[0]], isR:false},
+            {v:s[grp.skeys[1]]+'%', isR:false},
           ];
           vals.forEach(function(vobj,vi){
             var td=document.createElement('td');
