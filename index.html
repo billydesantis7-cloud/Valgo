@@ -10412,7 +10412,7 @@ function kinfoRenderGrades() {
       rows.sort(function(a,b){
         var d=_pSortDir, s=_pSort;
         if(s==='period') return d*a.key.localeCompare(b.key);
-        var map={d0:'d0',d0pct:'d0pct',d0R:'d0R',d1:'d1',d1pct:'d1pct',d1R:'d1R',e0:'e0',e0pct:'e0pct',e0R:'e0R',e1:'e1',e1pct:'e1pct',e1R:'e1R',totalR:'totalR'};
+        var map={d0:'d0',d0pct:'d0pct',d0R:'d0R',d1:'d1',d1pct:'d1pct',d1R:'d1R',e0:'e0',e0pct:'e0pct',e0R:'e0R',e1:'e1',e1pct:'e1pct',e1R:'e1R'};
         if(map[s]) return d*(a.stats[s]-b.stats[s]);
         return 0;
       });
@@ -10424,10 +10424,10 @@ function kinfoRenderGrades() {
       tbl.style.cssText='width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;min-width:760px;';
 
       var COL_GROUPS=[
-        {label:'DISC SEL = 0', color:'#f5c518', skeys:['d0','d0pct','d0R'], slabels:['COUNT','%','P&L (R)']},
-        {label:'DISC SEL = 1', color:'#4caf50', skeys:['d1','d1pct','d1R'], slabels:['COUNT','%','P&L (R)']},
-        {label:'SYS EXEC = 0', color:'#90caf9', skeys:['e0','e0pct','e0R'], slabels:['COUNT','%','P&L (R)']},
-        {label:'SYS EXEC = 1', color:'#26a69a', skeys:['e1','e1pct','e1R'], slabels:['COUNT','%','P&L (R)']},
+        {label:'DISC SEL = 0', color:'#f5c518', skeys:['d0pct','d0R'], slabels:['%','P&L (R)']},
+        {label:'DISC SEL = 1', color:'#4caf50', skeys:['d1pct','d1R'], slabels:['%','P&L (R)']},
+        {label:'SYS EXEC = 0', color:'#90caf9', skeys:['e0pct','e0R'], slabels:['%','P&L (R)']},
+        {label:'SYS EXEC = 1', color:'#26a69a', skeys:['e1pct','e1R'], slabels:['%','P&L (R)']},
       ];
 
       function mkTh(txt, key, color, extra){
@@ -10450,19 +10450,11 @@ function kinfoRenderGrades() {
 
       COL_GROUPS.forEach(function(grp){
         var th=document.createElement('th');
-        th.colSpan=3;
+        th.colSpan=2;
         th.style.cssText='padding:5px 8px;background:rgba(0,0,0,0.4);border-bottom:none;border-left:2px solid '+grp.color+'55;border-right:1px solid rgba(255,255,255,0.06);font-size:8px;letter-spacing:1px;color:'+grp.color+';text-align:center;';
         th.textContent=grp.label;
         tr0.appendChild(th);
       });
-      // Total P&L(R) column — rowspan 2
-      var thTR=document.createElement('th');
-      thTR.rowSpan=2;
-      var isTRActive=_pSort==='totalR';
-      thTR.style.cssText='padding:6px 10px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-left:2px solid rgba(255,255,255,0.15);font-size:7px;letter-spacing:1px;color:'+(isTRActive?'#fff':'rgba(255,255,255,0.5)')+';cursor:pointer;user-select:none;text-align:right;white-space:nowrap;vertical-align:middle;';
-      thTR.textContent='TOTAL P&L (R)'+(isTRActive?(_pSortDir===1?' ▲':' ▼'):'');
-      thTR.onclick=function(){ if(_pSort==='totalR') _pSortDir*=-1; else{_pSort='totalR';_pSortDir=-1;} renderPeriodTable(); };
-      tr0.appendChild(thTR);
       tbl.appendChild(tr0);
 
       // Sub-header row
@@ -10485,19 +10477,12 @@ function kinfoRenderGrades() {
         td0.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.06);border-right:2px solid rgba(255,255,255,0.15);background:'+bg+';white-space:nowrap;font-size:9px;color:var(--text);';
         td0.textContent=formatPeriodLabel(row.key,_pMode);
         tr.appendChild(td0);
-        // Total P&L(R) cell
-        var trCell=document.createElement('td');
-        var trVal=s.totalR;
-        var trCol=trVal>0?'#4caf50':trVal<0?'#ef5350':'rgba(255,255,255,0.3)';
-        trCell.style.cssText='padding:6px 10px;border-top:1px solid rgba(255,255,255,0.06);border-left:2px solid rgba(255,255,255,0.15);background:'+bg+';font-family:var(--display);font-size:12px;font-weight:bold;color:'+trCol+';text-align:right;white-space:nowrap;';
-        trCell.textContent=(trVal>0?'+':'')+trVal.toFixed(1)+'R';
-        tr.appendChild(trCell);
+
 
         COL_GROUPS.forEach(function(grp){
           var vals=[
-            {v:s[grp.skeys[0]], isR:false},
-            {v:s[grp.skeys[1]]+'%', isR:false},
-            {v:s[grp.skeys[2]], isR:true},
+            {v:s[grp.skeys[0]]+'%', isR:false},
+            {v:s[grp.skeys[1]], isR:true},
           ];
           vals.forEach(function(vobj,vi){
             var td=document.createElement('td');
