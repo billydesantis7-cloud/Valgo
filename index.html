@@ -10371,13 +10371,10 @@ function kinfoRenderGrades() {
 
     function renderPeriodTable(){
       monthDiv.innerHTML='';
-      // Header bar
       var hbar=document.createElement('div');
       hbar.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;';
       hbar.innerHTML='<div style="width:3px;height:18px;background:#c8a96e;border-radius:2px;flex-shrink:0;"></div>'
         +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#c8a96e;">PERIOD COMPARISON</div>';
-
-      // WEEKLY / MONTHLY toggle
       var toggle=document.createElement('div');
       toggle.style.cssText='display:flex;gap:0;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-left:8px;';
       ['weekly','monthly'].forEach(function(m){
@@ -10394,114 +10391,102 @@ function kinfoRenderGrades() {
       var groups=_pMode==='weekly'?weekGroups:monthGroups2;
       var keys=Object.keys(groups).sort();
       if(!keys.length){
-        monthDiv.innerHTML+='<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;">No graded trades found yet.</div>';
+        var empty=document.createElement('div');
+        empty.style.cssText='font-family:var(--mono);font-size:11px;color:var(--muted);padding:20px;text-align:center;';
+        empty.textContent='No graded trades found yet.';
+        monthDiv.appendChild(empty);
         return;
       }
 
-      // Build rows data
       var rows=keys.map(function(k){ return {key:k,stats:calcStats(groups[k])}; }).filter(function(r){return r.stats;});
-
-      // Sort
       rows.sort(function(a,b){
-        var d=_pSortDir;
-        var s=_pSort;
+        var d=_pSortDir, s=_pSort;
         if(s==='period') return d*a.key.localeCompare(b.key);
-        if(s==='d0') return d*(a.stats.d0-b.stats.d0);
-        if(s==='d0pct') return d*(a.stats.d0pct-b.stats.d0pct);
-        if(s==='d0R') return d*(a.stats.d0R-b.stats.d0R);
-        if(s==='d1') return d*(a.stats.d1-b.stats.d1);
-        if(s==='d1pct') return d*(a.stats.d1pct-b.stats.d1pct);
-        if(s==='d1R') return d*(a.stats.d1R-b.stats.d1R);
-        if(s==='e0') return d*(a.stats.e0-b.stats.e0);
-        if(s==='e0pct') return d*(a.stats.e0pct-b.stats.e0pct);
-        if(s==='e0R') return d*(a.stats.e0R-b.stats.e0R);
-        if(s==='e1') return d*(a.stats.e1-b.stats.e1);
-        if(s==='e1pct') return d*(a.stats.e1pct-b.stats.e1pct);
-        if(s==='e1R') return d*(a.stats.e1R-b.stats.e1R);
+        var map={d0:'d0',d0pct:'d0pct',d0R:'d0R',d1:'d1',d1pct:'d1pct',d1R:'d1R',e0:'e0',e0pct:'e0pct',e0R:'e0R',e1:'e1',e1pct:'e1pct',e1R:'e1R'};
+        if(map[s]) return d*(a.stats[s]-b.stats[s]);
         return 0;
       });
 
-      var PCOLS='110px repeat(3,60px) 6px repeat(3,60px) 6px repeat(3,60px) 6px repeat(3,60px)';
+      // 13 columns: PERIOD + 3*4 groups = 13
+      // Use table element for clean alignment
       var wrap=document.createElement('div'); wrap.style.cssText='overflow-x:auto;';
-      var grid=document.createElement('div');
-      grid.style.cssText='display:grid;grid-template-columns:'+PCOLS+';border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:700px;';
+      var tbl=document.createElement('table');
+      tbl.style.cssText='width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;min-width:760px;';
 
-      function sortHdr(key,label,color){
-        var el=document.createElement('div');
+      var COL_GROUPS=[
+        {label:'DISC SEL = 0', color:'#f5c518', skeys:['d0','d0pct','d0R'], slabels:['COUNT','%','P&L (R)']},
+        {label:'DISC SEL = 1', color:'#4caf50', skeys:['d1','d1pct','d1R'], slabels:['COUNT','%','P&L (R)']},
+        {label:'SYS EXEC = 0', color:'#90caf9', skeys:['e0','e0pct','e0R'], slabels:['COUNT','%','P&L (R)']},
+        {label:'SYS EXEC = 1', color:'#26a69a', skeys:['e1','e1pct','e1R'], slabels:['COUNT','%','P&L (R)']},
+      ];
+
+      function mkTh(txt, key, color, extra){
+        var th=document.createElement('th');
         var isActive=_pSort===key;
-        el.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActive?color:'rgba(255,255,255,0.4)')+';letter-spacing:1px;padding:5px 6px;cursor:pointer;user-select:none;text-align:center;border-left:1px solid var(--border);';
-        el.textContent=label+(isActive?(_pSortDir===1?' ▲':' ▼'):'');
-        el.onclick=function(){ if(_pSort===key) _pSortDir*=-1; else{_pSort=key;_pSortDir=-1;} renderPeriodTable(); };
-        return el;
+        th.style.cssText='padding:6px 8px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-right:1px solid rgba(255,255,255,0.06);font-size:8px;letter-spacing:1px;color:'+(isActive?color:'rgba(255,255,255,0.4)')+';cursor:pointer;user-select:none;white-space:nowrap;text-align:left;'+(extra||'');
+        th.textContent=txt+(isActive?(_pSortDir===1?' ▲':' ▼'):'');
+        if(key) th.onclick=function(){ if(_pSort===key) _pSortDir*=-1; else{_pSort=key;_pSortDir=-1;} renderPeriodTable(); };
+        return th;
       }
 
-      // Period header
-      var ph=document.createElement('div');
-      var isActiveP=_pSort==='period';
-      ph.style.cssText='font-family:var(--mono);font-size:7px;color:'+(isActiveP?'var(--accent)':'rgba(255,255,255,0.4)')+';letter-spacing:1px;padding:5px 8px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.35);';
-      ph.textContent=(_pMode==='weekly'?'WEEK':'MONTH')+(isActiveP?(_pSortDir===1?' ▲':' ▼'):'');
-      ph.onclick=function(){ if(_pSort==='period') _pSortDir*=-1; else{_pSort='period';_pSortDir=1;} renderPeriodTable(); };
-      grid.appendChild(ph);
+      // Group header row
+      var tr0=document.createElement('tr');
+      var th0=document.createElement('th');
+      th0.rowSpan=2;
+      th0.style.cssText='padding:6px 8px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-right:2px solid rgba(255,255,255,0.15);font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.4);cursor:pointer;user-select:none;text-align:left;';
+      th0.textContent=(_pMode==='weekly'?'WEEK':'MONTH')+(_pSort==='period'?(_pSortDir===1?' ▲':' ▼'):'');
+      th0.onclick=function(){ if(_pSort==='period') _pSortDir*=-1; else{_pSort='period';_pSortDir=1;} renderPeriodTable(); };
+      tr0.appendChild(th0);
 
-      // Group headers
-      [
-        {label:'DISC SEL = 0', color:'#f5c518', keys:['d0','d0pct','d0R'], labels:['COUNT','%','P&L(R)']},
-        {label:'DISC SEL = 1', color:'#4caf50', keys:['d1','d1pct','d1R'], labels:['COUNT','%','P&L(R)']},
-        {label:'SYS EXEC = 0', color:'#90caf9', keys:['e0','e0pct','e0R'], labels:['COUNT','%','P&L(R)']},
-        {label:'SYS EXEC = 1', color:'#26a69a', keys:['e1','e1pct','e1R'], labels:['COUNT','%','P&L(R)']},
-      ].forEach(function(grp){
-        // Divider spacer
-        var sp=document.createElement('div'); sp.style.cssText='background:rgba(0,0,0,0.35);'; grid.appendChild(sp);
-        grp.keys.forEach(function(k,ki){
-          var h=sortHdr(k,grp.labels[ki],grp.color);
-          h.style.background='rgba(0,0,0,0.35)';
-          if(ki===0) h.style.borderLeft='2px solid '+grp.color+'44';
-          grid.appendChild(h);
+      COL_GROUPS.forEach(function(grp){
+        var th=document.createElement('th');
+        th.colSpan=3;
+        th.style.cssText='padding:5px 8px;background:rgba(0,0,0,0.4);border-bottom:none;border-left:2px solid '+grp.color+'55;border-right:1px solid rgba(255,255,255,0.06);font-size:8px;letter-spacing:1px;color:'+grp.color+';text-align:center;';
+        th.textContent=grp.label;
+        tr0.appendChild(th);
+      });
+      tbl.appendChild(tr0);
+
+      // Sub-header row
+      var tr1=document.createElement('tr');
+      COL_GROUPS.forEach(function(grp){
+        grp.skeys.forEach(function(sk,si){
+          var th=mkTh(grp.slabels[si], sk, grp.color, 'border-top:1px solid var(--border);text-align:right;'+(si===0?'border-left:2px solid '+grp.color+'55;':''));
+          tr1.appendChild(th);
         });
       });
+      tbl.appendChild(tr1);
 
       // Data rows
       rows.forEach(function(row,ri){
         var s=row.stats;
-        var isEven=ri%2===0;
-        var bg=isEven?'rgba(255,255,255,0.02)':'transparent';
+        var bg=ri%2===0?'rgba(255,255,255,0.02)':'transparent';
+        var tr=document.createElement('tr');
 
-        var pl=document.createElement('div');
-        pl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);padding:7px 8px;border-top:1px solid var(--border);background:'+bg+';white-space:nowrap;';
-        pl.textContent=formatPeriodLabel(row.key,_pMode);
-        grid.appendChild(pl);
+        var td0=document.createElement('td');
+        td0.style.cssText='padding:7px 8px;border-top:1px solid rgba(255,255,255,0.06);border-right:2px solid rgba(255,255,255,0.15);background:'+bg+';white-space:nowrap;font-size:9px;color:var(--text);';
+        td0.textContent=formatPeriodLabel(row.key,_pMode);
+        tr.appendChild(td0);
 
-        function addCell(val,isR,groupColor,isFirst){
-          var c=document.createElement('div');
-          var col=isR?(val>0?'#4caf50':val<0?'#ef5350':'var(--muted)'):groupColor;
-          c.style.cssText='font-family:var(--display);font-size:12px;font-weight:bold;color:'+col+';padding:6px;border-top:1px solid var(--border);text-align:center;background:'+bg+';border-left:'+(isFirst?'2px solid '+groupColor+'44':'1px solid rgba(255,255,255,0.05)')+';';
-          c.textContent=isR?((val>0?'+':'')+val.toFixed(1)+'R'):(typeof val==='number'&&!isR&&val.toString().indexOf('%')<0?val:val);
-          grid.appendChild(c);
-        }
-        function addSpacer(){
-          var c=document.createElement('div'); c.style.cssText='background:'+bg+';border-top:1px solid var(--border);'; grid.appendChild(c);
-        }
-
-        var groups2=[
-          {vals:[s.d0,s.d0pct+'%',s.d0R],color:'#f5c518',isR:[false,false,true]},
-          {vals:[s.d1,s.d1pct+'%',s.d1R],color:'#4caf50',isR:[false,false,true]},
-          {vals:[s.e0,s.e0pct+'%',s.e0R],color:'#90caf9',isR:[false,false,true]},
-          {vals:[s.e1,s.e1pct+'%',s.e1R],color:'#26a69a',isR:[false,false,true]},
-        ];
-        groups2.forEach(function(grp){
-          addSpacer();
-          grp.vals.forEach(function(v,vi){
-            var c=document.createElement('div');
-            var col=grp.isR[vi]?(typeof v==='number'&&v>0?'#4caf50':typeof v==='number'&&v<0?'#ef5350':'var(--muted)'):grp.color;
-            var txt=grp.isR[vi]?((v>0?'+':'')+v.toFixed(1)+'R'):v;
-            c.style.cssText='font-family:var(--display);font-size:11px;font-weight:bold;color:'+col+';padding:6px 4px;border-top:1px solid var(--border);text-align:center;background:'+bg+';border-left:'+(vi===0?'2px solid '+grp.color+'44':'1px solid rgba(255,255,255,0.05)')+';';
-            c.textContent=txt;
-            grid.appendChild(c);
+        COL_GROUPS.forEach(function(grp){
+          var vals=[
+            {v:s[grp.skeys[0]], isR:false},
+            {v:s[grp.skeys[1]]+'%', isR:false},
+            {v:s[grp.skeys[2]], isR:true},
+          ];
+          vals.forEach(function(vobj,vi){
+            var td=document.createElement('td');
+            var col=vobj.isR?(vobj.v>0?'#4caf50':vobj.v<0?'#ef5350':'rgba(255,255,255,0.3)'):grp.color;
+            var txt=vobj.isR?((vobj.v>0?'+':'')+vobj.v.toFixed(1)+'R'):vobj.v;
+            td.style.cssText='padding:6px 8px;border-top:1px solid rgba(255,255,255,0.06);background:'+bg+';font-family:var(--display);font-size:11px;font-weight:bold;color:'+col+';text-align:right;'+(vi===0?'border-left:2px solid '+grp.color+'44;':'border-left:1px solid rgba(255,255,255,0.04);');
+            td.textContent=txt;
+            tr.appendChild(td);
           });
         });
+        tbl.appendChild(tr);
       });
 
-      wrap.appendChild(grid);
+      wrap.appendChild(tbl);
       monthDiv.appendChild(wrap);
     }
 
