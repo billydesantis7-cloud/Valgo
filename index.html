@@ -7257,7 +7257,7 @@ function scaAddTableRow(id) {
   if (!container) return;
   var existing = container.querySelectorAll('[id^="'+id+'_row"]');
   var r = existing.length + 1;
-  if (r > 2) return;
+  if (r > 4) return;
 
   var isShort = id.indexOf('_short_') >= 0;
   var idx = parseInt(id.split('_').pop()) || 1;
