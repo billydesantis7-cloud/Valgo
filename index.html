@@ -7299,14 +7299,14 @@ function scaAddTableRow(id) {
   // Wire inputs
   div.querySelectorAll('.sca-input').forEach(function(el){ el.addEventListener('input', scaRecalcAll); });
 
-  if (r >= 2) { var btn=document.getElementById(id+'_addbtn'); if(btn) btn.style.display='none'; }
+  if (r >= 4) { var btn=document.getElementById(id+'_addbtn'); if(btn) btn.style.display='none'; }
   scaRecalcAll();
 }
 
 function scaRemoveTableRow(id, r) {
   var el = document.getElementById(id+'_row'+r);
   if (el) el.remove();
-  for(var i=r+1;i<=2;i++){var e2=document.getElementById(id+'_row'+i);if(e2)e2.remove();}
+  for(var i=r+1;i<=4;i++){var e2=document.getElementById(id+'_row'+i);if(e2)e2.remove();}
   var btn=document.getElementById(id+'_addbtn'); if(btn){btn.style.display='block';}
   scaRecalcAll();
 }
@@ -7343,7 +7343,7 @@ function scaCalcBlock(dir,idx,R){
   var entry0=val('_0_entry'), stop0=val('_0_stop'), size0=val('_0_size');
   var target=val('_target');
   if(!entry0||!stop0||!size0){set('_0_total','—');set('_0_avg','—');set('_0_rrisk','—');set('_0_rtarget','—');
-    for(var r=1;r<=2;r++){if(document.getElementById(id+'_'+r+'_entry')){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}}
+    for(var r=1;r<=4;r++){if(document.getElementById(id+'_'+r+'_entry')){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}}
     return;
   }
 
@@ -7358,7 +7358,7 @@ function scaCalcBlock(dir,idx,R){
   }
 
   var prevAvgP=entry0, prevTotal=size0;
-  var maxAddRows=2;
+  var maxAddRows=4;
   for(var r=1;r<=maxAddRows;r++){
     if(!document.getElementById(id+'_'+r+'_entry')) break;
     var entryR=val('_'+r+'_entry'), stopR=val('_'+r+'_stop');
