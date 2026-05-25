@@ -9612,11 +9612,10 @@ function ttShowWhyPage(){
 }
 
 
-// ── NEEDLE MOVERS META (mr/ls toggles) ──
+// ── NEEDLE MOVERS META ──
 var ttNeedleMeta = (function(){
   try { return JSON.parse(localStorage.getItem('ttNeedleMeta')||'{}'); } catch(e){ return {}; }
 })();
-
 function ttSaveNeedleMeta(id, field, val){
   if(!ttNeedleMeta[id]) ttNeedleMeta[id]={};
   if(ttNeedleMeta[id][field]===val){ delete ttNeedleMeta[id][field]; }
@@ -9640,39 +9639,37 @@ function ttShowNeedleMovers(){
     allEntries=allEntries.slice().sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
 
     page.innerHTML='';
-    var wrap=document.createElement('div'); wrap.style.cssText='width:520px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
+    var wrap=document.createElement('div'); wrap.style.cssText='width:580px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
     var _pa=page.appendChild.bind(page); page.appendChild=function(el){ if(el===wrap) _pa(el); else wrap.appendChild(el); };
 
-    // Header
+    // Header row 1: title + close
     var hdr=document.createElement('div');
-    hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
-    hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">📍 NEEDLE MOVERS</div>';
-
-    // Edge filter buttons
-    var filterWrap=document.createElement('div');
-    filterWrap.style.cssText='display:flex;align-items:center;gap:4px;';
-    filterWrap.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-right:2px;">EDGE ≥</span>';
-    [50,55,60,65,70].forEach(function(val){
-      var btn=document.createElement('button');
-      btn.textContent=val;
-      var active=(val===_nmMinEdge);
-      btn.style.cssText='font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:3px;cursor:pointer;border:1px solid '+(active?'#90caf9':'rgba(255,255,255,0.15)')+';background:'+(active?'rgba(144,202,249,0.2)':'transparent')+';color:'+(active?'#90caf9':'var(--muted)')+';transition:all 0.1s;';
-      btn.onclick=function(){ _nmMinEdge=val; buildPage(); };
-      filterWrap.appendChild(btn);
-    });
-    hdr.appendChild(filterWrap);
-
-    var subtitleEl=document.createElement('div');
-    subtitleEl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
-    subtitleEl.textContent='top ops across all months · '+allEntries.length+' entries';
-    hdr.appendChild(subtitleEl);
-
+    hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;';
+    hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">&#x1F4CD; NEEDLE MOVERS</div>';
     var closeBtn=document.createElement('button');
     closeBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:4px;cursor:pointer;';
     closeBtn.textContent='✕ CLOSE';
     closeBtn.onclick=function(){ page.remove(); };
     hdr.appendChild(closeBtn);
     page.appendChild(hdr);
+
+    // Header row 2: slider
+    var sliderRow=document.createElement('div');
+    sliderRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 16px;';
+    sliderRow.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;white-space:nowrap;">MIN EDGE</span>'
+      +'<input id="_nmSlider" type="range" min="0" max="100" step="5" value="'+_nmMinEdge+'" style="flex:1;accent-color:#90caf9;cursor:pointer;">'
+      +'<span id="_nmSliderVal" style="font-family:var(--display);font-size:18px;font-weight:bold;color:#90caf9;min-width:36px;text-align:right;">'+_nmMinEdge+'</span>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">('+allEntries.length+' entries)</span>';
+    page.appendChild(sliderRow);
+
+    // Wire slider — live update label + refilter on release
+    setTimeout(function(){
+      var sl=document.getElementById('_nmSlider');
+      var lbl=document.getElementById('_nmSliderVal');
+      if(!sl||!lbl) return;
+      sl.oninput=function(){ lbl.textContent=sl.value; };
+      sl.onchange=function(){ _nmMinEdge=parseInt(sl.value); buildPage(); };
+    },0);
 
     // Compute stats
     var total=allEntries.length;
