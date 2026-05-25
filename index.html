@@ -868,7 +868,7 @@ async function forceReloadFromSupa(){
 // ── One-time migration from localStorage/IDB → Supabase ────
 async function migrateLocalToSupabase() {
   _sbSetStatus('☁ MIGRATING...', '#f5c518');
-  var keys = ['executions_cache','execMeta','manualTrades','tvTrades','tvDayR','tvTradeMeta','ttEntries','rollingNVBOverrides'];
+  var keys = ['executions_cache','execMeta','manualTrades','tvTrades','tvDayR','tvTradeMeta','ttEntries','rollingNVBOverrides','ttNeedleMeta'];
   for (var i = 0; i < keys.length; i++) {
     var v = localStorage.getItem(keys[i]);
     if (v && v !== '[]' && v !== '{}' && v !== 'null') {
@@ -1459,7 +1459,8 @@ function exportBackup(){
         tvTrades:         localStorage.getItem('tvTrades')||'[]',
         tvDayR:           localStorage.getItem('tvDayR')||'{}',
         ttEntries:        localStorage.getItem('ttEntries')||'[]',
-        rollingNVBOverrides: localStorage.getItem('rollingNVBOverrides')||'{}'
+        rollingNVBOverrides: localStorage.getItem('rollingNVBOverrides')||'{}',
+        ttNeedleMeta:        localStorage.getItem('ttNeedleMeta')||'{}'
       };
 
       var imgData={
@@ -1584,7 +1585,7 @@ function importBackup(event){
             var data=JSON.parse(dataMatch[1]);
             for(var k in data){try{localStorage.setItem(k,data[k]);}catch(er){}}
             // Push text data to Supabase
-            var _sbKeys=['executions_cache','execMeta','tvTrades','tvDayR','ttEntries','rollingNVBOverrides'];
+            var _sbKeys=['executions_cache','execMeta','tvTrades','tvDayR','ttEntries','rollingNVBOverrides','ttNeedleMeta'];
             _sbKeys.forEach(function(k){var v=localStorage.getItem(k);if(v&&v!=='[]'&&v!=='{}')sbSave(k,v);});
             if(typeof executions!=='undefined')try{executions=JSON.parse(localStorage.getItem('executions_cache')||'[]');}catch(er){}
             if(typeof execMeta!=='undefined')try{execMeta=JSON.parse(localStorage.getItem('execMeta')||'{}');}catch(er){}
@@ -1636,6 +1637,7 @@ function importBackup(event){
       if(data.myTradeImages){localStorage.setItem('myTradeImages',data.myTradeImages);}
       if(data.ttEntries){localStorage.setItem('ttEntries',data.ttEntries);sbSave('ttEntries',data.ttEntries);}
       if(data.rollingNVBOverrides){localStorage.setItem('rollingNVBOverrides',data.rollingNVBOverrides);sbSave('rollingNVBOverrides',data.rollingNVBOverrides);}
+      if(data.ttNeedleMeta){localStorage.setItem('ttNeedleMeta',data.ttNeedleMeta);sbSave('ttNeedleMeta',data.ttNeedleMeta);try{ttNeedleMeta=JSON.parse(data.ttNeedleMeta);}catch(er){}}
       try{if(typeof tvTrades!=='undefined')tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]');}catch(er){}
       try{if(typeof tvDayR!=='undefined')tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(er){}
       try{if(typeof tvTradeImages!=='undefined')tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(er){}
@@ -7299,14 +7301,14 @@ function scaAddTableRow(id) {
   // Wire inputs
   div.querySelectorAll('.sca-input').forEach(function(el){ el.addEventListener('input', scaRecalcAll); });
 
-  if (r >= 2) { var btn=document.getElementById(id+'_addbtn'); if(btn) btn.style.display='none'; }
+  if (r >= 4) { var btn=document.getElementById(id+'_addbtn'); if(btn) btn.style.display='none'; }
   scaRecalcAll();
 }
 
 function scaRemoveTableRow(id, r) {
   var el = document.getElementById(id+'_row'+r);
   if (el) el.remove();
-  for(var i=r+1;i<=2;i++){var e2=document.getElementById(id+'_row'+i);if(e2)e2.remove();}
+  for(var i=r+1;i<=4;i++){var e2=document.getElementById(id+'_row'+i);if(e2)e2.remove();}
   var btn=document.getElementById(id+'_addbtn'); if(btn){btn.style.display='block';}
   scaRecalcAll();
 }
@@ -7343,7 +7345,7 @@ function scaCalcBlock(dir,idx,R){
   var entry0=val('_0_entry'), stop0=val('_0_stop'), size0=val('_0_size');
   var target=val('_target');
   if(!entry0||!stop0||!size0){set('_0_total','—');set('_0_avg','—');set('_0_rrisk','—');set('_0_rtarget','—');
-    for(var r=1;r<=2;r++){if(document.getElementById(id+'_'+r+'_entry')){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}}
+    for(var r=1;r<=4;r++){if(document.getElementById(id+'_'+r+'_entry')){set('_'+r+'_size','—');set('_'+r+'_total','—');set('_'+r+'_avg','—');set('_'+r+'_rrisk','—');set('_'+r+'_rtarget','—');}}
     return;
   }
 
@@ -7358,7 +7360,7 @@ function scaCalcBlock(dir,idx,R){
   }
 
   var prevAvgP=entry0, prevTotal=size0;
-  var maxAddRows=2;
+  var maxAddRows=4;
   for(var r=1;r<=maxAddRows;r++){
     if(!document.getElementById(id+'_'+r+'_entry')) break;
     var entryR=val('_'+r+'_entry'), stopR=val('_'+r+'_stop');
@@ -9610,6 +9612,19 @@ function ttShowWhyPage(){
 }
 
 
+// ── NEEDLE MOVERS META (mr/ls toggles) ──
+var ttNeedleMeta = (function(){
+  try { return JSON.parse(localStorage.getItem('ttNeedleMeta')||'{}'); } catch(e){ return {}; }
+})();
+
+function ttSaveNeedleMeta(id, field, val){
+  if(!ttNeedleMeta[id]) ttNeedleMeta[id]={};
+  if(ttNeedleMeta[id][field]===val){ delete ttNeedleMeta[id][field]; }
+  else { ttNeedleMeta[id][field]=val; }
+  localStorage.setItem('ttNeedleMeta', JSON.stringify(ttNeedleMeta));
+  if(typeof sbSave==='function') sbSave('ttNeedleMeta', JSON.stringify(ttNeedleMeta));
+}
+
 function ttShowNeedleMovers(){
   var existing=document.getElementById('_ttNeedlePage');
   if(existing){ existing.remove(); return; }
@@ -9631,12 +9646,12 @@ function ttShowNeedleMovers(){
     // Header
     var hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
-    hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">\u{1F4CD} NEEDLE MOVERS</div>';
+    hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">📍 NEEDLE MOVERS</div>';
 
     // Edge filter buttons
     var filterWrap=document.createElement('div');
     filterWrap.style.cssText='display:flex;align-items:center;gap:4px;';
-    filterWrap.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-right:2px;">EDGE \u2265</span>';
+    filterWrap.innerHTML='<span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-right:2px;">EDGE ≥</span>';
     [50,55,60,65,70].forEach(function(val){
       var btn=document.createElement('button');
       btn.textContent=val;
@@ -9649,12 +9664,12 @@ function ttShowNeedleMovers(){
 
     var subtitleEl=document.createElement('div');
     subtitleEl.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);';
-    subtitleEl.textContent='top ops across all months \u00b7 '+allEntries.length+' entries';
+    subtitleEl.textContent='top ops across all months · '+allEntries.length+' entries';
     hdr.appendChild(subtitleEl);
 
     var closeBtn=document.createElement('button');
     closeBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:4px;cursor:pointer;';
-    closeBtn.textContent='\u2715 CLOSE';
+    closeBtn.textContent='✕ CLOSE';
     closeBtn.onclick=function(){ page.remove(); };
     hdr.appendChild(closeBtn);
     page.appendChild(hdr);
