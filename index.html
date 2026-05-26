@@ -431,11 +431,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
             <div style="border-right:1px solid var(--border);">
-              <div style="padding:8px 16px;background:rgba(38,166,154,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#26a69a;letter-spacing:2px;">✓ WINS</div>
+              <div id="tvWrrDrillWinsHdr" onclick="tvWrrDrillSort('wins')" style="padding:8px 16px;background:rgba(38,166,154,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#26a69a;letter-spacing:2px;cursor:pointer;user-select:none;">✓ WINS <span id="tvWrrDrillWinsArrow" style="float:right;opacity:0.7;">↓</span></div>
               <div id="tvWrrDrillWins" style="padding:12px;display:flex;flex-direction:column;gap:10px;"></div>
             </div>
             <div>
-              <div style="padding:8px 16px;background:rgba(239,83,80,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#ef5350;letter-spacing:2px;">✗ LOSSES</div>
+              <div id="tvWrrDrillLossesHdr" onclick="tvWrrDrillSort('losses')" style="padding:8px 16px;background:rgba(239,83,80,0.1);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:#ef5350;letter-spacing:2px;cursor:pointer;user-select:none;">✗ LOSSES <span id="tvWrrDrillLossesArrow" style="float:right;opacity:0.7;">↓</span></div>
               <div id="tvWrrDrillLosses" style="padding:12px;display:flex;flex-direction:column;gap:10px;"></div>
             </div>
           </div>
@@ -5198,14 +5198,45 @@ function tvWrrDrill(period){
   var trades=tvGetFilteredTrades();
   var pk=function(date){if(tvWrrMode==='monthly')return date.slice(0,7);var d=new Date(date+'T12:00:00'),day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);mon.setDate(d.getDate()+diff);var sun=new Date(mon);sun.setDate(mon.getDate()+6);return mon.toISOString().slice(0,10)+' - '+sun.toISOString().slice(0,10);};
   var pts=trades.filter(function(t){return pk(t.date)===period;});
-  var ws=pts.filter(function(t){return t.pnl>0;});
-  var ls=pts.filter(function(t){return t.pnl<0;});
+
+  // Store sorted arrays globally so tvWrrDrillSort can re-render
+  window._tvDrillWs=pts.filter(function(t){return t.pnl>0;});
+  window._tvDrillLs=pts.filter(function(t){return t.pnl<0;});
+  window._tvDrillWinsDir=1;   // 1=biggest first
+  window._tvDrillLossesDir=1; // 1=biggest loss first
+
+  var titleEl=document.getElementById('tvWrrDrillTitle');
+  var panel=document.getElementById('tvWrrDrillPanel');
+  if(!panel) return;
+  if(titleEl) titleEl.textContent=period+' — '+window._tvDrillWs.length+' WINS / '+window._tvDrillLs.length+' LOSSES';
+  panel.style.display='block';
+  tvWrrDrillRender();
+  setTimeout(function(){panel.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
+}
+
+function tvWrrDrillRender(){
+  var winsEl=document.getElementById('tvWrrDrillWins');
+  var lossesEl=document.getElementById('tvWrrDrillLosses');
+  var wArrow=document.getElementById('tvWrrDrillWinsArrow');
+  var lArrow=document.getElementById('tvWrrDrillLossesArrow');
+  if(!winsEl||!lossesEl) return;
+
+  var wDir=window._tvDrillWinsDir||1;
+  var lDir=window._tvDrillLossesDir||1;
+  var sortedWs=(window._tvDrillWs||[]).slice().sort(function(a,b){ return wDir*(b.pnl-a.pnl); });
+  var sortedLs=(window._tvDrillLs||[]).slice().sort(function(a,b){ return lDir*(a.pnl-b.pnl); });
+
+  if(wArrow) wArrow.textContent=wDir===1?'↓':'↑';
+  if(lArrow) lArrow.textContent=lDir===1?'↓':'↑';
+
   function tradeCard(t,isWin){
     var imgKey=t.date+'_'+t.symbol+'_'+(t.side||'');
     var img=(typeof tvTradeImages!=='undefined'&&tvTradeImages[imgKey])||myTradeImages[imgKey]||null;
-    var rv=tvDayR[t.date];
-    var rVal=t.rMultiple||(rv&&rv!==0?t.pnl/rv:null);
-    var pnlStr=rVal!=null?(rVal>=0?'+':'')+rVal.toFixed(2)+'R':(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0);
+    var _rv=tvDayR[t.date];
+    var _rVal=t.rMultiple||(_rv&&_rv!==0?t.pnl/_rv:null);
+    var pnlStr=(typeof tvUnit!=='undefined'&&tvUnit==='R')
+      ?(_rVal!=null?(_rVal>=0?'+':'')+_rVal.toFixed(2)+'R':'--')
+      :(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0);
     var pnlC=isWin?'#26a69a':'#ef5350';
     var html='<div style="background:var(--surface);border:1px solid '+(isWin?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)')+';border-radius:6px;overflow:hidden;">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);">';
@@ -5214,24 +5245,23 @@ function tvWrrDrill(period){
     html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:'+pnlC+';">'+pnlStr+'</span>';
     html+='</div>';
     if(img){
-      html+='<img src="'+img+'" style="width:100%;max-height:200px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;" onclick="expandMyImg(\''+img+'\')">';
+      html+='<img src="'+img+'" style="width:100%;max-height:200px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;" onclick="expandMyImg(''+img+'')">';
     } else {
       html+='<div style="height:60px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--muted);">NO CHART</div>';
     }
     html+='</div>';
     return html;
   }
-  var winsEl=document.getElementById('tvWrrDrillWins');
-  var lossesEl=document.getElementById('tvWrrDrillLosses');
-  var titleEl=document.getElementById('tvWrrDrillTitle');
-  var panel=document.getElementById('tvWrrDrillPanel');
-  if(!winsEl||!lossesEl||!panel) return;
-  titleEl.textContent=period+' — '+ws.length+' WINS / '+ls.length+' LOSSES';
-  winsEl.innerHTML=ws.length?ws.map(function(t){return tradeCard(t,true);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No wins this period.</div>';
-  lossesEl.innerHTML=ls.length?ls.map(function(t){return tradeCard(t,false);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No losses this period.</div>';
-  panel.style.display='block';
-  setTimeout(function(){panel.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
+  winsEl.innerHTML=sortedWs.length?sortedWs.map(function(t){return tradeCard(t,true);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No wins this period.</div>';
+  lossesEl.innerHTML=sortedLs.length?sortedLs.map(function(t){return tradeCard(t,false);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No losses this period.</div>';
 }
+
+function tvWrrDrillSort(col){
+  if(col==='wins') window._tvDrillWinsDir=(window._tvDrillWinsDir||1)*-1;
+  else window._tvDrillLossesDir=(window._tvDrillLossesDir||1)*-1;
+  tvWrrDrillRender();
+}
+
 function renderTvWrr(){
   var el=document.getElementById('tvWrrTable'); if(!el) return;
   var trades=tvGetFilteredTrades();
