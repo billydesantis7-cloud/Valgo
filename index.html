@@ -8843,27 +8843,31 @@ var _gradeReviewTrades = [];
 
 var EXEC_SCORE_RUBRIC = [
   {section:'ENTRY', items:[
-    {key:'e1', label:"Didn't fomo chase", weight:2},
-    {key:'e2', label:"Didn't miss an entry", weight:2},
-    {key:'e3', label:'Systematic', weight:2},
-    {key:'e4', label:'Hit the correct size (not too much or too little)', weight:2},
-    {key:'e5', label:"Didn't hit new lows too early", weight:2},
-    {key:'e6', label:'Not too early', weight:1},
-    {key:'e7', label:'Not forced', weight:1},
+    {key:'e1', label:'Not forced', weight:16},
+    {key:'e2', label:"Didn't fomo chase", weight:11},
+    {key:'e3', label:'Not forced premarket', weight:11},
+    {key:'e4', label:"Didn't miss an entry", weight:10},
+    {key:'e5', label:'Systematic', weight:7},
+    {key:'e6', label:"Didn't hit new lows too early / didn't force new low", weight:7},
+    {key:'e7', label:'Not too early / not too early premarket', weight:5},
+    {key:'e8', label:'Hit the correct size (not too much or too little)', weight:5},
+    {key:'e9', label:'Kept head in the game', weight:4},
+    {key:'e10', label:'Not tunnel visioned', weight:3},
   ]},
   {section:'EXIT', items:[
-    {key:'x1', label:'Good % exits (not too much not too little)', weight:4},
-    {key:'x2', label:"Didn't get flat for no reason", weight:3},
-    {key:'x3', label:'Systematic', weight:2},
-    {key:'x4', label:'Not forced out mid range', weight:1},
+    {key:'x1', label:'Good % exits (not too much not too little)', weight:9},
+    {key:'x2', label:"Didn't get flat for no reason", weight:4},
+    {key:'x3', label:'Not forced out mid range', weight:2},
+    {key:'x4', label:'Systematic', weight:1},
   ]},
   {section:'STOP', items:[
-    {key:'s1', label:'Not forced to stop', weight:1},
-    {key:'s2', label:'Not flat for no reason', weight:1},
+    {key:'s1', label:'Not flat for no reason', weight:5},
+    {key:'s2', label:'Not forced to stop', weight:2},
     {key:'s3', label:"Didn't stop out too much %", weight:1},
   ]},
 ];
-var EXEC_SCORE_MAX = 25;
+// Max = 79 (entry) + 16 (exit) + 8 (stop) = 103; score = earned/103 * 100
+var EXEC_SCORE_MAX = 103;
 
 function kinfoCalcExecScore(checks){
   // checks is an object {e1:true, e2:false, ...}
@@ -9630,7 +9634,6 @@ function ttShowNeedleMovers(){
     var wrap=document.createElement('div');
     wrap.style.cssText='width:580px;max-width:98vw;margin:0 auto;';
     page.appendChild(wrap);
-    // Header
     var hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;';
     var titleEl=document.createElement('div');
@@ -9643,7 +9646,6 @@ function ttShowNeedleMovers(){
     closeBtn.onclick=function(){page.remove();};
     hdr.appendChild(closeBtn);
     wrap.appendChild(hdr);
-    // Slider
     var sliderRow=document.createElement('div');
     sliderRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 16px;';
     var sliderLabel=document.createElement('span');
@@ -9663,15 +9665,11 @@ function ttShowNeedleMovers(){
     sliderRow.appendChild(sliderLabel);sliderRow.appendChild(slider);
     sliderRow.appendChild(sliderVal);sliderRow.appendChild(sliderCount);
     wrap.appendChild(sliderRow);
-    // Stats
     var mrCount=0,longCount=0,shortCount=0,mrLongCount=0,mrShortCount=0,total=allEntries.length;
     allEntries.forEach(function(e){
       var m=ttNeedleMeta[e.id]||{};
-      if(m.mr==='yes')mrCount++;
-      if(m.ls==='long')longCount++;
-      if(m.ls==='short')shortCount++;
-      if(m.mr==='yes'&&m.ls==='long')mrLongCount++;
-      if(m.mr==='yes'&&m.ls==='short')mrShortCount++;
+      if(m.mr==='yes')mrCount++;if(m.ls==='long')longCount++;if(m.ls==='short')shortCount++;
+      if(m.mr==='yes'&&m.ls==='long')mrLongCount++;if(m.mr==='yes'&&m.ls==='short')mrShortCount++;
     });
     function pct(n){return total?Math.round(n/total*100)+'%':'--';}
     var statsGrid=document.createElement('div');
@@ -9690,7 +9688,6 @@ function ttShowNeedleMovers(){
       statsGrid.appendChild(card);
     });
     wrap.appendChild(statsGrid);
-    // Table
     var NM_COL='grid-template-columns:38px 58px 28px 1fr 22px 22px 22px 58px 68px';
     var tableWrap=document.createElement('div');
     tableWrap.style.cssText='border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,0.3);';
