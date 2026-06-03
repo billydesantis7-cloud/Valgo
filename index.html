@@ -4352,8 +4352,16 @@ function splitIntoTrades(execRows,date){
         // No offsetting side — fully open position, show on calendar with OPEN badge
         var openQty=isShort?sellQty:buyQty;
         var avgEntryOpen=isShort?(sellRev/sellQty):(buyCost/buyQty);
-        trades.push({id:'tv_'+date+'_'+symbol+'_'+openTime+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:isShort?'short':'long',openTime,closeTime:null,volume:openQty,entryPrice:parseFloat(avgEntryOpen.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
+        trades.push({id:'tv_'+date+'_'+symbol+'_'+openTime+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:isShort?'short':'long',openTime,closeTime:null,volume:openQty,openQty:openQty,entryPrice:parseFloat(avgEntryOpen.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
         tradeExecs=[];return;
+      }
+      // Partial close: if one side has more qty, there's a remaining open position
+      var leftoverQty=Math.abs(buyQty-sellQty);
+      if(leftoverQty>0){
+        // Some shares still open after this trade — create an open remainder trade
+        var leftoverSide=buyQty>sellQty?'long':'short';
+        var leftoverEntry=leftoverSide==='long'?(buyCost/buyQty):(sellRev/sellQty);
+        trades.push({id:'tv_'+date+'_'+symbol+'_open_'+Math.random().toString(36).slice(2,6),date,symbol,side:leftoverSide,openTime:openTime,closeTime:null,volume:leftoverQty,openQty:leftoverQty,entryPrice:parseFloat(leftoverEntry.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
       }
       var avgEntry=isShort?(sellRev/sellQty):(buyCost/buyQty);
       var avgExit=isShort?(buyCost/buyQty):(sellRev/sellQty);
@@ -4388,14 +4396,19 @@ function tvHandleImport(event){
       // Check if today's CSV has any executions for this symbol
       var hasToday = execs.some(function(ex){ return ex.symbol === op.symbol; });
       if(!hasToday) return;
+
+      // Calculate the ACTUAL remaining open quantity by replaying the open day's execs.
+      // op.volume is the full original volume — we need what's left open.
+      // We detect this by checking if the open trade has a stored openQty, else fall back to volume.
+      var remainingQty = op.openQty || op.volume;
+
       // Inject a synthetic exec representing the carry-over position
-      // Use opposite side logic: if original was long (bought), inject a Buy
       var synthSide = op.side === 'long' ? 'B' : 'SS';
       execs.unshift({
         time: '00:00:00',  // midnight — sorts before real execs
         symbol: op.symbol,
         price: op.entryPrice,
-        qty: op.volume,
+        qty: remainingQty,
         side: synthSide
       });
     });
@@ -4409,6 +4422,10 @@ function tvHandleImport(event){
         tvTrades = tvTrades.map(function(t){
           if(t.id === op.id) return Object.assign({}, t, {open: false, openedOnly: true, closedDate: date});
           return t;
+        });
+        // Remove any leftover open remainder for this symbol/date — it's now closed
+        tvTrades = tvTrades.filter(function(t){
+          return !(t.open && t.symbol===op.symbol && t.date===op.date && t.id!==op.id);
         });
       }
     });
