@@ -4047,25 +4047,19 @@ function tvTab(t){
 }
 
 function tvToggleOpenBadge(tradeId){
-  // Find the trade
-  var t = tvTrades.find(function(t){ return t.id===tradeId; });
+  var t=tvTrades.find(function(t){return t.id===tradeId;});
   if(!t) return;
-  var label = t.openedOnly ? 'OPENED marker' : 'OPEN marker';
-  if(!confirm('Remove the '+label+' for '+t.symbol+' on '+t.date+'?\nThis will hide it from the calendar (the trade data is kept).')) return;
-  tvTrades = tvTrades.map(function(tr){
+  var label=t.openedOnly?'OPENED marker':'OPEN marker';
+  if(!confirm('Remove the '+label+' for '+t.symbol+' on '+t.date+'?\nThe trade data is kept.')) return;
+  tvTrades=tvTrades.map(function(tr){
     if(tr.id!==tradeId) return tr;
-    var updated = Object.assign({}, tr);
-    // Flip to a closed-looking trade with pnl:0 so it stays hidden from stats
-    // but is kept in storage in case you want to restore it
-    delete updated.open;
-    delete updated.openedOnly;
-    updated._badgeDismissed = true;
-    // If it was openedOnly (swing open marker), give it a $0 exit so it looks closed
-    if(!updated.exitPrice) updated.exitPrice = updated.entryPrice;
-    return updated;
+    var u=Object.assign({},tr);
+    delete u.open; delete u.openedOnly;
+    u._badgeDismissed=true;
+    if(!u.exitPrice) u.exitPrice=u.entryPrice;
+    return u;
   });
-  tvSave();
-  renderTvCal();
+  tvSave(); renderTvCal();
   if(tvDayExpandedDate) _renderDayPanel(tvDayExpandedDate);
 }
 
@@ -5162,6 +5156,8 @@ function tvEditTrade(t){
     tvTrades[idx].pnl=parseFloat(fPnl.inp.value)||t.pnl;
     tvTrades[idx].openTime=fOpen.inp.value||t.openTime;
     tvTrades[idx].closeTime=fClose.inp.value||t.closeTime;
+    var _rv=tvDayR[tvTrades[idx].date];
+    tvTrades[idx].rMultiple=_rv&&_rv>0?parseFloat((tvTrades[idx].pnl/_rv).toFixed(2)):null;
     tvSave();
     modal.remove();
     renderTvTrades();renderTvCal();
@@ -5187,7 +5183,7 @@ function tvGetFilteredTrades(){
   var from=_tvDateFrom||(document.getElementById('tvRptFrom')?document.getElementById('tvRptFrom').value:'');
   var to=_tvDateTo||(document.getElementById('tvRptTo')?document.getElementById('tvRptTo').value:'');
   return tvTrades.filter(function(t){
-    if(t.open||t.openedOnly) return false;  // exclude incomplete/open trades from all stats
+    if(t.open||t.openedOnly) return false;
     if(from&&t.date<from)return false;
     if(to&&t.date>to)return false;
     return true;
@@ -6845,23 +6841,22 @@ function renderCompounding(){
 function fixTradeFlags(){
   var fixed=0;
   tvTrades = tvTrades.map(function(t){
-    // openedOnly should ONLY be set on trades that explicitly have exitPrice===null AND were set by swing logic
-    // If a trade has a real exitPrice, it should never be openedOnly
+    var clean = Object.assign({}, t);
+    var changed = false;
     if(t.openedOnly && t.exitPrice !== null && t.exitPrice !== undefined){
-      var clean = Object.assign({}, t);
-      delete clean.openedOnly;
-      delete clean.open;
-      fixed++;
-      return clean;
+      delete clean.openedOnly; delete clean.open; changed=true;
     }
-    // If open=true but has exitPrice, also clean it
     if(t.open && t.exitPrice !== null && t.exitPrice !== undefined){
-      var clean2 = Object.assign({}, t);
-      delete clean2.open;
-      fixed++;
-      return clean2;
+      delete clean.open; changed=true;
     }
-    return t;
+    // Recalculate rMultiple from current pnl — fixes stale R after manual edits
+    if(!t.open && !t.openedOnly && t.pnl != null){
+      var rv=tvDayR[t.date];
+      var correctR=rv&&rv>0?parseFloat((t.pnl/rv).toFixed(2)):null;
+      if(correctR!==null && correctR!==t.rMultiple){ clean.rMultiple=correctR; changed=true; }
+    }
+    if(changed) fixed++;
+    return changed?clean:t;
   });
   localStorage.setItem('tvTrades', JSON.stringify(tvTrades));
   sbSave('tvTrades', JSON.stringify(tvTrades));
