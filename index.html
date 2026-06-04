@@ -4054,8 +4054,7 @@ function tvToggleOpenBadge(tradeId){
   tvTrades=tvTrades.map(function(tr){
     if(tr.id!==tradeId) return tr;
     var u=Object.assign({},tr);
-    delete u.open; delete u.openedOnly;
-    u._badgeDismissed=true;
+    delete u.open; delete u.openedOnly; u._badgeDismissed=true;
     if(!u.exitPrice) u.exitPrice=u.entryPrice;
     return u;
   });
@@ -5114,6 +5113,7 @@ function tvEditTrade(t){
   var fPnl=field('P&L ($)',t.pnl,'number');fPnl.inp.step='0.01';
   var fOpen=field('OPEN TIME',t.openTime||'');
   var fClose=field('CLOSE TIME',t.closeTime||'');
+  var fR=field('R MULTIPLE (override)',t.rMultiple!=null?t.rMultiple:'','number');fR.inp.step='0.01';fR.inp.placeholder='leave blank to auto-calc';
 
   // Auto-calc P&L when entry/exit/vol change
   function autoCalcPnl(){
@@ -5129,7 +5129,7 @@ function tvEditTrade(t){
   [fEntry.inp,fExit.inp,fVol.inp].forEach(function(i){i.addEventListener('input',autoCalcPnl);});
   sideSelect.addEventListener('change',autoCalcPnl);
 
-  [fDate.el,fSym.el,fSide,fVol.el,fEntry.el,fExit.el,fPnl.el,fOpen.el,fClose.el].forEach(function(el){grid.appendChild(el);});
+  [fDate.el,fSym.el,fSide,fVol.el,fEntry.el,fExit.el,fPnl.el,fR.el,fOpen.el,fClose.el].forEach(function(el){grid.appendChild(el);});
   wrap.appendChild(grid);
 
   var note=document.createElement('div');note.style.cssText='font-size:10px;color:rgba(200,169,110,0.7);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);padding:8px 12px;border-radius:5px;';
@@ -5156,8 +5156,13 @@ function tvEditTrade(t){
     tvTrades[idx].pnl=parseFloat(fPnl.inp.value)||t.pnl;
     tvTrades[idx].openTime=fOpen.inp.value||t.openTime;
     tvTrades[idx].closeTime=fClose.inp.value||t.closeTime;
-    var _rv=tvDayR[tvTrades[idx].date];
-    tvTrades[idx].rMultiple=_rv&&_rv>0?parseFloat((tvTrades[idx].pnl/_rv).toFixed(2)):null;
+    var _rOverride=parseFloat(fR.inp.value);
+    if(!isNaN(_rOverride)&&fR.inp.value.trim()!==''){
+      tvTrades[idx].rMultiple=parseFloat(_rOverride.toFixed(2));
+    } else {
+      var _rv=tvDayR[tvTrades[idx].date];
+      tvTrades[idx].rMultiple=_rv&&_rv>0?parseFloat((tvTrades[idx].pnl/_rv).toFixed(2)):null;
+    }
     tvSave();
     modal.remove();
     renderTvTrades();renderTvCal();
@@ -6841,21 +6846,15 @@ function renderCompounding(){
 function fixTradeFlags(){
   var fixed=0;
   tvTrades = tvTrades.map(function(t){
-    var clean = Object.assign({}, t);
-    var changed = false;
-    if(t.openedOnly && t.exitPrice !== null && t.exitPrice !== undefined){
-      delete clean.openedOnly; delete clean.open; changed=true;
-    }
-    if(t.open && t.exitPrice !== null && t.exitPrice !== undefined){
-      delete clean.open; changed=true;
-    }
-    // Recalculate rMultiple from current pnl — fixes stale R after manual edits
-    if(!t.open && !t.openedOnly && t.pnl != null){
+    var clean=Object.assign({},t); var changed=false;
+    if(t.openedOnly&&t.exitPrice!==null&&t.exitPrice!==undefined){delete clean.openedOnly;delete clean.open;changed=true;}
+    if(t.open&&t.exitPrice!==null&&t.exitPrice!==undefined){delete clean.open;changed=true;}
+    if(!t.open&&!t.openedOnly&&t.pnl!=null){
       var rv=tvDayR[t.date];
       var correctR=rv&&rv>0?parseFloat((t.pnl/rv).toFixed(2)):null;
-      if(correctR!==null && correctR!==t.rMultiple){ clean.rMultiple=correctR; changed=true; }
+      if(correctR!==null&&correctR!==t.rMultiple){clean.rMultiple=correctR;changed=true;}
     }
-    if(changed) fixed++;
+    if(changed)fixed++;
     return changed?clean:t;
   });
   localStorage.setItem('tvTrades', JSON.stringify(tvTrades));
