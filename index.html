@@ -4046,6 +4046,30 @@ function tvTab(t){
   if(t==='valdata') renderTvValData();
 }
 
+function tvToggleOpenBadge(tradeId){
+  // Find the trade
+  var t = tvTrades.find(function(t){ return t.id===tradeId; });
+  if(!t) return;
+  var label = t.openedOnly ? 'OPENED marker' : 'OPEN marker';
+  if(!confirm('Remove the '+label+' for '+t.symbol+' on '+t.date+'?\nThis will hide it from the calendar (the trade data is kept).')) return;
+  tvTrades = tvTrades.map(function(tr){
+    if(tr.id!==tradeId) return tr;
+    var updated = Object.assign({}, tr);
+    // Flip to a closed-looking trade with pnl:0 so it stays hidden from stats
+    // but is kept in storage in case you want to restore it
+    delete updated.open;
+    delete updated.openedOnly;
+    updated._badgeDismissed = true;
+    // If it was openedOnly (swing open marker), give it a $0 exit so it looks closed
+    if(!updated.exitPrice) updated.exitPrice = updated.entryPrice;
+    return updated;
+  });
+  tvSave();
+  renderTvCal();
+  if(tvDayExpandedDate) _renderDayPanel(tvDayExpandedDate);
+}
+
+
 // ── VAL DATA STATE ────────────────────────────────────────────────────────
 var _tvVdMode='grid', _tvVdThreshold=100, _tvVdIncludeHM=true, _tvVdBookIdx=0, _tvVdActive=null;
 
@@ -4352,16 +4376,8 @@ function splitIntoTrades(execRows,date){
         // No offsetting side — fully open position, show on calendar with OPEN badge
         var openQty=isShort?sellQty:buyQty;
         var avgEntryOpen=isShort?(sellRev/sellQty):(buyCost/buyQty);
-        trades.push({id:'tv_'+date+'_'+symbol+'_'+openTime+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:isShort?'short':'long',openTime,closeTime:null,volume:openQty,openQty:openQty,entryPrice:parseFloat(avgEntryOpen.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
+        trades.push({id:'tv_'+date+'_'+symbol+'_'+openTime+'_'+Math.random().toString(36).slice(2,6),date,symbol,side:isShort?'short':'long',openTime,closeTime:null,volume:openQty,entryPrice:parseFloat(avgEntryOpen.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
         tradeExecs=[];return;
-      }
-      // Partial close: if one side has more qty, there's a remaining open position
-      var leftoverQty=Math.abs(buyQty-sellQty);
-      if(leftoverQty>0){
-        // Some shares still open after this trade — create an open remainder trade
-        var leftoverSide=buyQty>sellQty?'long':'short';
-        var leftoverEntry=leftoverSide==='long'?(buyCost/buyQty):(sellRev/sellQty);
-        trades.push({id:'tv_'+date+'_'+symbol+'_open_'+Math.random().toString(36).slice(2,6),date,symbol,side:leftoverSide,openTime:openTime,closeTime:null,volume:leftoverQty,openQty:leftoverQty,entryPrice:parseFloat(leftoverEntry.toFixed(4)),exitPrice:null,pnl:0,rMultiple:null,open:true});
       }
       var avgEntry=isShort?(sellRev/sellQty):(buyCost/buyQty);
       var avgExit=isShort?(buyCost/buyQty):(sellRev/sellQty);
@@ -4396,19 +4412,14 @@ function tvHandleImport(event){
       // Check if today's CSV has any executions for this symbol
       var hasToday = execs.some(function(ex){ return ex.symbol === op.symbol; });
       if(!hasToday) return;
-
-      // Calculate the ACTUAL remaining open quantity by replaying the open day's execs.
-      // op.volume is the full original volume — we need what's left open.
-      // We detect this by checking if the open trade has a stored openQty, else fall back to volume.
-      var remainingQty = op.openQty || op.volume;
-
       // Inject a synthetic exec representing the carry-over position
+      // Use opposite side logic: if original was long (bought), inject a Buy
       var synthSide = op.side === 'long' ? 'B' : 'SS';
       execs.unshift({
         time: '00:00:00',  // midnight — sorts before real execs
         symbol: op.symbol,
         price: op.entryPrice,
-        qty: remainingQty,
+        qty: op.volume,
         side: synthSide
       });
     });
@@ -4422,10 +4433,6 @@ function tvHandleImport(event){
         tvTrades = tvTrades.map(function(t){
           if(t.id === op.id) return Object.assign({}, t, {open: false, openedOnly: true, closedDate: date});
           return t;
-        });
-        // Remove any leftover open remainder for this symbol/date — it's now closed
-        tvTrades = tvTrades.filter(function(t){
-          return !(t.open && t.symbol===op.symbol && t.date===op.date && t.id!==op.id);
         });
       }
     });
@@ -4567,8 +4574,8 @@ function renderTvCal(){
     // Append open/openedOnly positions below closed ones with a badge
     symStack+=openDayTrades.map(function(t){
       var badge = t.openedOnly
-        ? '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPENED</span>'
-        : '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPEN</span>';
+        ? '<span onclick="event.stopPropagation();tvToggleOpenBadge(&quot;'+t.id+'&quot;)" title="Click to remove OPENED marker" style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;cursor:pointer;">OPENED ✕</span>'
+        : '<span onclick="event.stopPropagation();tvToggleOpenBadge(&quot;'+t.id+'&quot;)" title="Click to remove OPEN marker" style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;cursor:pointer;">OPEN ✕</span>';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;">'
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';">'+t.symbol+'</span>'
         +badge
@@ -5179,7 +5186,12 @@ function tvEditTrade(t){
 function tvGetFilteredTrades(){
   var from=_tvDateFrom||(document.getElementById('tvRptFrom')?document.getElementById('tvRptFrom').value:'');
   var to=_tvDateTo||(document.getElementById('tvRptTo')?document.getElementById('tvRptTo').value:'');
-  return tvTrades.filter(function(t){if(from&&t.date<from)return false;if(to&&t.date>to)return false;return true;});
+  return tvTrades.filter(function(t){
+    if(t.open||t.openedOnly) return false;  // exclude incomplete/open trades from all stats
+    if(from&&t.date<from)return false;
+    if(to&&t.date>to)return false;
+    return true;
+  });
 }
 
 // ── TV REPORTS (simplified but functional) ────────────────
