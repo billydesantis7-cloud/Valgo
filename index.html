@@ -4046,23 +4046,6 @@ function tvTab(t){
   if(t==='valdata') renderTvValData();
 }
 
-function tvToggleOpenBadge(tradeId){
-  var t=tvTrades.find(function(t){return t.id===tradeId;});
-  if(!t) return;
-  var label=t.openedOnly?'OPENED marker':'OPEN marker';
-  if(!confirm('Remove the '+label+' for '+t.symbol+' on '+t.date+'?\nThe trade data is kept.')) return;
-  tvTrades=tvTrades.map(function(tr){
-    if(tr.id!==tradeId) return tr;
-    var u=Object.assign({},tr);
-    delete u.open; delete u.openedOnly; u._badgeDismissed=true;
-    if(!u.exitPrice) u.exitPrice=u.entryPrice;
-    return u;
-  });
-  tvSave(); renderTvCal();
-  if(tvDayExpandedDate) _renderDayPanel(tvDayExpandedDate);
-}
-
-
 // ── VAL DATA STATE ────────────────────────────────────────────────────────
 var _tvVdMode='grid', _tvVdThreshold=100, _tvVdIncludeHM=true, _tvVdBookIdx=0, _tvVdActive=null;
 
@@ -4567,8 +4550,8 @@ function renderTvCal(){
     // Append open/openedOnly positions below closed ones with a badge
     symStack+=openDayTrades.map(function(t){
       var badge = t.openedOnly
-        ? '<span onclick="event.stopPropagation();tvToggleOpenBadge(&quot;'+t.id+'&quot;)" title="Click to remove OPENED marker" style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;cursor:pointer;">OPENED ✕</span>'
-        : '<span onclick="event.stopPropagation();tvToggleOpenBadge(&quot;'+t.id+'&quot;)" title="Click to remove OPEN marker" style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;cursor:pointer;">OPEN ✕</span>';
+        ? '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:rgba(255,152,0,0.2);color:#ff9800;border:1px solid #ff9800;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPENED</span>'
+        : '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;background:#ff9800;color:#000;padding:1px 4px;border-radius:3px;font-weight:bold;letter-spacing:0.5px;">OPEN</span>';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;">'
         +'<span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:'+(t.side==='long'?'#26a69a':'#ef5350')+';">'+t.symbol+'</span>'
         +badge
@@ -5113,7 +5096,6 @@ function tvEditTrade(t){
   var fPnl=field('P&L ($)',t.pnl,'number');fPnl.inp.step='0.01';
   var fOpen=field('OPEN TIME',t.openTime||'');
   var fClose=field('CLOSE TIME',t.closeTime||'');
-  var fR=field('R MULTIPLE (override)',t.rMultiple!=null?t.rMultiple:'','number');fR.inp.step='0.01';fR.inp.placeholder='leave blank to auto-calc';
 
   // Auto-calc P&L when entry/exit/vol change
   function autoCalcPnl(){
@@ -5129,7 +5111,7 @@ function tvEditTrade(t){
   [fEntry.inp,fExit.inp,fVol.inp].forEach(function(i){i.addEventListener('input',autoCalcPnl);});
   sideSelect.addEventListener('change',autoCalcPnl);
 
-  [fDate.el,fSym.el,fSide,fVol.el,fEntry.el,fExit.el,fPnl.el,fR.el,fOpen.el,fClose.el].forEach(function(el){grid.appendChild(el);});
+  [fDate.el,fSym.el,fSide,fVol.el,fEntry.el,fExit.el,fPnl.el,fOpen.el,fClose.el].forEach(function(el){grid.appendChild(el);});
   wrap.appendChild(grid);
 
   var note=document.createElement('div');note.style.cssText='font-size:10px;color:rgba(200,169,110,0.7);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);padding:8px 12px;border-radius:5px;';
@@ -5156,13 +5138,6 @@ function tvEditTrade(t){
     tvTrades[idx].pnl=parseFloat(fPnl.inp.value)||t.pnl;
     tvTrades[idx].openTime=fOpen.inp.value||t.openTime;
     tvTrades[idx].closeTime=fClose.inp.value||t.closeTime;
-    var _rOverride=parseFloat(fR.inp.value);
-    if(!isNaN(_rOverride)&&fR.inp.value.trim()!==''){
-      tvTrades[idx].rMultiple=parseFloat(_rOverride.toFixed(2));
-    } else {
-      var _rv=tvDayR[tvTrades[idx].date];
-      tvTrades[idx].rMultiple=_rv&&_rv>0?parseFloat((tvTrades[idx].pnl/_rv).toFixed(2)):null;
-    }
     tvSave();
     modal.remove();
     renderTvTrades();renderTvCal();
@@ -5187,12 +5162,7 @@ function tvEditTrade(t){
 function tvGetFilteredTrades(){
   var from=_tvDateFrom||(document.getElementById('tvRptFrom')?document.getElementById('tvRptFrom').value:'');
   var to=_tvDateTo||(document.getElementById('tvRptTo')?document.getElementById('tvRptTo').value:'');
-  return tvTrades.filter(function(t){
-    if(t.open||t.openedOnly) return false;
-    if(from&&t.date<from)return false;
-    if(to&&t.date>to)return false;
-    return true;
-  });
+  return tvTrades.filter(function(t){if(from&&t.date<from)return false;if(to&&t.date>to)return false;return true;});
 }
 
 // ── TV REPORTS (simplified but functional) ────────────────
@@ -5564,6 +5534,7 @@ function renderTvWrr(){
     var avgL=ls.length?ls.reduce(function(s,t){return s+(t.pnl||0);},0)/ls.length:0;
     var rr=ls.length&&avgL!==0?Math.abs(avgW/avgL):null;
     var totalPnl=pts.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var totalR=(function(){var rv;return pts.reduce(function(s,t){rv=tvDayR[t.date];return s+(t.rMultiple!=null?t.rMultiple:(rv&&rv>0?t.pnl/rv:0));},0);})();
     var rT=pts.filter(function(t){return rOf(t)!=null;});
     var totalR=rT.reduce(function(s,t){return s+rOf(t);},0);
     return{period:p,pts:pts,ws:ws,ls:ls,wr:wr,avgW:avgW,avgL:avgL,rr:rr,totalPnl:totalPnl,totalR:totalR,rT:rT};
@@ -5576,25 +5547,28 @@ function renderTvWrr(){
     if(f==='l') return d*(a.ls.length-b.ls.length);
     if(f==='avgw'){ var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2); }
     if(f==='avgl'){ var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2); }
-    if(f==='pnl') return d*(a.totalPnl-b.totalPnl);
+    var _useR=(typeof tvUnit!=='undefined'&&tvUnit==='R');
+    var _rr=function(t){var rv=tvDayR[t.date];return t.rMultiple!=null?t.rMultiple:(rv&&rv>0?t.pnl/rv:0);};
+    var _val=function(t){return _useR?_rr(t):(t.pnl||0);};
+    if(f==='pnl') return d*(_useR?(a.totalR-b.totalR):(a.totalPnl-b.totalPnl));
     if(f==='pf'){
-      var aw_a=a.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var al_a=Math.abs(a.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
-      var aw_b=b.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var al_b=Math.abs(b.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
+      var aw_a=a.ws.reduce(function(s,t){return s+_val(t);},0);
+      var al_a=Math.abs(a.ls.reduce(function(s,t){return s+_val(t);},0));
+      var aw_b=b.ws.reduce(function(s,t){return s+_val(t);},0);
+      var al_b=Math.abs(b.ls.reduce(function(s,t){return s+_val(t);},0));
       return d*((al_a?aw_a/al_a:0)-(al_b?aw_b/al_b:0));
     }
-    if(f==='totalwon') return d*(a.ws.reduce(function(s,t){return s+(t.pnl||0);},0)-b.ws.reduce(function(s,t){return s+(t.pnl||0);},0));
-    if(f==='totalloss') return d*(a.ls.reduce(function(s,t){return s+(t.pnl||0);},0)-b.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
+    if(f==='totalwon') return d*(a.ws.reduce(function(s,t){return s+_val(t);},0)-b.ws.reduce(function(s,t){return s+_val(t);},0));
+    if(f==='totalloss') return d*(a.ls.reduce(function(s,t){return s+_val(t);},0)-b.ls.reduce(function(s,t){return s+_val(t);},0));
     if(f==='wr') return d*(a.wr-b.wr);
     if(f==='rr') return d*((a.rr||0)-(b.rr||0));
-    if(f==='lgwin'){ var lwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return t.pnl;})):0; var lwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return t.pnl;})):0; return d*(lwa-lwb); }
-    if(f==='lgloss'){ var lla=a.ls.length?Math.min.apply(null,a.ls.map(function(t){return t.pnl;})):0; var llb=b.ls.length?Math.min.apply(null,b.ls.map(function(t){return t.pnl;})):0; return d*(lla-llb); }
+    if(f==='lgwin'){ var lwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return _val(t);})):0; var lwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return _val(t);})):0; return d*(lwa-lwb); }
+    if(f==='lgloss'){ var lla=a.ls.length?Math.min.apply(null,a.ls.map(function(t){return _val(t);})):0; var llb=b.ls.length?Math.min.apply(null,b.ls.map(function(t){return _val(t);})):0; return d*(lla-llb); }
     if(f==='lgwl'){
-      var lgwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return t.pnl;})):0;
-      var lgla=a.ls.length?Math.abs(Math.min.apply(null,a.ls.map(function(t){return t.pnl;}))):0;
-      var lgwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return t.pnl;})):0;
-      var lglb=b.ls.length?Math.abs(Math.min.apply(null,b.ls.map(function(t){return t.pnl;}))):0;
+      var lgwa=a.ws.length?Math.max.apply(null,a.ws.map(function(t){return _val(t);})):0;
+      var lgla=a.ls.length?Math.abs(Math.min.apply(null,a.ls.map(function(t){return _val(t);}))):0;
+      var lgwb=b.ws.length?Math.max.apply(null,b.ws.map(function(t){return _val(t);})):0;
+      var lglb=b.ls.length?Math.abs(Math.min.apply(null,b.ls.map(function(t){return _val(t);}))):0;
       return d*((lgla?lgwa/lgla:0)-(lglb?lgwb/lglb:0));
     }
     return d*a.period.localeCompare(b.period);
@@ -6846,16 +6820,23 @@ function renderCompounding(){
 function fixTradeFlags(){
   var fixed=0;
   tvTrades = tvTrades.map(function(t){
-    var clean=Object.assign({},t); var changed=false;
-    if(t.openedOnly&&t.exitPrice!==null&&t.exitPrice!==undefined){delete clean.openedOnly;delete clean.open;changed=true;}
-    if(t.open&&t.exitPrice!==null&&t.exitPrice!==undefined){delete clean.open;changed=true;}
-    if(!t.open&&!t.openedOnly&&t.pnl!=null){
-      var rv=tvDayR[t.date];
-      var correctR=rv&&rv>0?parseFloat((t.pnl/rv).toFixed(2)):null;
-      if(correctR!==null&&correctR!==t.rMultiple){clean.rMultiple=correctR;changed=true;}
+    // openedOnly should ONLY be set on trades that explicitly have exitPrice===null AND were set by swing logic
+    // If a trade has a real exitPrice, it should never be openedOnly
+    if(t.openedOnly && t.exitPrice !== null && t.exitPrice !== undefined){
+      var clean = Object.assign({}, t);
+      delete clean.openedOnly;
+      delete clean.open;
+      fixed++;
+      return clean;
     }
-    if(changed)fixed++;
-    return changed?clean:t;
+    // If open=true but has exitPrice, also clean it
+    if(t.open && t.exitPrice !== null && t.exitPrice !== undefined){
+      var clean2 = Object.assign({}, t);
+      delete clean2.open;
+      fixed++;
+      return clean2;
+    }
+    return t;
   });
   localStorage.setItem('tvTrades', JSON.stringify(tvTrades));
   sbSave('tvTrades', JSON.stringify(tvTrades));
