@@ -6697,9 +6697,13 @@ function renderRollingStats(){
   }
 
   var _rptFilter=window._rptFilter||'all';
-  var _rptYMax=window._rptYMax||20;
-  var _rptYMin=window._rptYMin||-3;
-  var _rptLines=window._rptLines||[];
+  var _rptLines=window._rptLines||(window._rptLines=[2,-1]);
+  // Auto-scale Y axis to data unless user has manually set it
+  var _allRVals=rows.map(function(r){return r.r;});
+  var _autoMax=_allRVals.length?Math.ceil(Math.max.apply(null,_allRVals))+1:13;
+  var _autoMin=_allRVals.length?Math.floor(Math.min.apply(null,_allRVals))-0.5:-2;
+  var _rptYMax=window._rptYMax!=null?window._rptYMax:_autoMax;
+  var _rptYMin=window._rptYMin!=null?window._rptYMin:_autoMin;
 
   var _now2=new Date();
   function _rptDateBound(key){
@@ -6758,10 +6762,10 @@ function renderRollingStats(){
     +'</div>'
     +'<div style="display:flex;align-items:center;gap:5px;margin-left:auto;">'
     +'<span style="font-size:9px;color:var(--muted);">TOP</span>'
-    +'<input type="range" id="rptYMaxSlider" min="1" max="30" step="1" value="'+_rptYMax+'" style="width:55px;accent-color:var(--accent);" oninput="window._rptYMax=parseInt(this.value);document.getElementById(\'rptYMaxVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.max=parseInt(this.value);window._rollingCharts.rollingRBarChart.update();}">'
+    +'<input type="range" id="rptYMaxSlider" min="1" max="50" step="1" value="'+_rptYMax+'" style="width:55px;accent-color:var(--accent);" oninput="window._rptYMax=parseInt(this.value);document.getElementById(\'rptYMaxVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.max=parseInt(this.value);window._rollingCharts.rollingRBarChart.update();}">'
     +'<span id="rptYMaxVal" style="font-size:9px;color:var(--accent);min-width:24px;">'+_rptYMax+'R</span>'
     +'<span style="font-size:9px;color:var(--muted);">BOT</span>'
-    +'<input type="range" id="rptYMinSlider" min="-20" max="-1" step="1" value="'+_rptYMin+'" style="width:55px;accent-color:#ef5350;" oninput="window._rptYMin=parseInt(this.value);document.getElementById(\'rptYMinVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.min=parseInt(this.value);window._rollingCharts.rollingRBarChart.update();}">'
+    +'<input type="range" id="rptYMinSlider" min="-20" max="-0.5" step="0.5" value="'+_rptYMin+'" style="width:55px;accent-color:#ef5350;" oninput="window._rptYMin=parseFloat(this.value);document.getElementById(\'rptYMinVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.min=parseFloat(this.value);window._rollingCharts.rollingRBarChart.update();}">'
     +'<span id="rptYMinVal" style="font-size:9px;color:#ef5350;min-width:26px;">'+_rptYMin+'R</span>'
     +'</div></div>'
     +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap;">'
