@@ -5725,7 +5725,7 @@ function renderTT(){
         +'<span style="font-family:var(--mono);font-size:8px;color:#ffffff;font-weight:bold;">'+d2+'</span>'
         +'<span style="font-family:var(--display);font-size:10px;color:'+pair[0]+';white-space:normal;overflow:hidden;word-break:break-word;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+e.ticker+'</span>'
         +'<span style="font-family:var(--display);font-size:11px;font-weight:bold;color:'+pair[0]+';text-align:center;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+(e.edge!=null?e.edge:'')+'</span>'
-        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;white-space:normal;word-break:break-word;line-height:1.4;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
         +'<span class="tt-rpot-cell" data-id="'+e.id+'" style="font-family:var(--mono);font-size:9px;color:#f5c518;text-align:center;cursor:pointer;font-weight:bold;" title="Click to set R potential">'+(e.rPotential!=null?e.rPotential+'R':'—')+'</span>'
         +(function(){var c=_nvbCell(bt,false);return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(vt,true).size+';color:'+_nvbCell(vt,true).color+';text-align:center;font-weight:'+_nvbCell(vt,true).weight+';">'+_nvbCell(vt,true).displayText+'</span>'
@@ -6664,74 +6664,20 @@ function renderRollingStats(){
     });
   }
 
-  var seenDays={},dayLabels=[],cumRData=[],tradeLabels=[],tradeR=[],tradeColors=[],tradeMeta=[];
+  var seenDays={},dayLabels=[],cumRData=[],tradeLabels=[],tradeR=[],tradeColors=[];
   // Build per-day end-of-day cumR (use LAST trade of each day, not first)
   var dayEndCumR={};
   rows.forEach(function(r){
     dayEndCumR[r.ds]=r.cum_r; // keeps overwriting — last trade wins
-    tradeLabels.push(r.t||'');  // always store ticker — show all on hover
+    tradeLabels.push(r.r>=1?r.t:'');
     tradeR.push(parseFloat(r.r.toFixed(3)));
     tradeColors.push(r.r>=0?'rgba(38,166,154,0.75)':'rgba(239,83,80,0.75)');
-    tradeMeta.push({ticker:r.t||'',date:r.ds||'',r:r.r,pnl:r.pnl});
   });
   // Build cumRData in sorted day order using end-of-day values
   Object.keys(dayEndCumR).sort().forEach(function(ds){
     dayLabels.push(ds.slice(5));
     cumRData.push(dayEndCumR[ds]);
   });
-
-  var cumTopScale=window._cumTopScale||50;
-  var maActive=window._maActive||{5:false,10:false,20:false,50:false};
-  var maColors={5:'#ffffff',10:'#ab47bc',20:'#f5c518',50:'#ef5350'};
-
-  function maToggleBtn(period){
-    var on=maActive[period];
-    var col=maColors[period];
-    return '<button onclick="window._maActive=window._maActive||{};window._maActive['+period+']=!window._maActive['+period+'];renderRollingStats();" '
-      +'style="font-family:var(--display);font-size:10px;font-weight:bold;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:1px;'
-      +'border:2px solid '+col+';'
-      +'background:'+(on?col:'transparent')+';'
-      +'color:'+(on?'#000':col)+';'
-      +'box-shadow:'+(on?'0 0 8px '+col+'88':'none')+';'
-      +'transition:all 0.1s;">'+period+'</button>';
-  }
-
-  var _rptFilter=window._rptFilter||'all';
-  var _rptYMax=window._rptYMax||20;
-  var _rptYMin=window._rptYMin||-3;
-  var _rptLines=window._rptLines||[];
-
-  var _now2=new Date();
-  function _rptDateBound(key){
-    var d=new Date(_now2);
-    if(key==='wtd'){var day=d.getDay(),diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);}
-    else if(key==='mtd'){d.setDate(1);}
-    else if(key==='ytd'){d.setMonth(0);d.setDate(1);}
-    else if(key==='3m'){d.setMonth(d.getMonth()-3);}
-    else if(key==='6m'){d.setMonth(d.getMonth()-6);}
-    else return null;
-    return d.toISOString().slice(0,10);
-  }
-  var _rptBound=_rptDateBound(_rptFilter);
-  var filtTradeLabels=[],filtTradeR=[],filtTradeColors=[],filtTradeMeta=[];
-  rows.forEach(function(r){
-    if(_rptBound&&r.ds<_rptBound) return;
-    filtTradeLabels.push(r.t||'');
-    filtTradeR.push(parseFloat(r.r.toFixed(3)));
-    filtTradeColors.push(r.r>=0?'rgba(38,166,154,0.75)':'rgba(239,83,80,0.75)');
-    filtTradeMeta.push({ticker:r.t||'',date:r.ds||'',r:r.r,pnl:r.pnl});
-  });
-  window._filtTradeMeta=filtTradeMeta;
-
-  function _rptFilterBtn(key,label){
-    var on=_rptFilter===key;
-    return '<button onclick="window._rptFilter=\''+key+'\';renderRollingStats();" style="font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'rgba(255,255,255,0.2)')+';background:'+(on?'rgba(200,169,110,0.2)':'transparent')+';color:'+(on?'var(--accent)':'var(--muted)')+';">'+label+'</button>';
-  }
-  function _rptLineBtn(val){
-    var on=(_rptLines||[]).indexOf(val)>=0;
-    var col=val>0?'rgba(38,166,154,0.8)':'rgba(239,83,80,0.8)';
-    return '<button onclick="var ls=window._rptLines||[];var idx=ls.indexOf('+val+');if(idx>=0)ls.splice(idx,1);else ls.push('+val+');window._rptLines=ls;renderRollingStats();" style="font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;border:1px solid '+(on?col:'rgba(255,255,255,0.2)')+';background:'+(on?'rgba(38,166,154,0.12)':'transparent')+';color:'+(on?col:'var(--muted)')+';">'+(val>0?'+':'')+val+'R</button>';
-  }
 
   var cumTopScale=window._cumTopScale||50;
   var maActive=window._maActive||{5:false,10:false,20:false,50:false};
@@ -6766,29 +6712,13 @@ function renderRollingStats(){
     +'<div style="position:relative;height:220px;"><canvas id="rollingCumChart"></canvas></div></div>'
     +'</div>'
     +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;">'
-    +'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
-    +'<span style="font-size:10px;color:#ffffff;letter-spacing:1px;margin-right:4px;">R PER TRADE</span>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;">'
-    +_rptFilterBtn('wtd','WTD')+_rptFilterBtn('mtd','MTD')+_rptFilterBtn('ytd','YTD')
-    +_rptFilterBtn('3m','3M')+_rptFilterBtn('6m','6M')+_rptFilterBtn('all','ALL')
-    +'</div>'
-    +'<div style="display:flex;align-items:center;gap:5px;margin-left:auto;">'
-    +'<span style="font-size:9px;color:var(--muted);">TOP</span>'
-    +'<input type="range" id="rptYMaxSlider" min="1" max="30" step="1" value="'+_rptYMax+'" style="width:55px;accent-color:var(--accent);" oninput="window._rptYMax=parseInt(this.value);document.getElementById(\'rptYMaxVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.max=parseInt(this.value);window._rollingCharts.rollingRBarChart.update();}">'
-    +'<span id="rptYMaxVal" style="font-size:9px;color:var(--accent);min-width:24px;">'+_rptYMax+'R</span>'
-    +'<span style="font-size:9px;color:var(--muted);">BOT</span>'
-    +'<input type="range" id="rptYMinSlider" min="-20" max="-1" step="1" value="'+_rptYMin+'" style="width:55px;accent-color:#ef5350;" oninput="window._rptYMin=parseInt(this.value);document.getElementById(\'rptYMinVal\').textContent=this.value+\'R\';if(window._rollingCharts&&window._rollingCharts.rollingRBarChart){window._rollingCharts.rollingRBarChart.options.scales.y.min=parseInt(this.value);window._rollingCharts.rollingRBarChart.update();}">'
-    +'<span id="rptYMinVal" style="font-size:9px;color:#ef5350;min-width:26px;">'+_rptYMin+'R</span>'
-    +'</div></div>'
-    +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap;">'
-    +'<span style="font-size:9px;color:var(--muted);margin-right:2px;">LINES</span>'
-    +[-3,-2,-1,1,2,3,4,5].map(function(v){return _rptLineBtn(v);}).join('')
-    +'</div>'
+    +'<div style="font-size:10px;color:#ffffff;letter-spacing:1px;margin-bottom:10px;">R PER TRADE</div>'
     +'<div style="position:relative;height:200px;"><canvas id="rollingRBarChart"></canvas></div></div>'
     +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;">'
     +'<div style="font-size:10px;color:#ffffff;letter-spacing:1px;margin-bottom:10px;">CUMULATIVE DRAWDOWN</div>'
     +'<div style="position:relative;height:180px;"><canvas id="rollingDrawdownChart"></canvas></div></div>'
     +'</div>';
+
   container.innerHTML=tableHtml+chartsHtml;
 
   setTimeout(function(){
@@ -6815,81 +6745,25 @@ function renderRollingStats(){
     var cumDatasets=[{data:cumRData,borderColor:'#26a69a',backgroundColor:'rgba(38,166,154,0.08)',fill:true,tension:0.3,pointRadius:1,borderWidth:2}].concat(maDatasets);
     if(cumC&&typeof Chart!=='undefined') window._rollingCharts.rollingCumChart=new Chart(cumC,{type:'line',data:{labels:dayLabels,datasets:cumDatasets},options:cumOpts});
 
-    var _rptYMaxNow=window._rptYMax||20;
-    var _rptYMinNow=window._rptYMin||-3;
-    var _rptLinesNow=window._rptLines||[];
-    var _ftm=window._filtTradeMeta||filtTradeMeta||[];
-
     var barOpts={
       responsive:true,maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            title:function(items){
-              var m=_ftm[items[0].dataIndex];
-              return m?(m.ticker+' · '+m.date):'';
-            },
-            label:function(ctx){
-              var v=ctx.raw;
-              var m=_ftm[ctx.dataIndex];
-              var rStr=(v>=0?'+':'')+v.toFixed(2)+'R';
-              return m?rStr+' · '+(m.pnl>=0?'+$':'-$')+Math.abs(m.pnl||0).toFixed(2):rStr;
-            }
-          }
-        }
-      },
-      onClick:function(evt,elements){
-        if(!elements||!elements.length) return;
-        var idx=elements[0].index;
-        var m=_ftm[idx]; if(!m) return;
-        var imgKey=m.date+'_'+m.ticker+'_';
-        // Try both sides
-        var img=null;
-        if(typeof myTradeImages!=='undefined'){
-          img=myTradeImages[imgKey+'long']||myTradeImages[imgKey+'short']||null;
-          if(!img){ Object.keys(myTradeImages).forEach(function(k){ if(k.indexOf(m.date+'_'+m.ticker)===0) img=myTradeImages[k]; }); }
-        }
-        if(typeof tvTradeImages!=='undefined'&&!img){
-          img=tvTradeImages[imgKey+'long']||tvTradeImages[imgKey+'short']||null;
-          if(!img){ Object.keys(tvTradeImages).forEach(function(k){ if(k.indexOf(m.date+'_'+m.ticker)===0) img=tvTradeImages[k]; }); }
-        }
-        if(img&&typeof expandMyImg==='function'){ expandMyImg(img); return; }
-        // No image — show info popup
-        var pop=document.createElement('div');
-        pop.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
-        pop.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 32px;font-family:var(--mono);text-align:center;">'
-          +'<div style="font-size:20px;font-weight:bold;color:#fff;margin-bottom:6px;">'+m.ticker+'</div>'
-          +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'+m.date+'</div>'
-          +'<div style="font-size:16px;color:'+(m.r>=0?'#26a69a':'#ef5350')+';margin-bottom:4px;">'+(m.r>=0?'+':'')+m.r.toFixed(2)+'R</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-bottom:16px;">No chart saved for this trade</div>'
-          +'<button onclick="this.closest(\'div[style*=fixed]\').remove();" style="font-family:var(--mono);font-size:10px;padding:6px 16px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">CLOSE</button>'
-          +'</div>';
-        pop.onclick=function(e){if(e.target===pop)pop.remove();};
-        document.body.appendChild(pop);
-      },
+      plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:'#ffffff',font:{size:8},maxRotation:45,autoSkip:true,maxTicksLimit:40},grid:{color:'rgba(255,255,255,0.02)'}},
-        y:{min:_rptYMinNow,max:_rptYMaxNow,ticks:{color:'#ffffff',font:{size:9},callback:function(v){return v+'R';}},grid:{color:'rgba(255,255,255,0.06)'}}
+        x:{ticks:{color:'#ffffff',font:{size:8},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.02)'}},
+        y:{min:-3,ticks:{color:'#ffffff',font:{size:9},callback:function(v){return v+'R';}},grid:{color:'rgba(255,255,255,0.06)'}}
       }
     };
     if(barC&&typeof Chart!=='undefined'){
-      var refLinesPlug={id:'refLines',afterDraw:function(chart){
+      var minusOnePlug={id:'minusOneLine',afterDraw:function(chart){
         var ctx=chart.ctx,yScale=chart.scales.y,xScale=chart.scales.x;
-        if(!yScale||!yScale.getPixelForValue)return;
-        (_rptLinesNow||[]).forEach(function(val){
-          var y=yScale.getPixelForValue(val);
-          var col=val>0?'rgba(38,166,154,0.75)':'rgba(239,83,80,0.75)';
-          ctx.save();ctx.beginPath();ctx.setLineDash([4,4]);
-          ctx.moveTo(xScale.left,y);ctx.lineTo(xScale.right,y);
-          ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
-          ctx.fillStyle=col;ctx.font='bold 9px monospace';
-          ctx.fillText((val>0?'+':'')+val+'R',xScale.right+4,y+3);
-          ctx.setLineDash([]);ctx.restore();
-        });
+        if(!yScale||yScale.getPixelForValue==null)return;
+        var y=yScale.getPixelForValue(-1);
+        ctx.save();ctx.beginPath();ctx.setLineDash([]);
+        ctx.moveTo(xScale.left,y);ctx.lineTo(xScale.right,y);
+        ctx.strokeStyle='rgba(239,83,80,0.75)';ctx.lineWidth=1.5;ctx.stroke();
+        ctx.restore();
       }};
-      barC.style.cursor='pointer';
-      window._rollingCharts.rollingRBarChart=new Chart(barC,{type:'bar',data:{labels:filtTradeLabels,datasets:[{data:filtTradeR,backgroundColor:filtTradeColors,borderRadius:2}]},options:barOpts,plugins:[refLinesPlug]});
+      window._rollingCharts.rollingRBarChart=new Chart(barC,{type:'bar',data:{labels:tradeLabels,datasets:[{data:tradeR,backgroundColor:tradeColors,borderRadius:2}]},options:barOpts,plugins:[minusOnePlug]});
     }
 
     // Drawdown chart
