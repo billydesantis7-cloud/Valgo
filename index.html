@@ -5192,40 +5192,69 @@ var tvWrrMode='weekly',tvWrrSortField='period',tvWrrSortDir=-1;
 function tvWrrPeriod(mode){tvWrrMode=mode;document.getElementById('tvWrrWeekly').style.background=mode==='weekly'?'var(--accent)':'transparent';document.getElementById('tvWrrWeekly').style.color=mode==='weekly'?'var(--bg)':'var(--muted)';document.getElementById('tvWrrMonthly').style.background=mode==='monthly'?'var(--accent)':'transparent';document.getElementById('tvWrrMonthly').style.color=mode==='monthly'?'var(--bg)':'var(--muted)';renderTvWrr();}
 function tvWrrSort(field){if(tvWrrSortField===field)tvWrrSortDir*=-1;else{tvWrrSortField=field;tvWrrSortDir=-1;}renderTvWrr();}
 function tvWrrCloseDrill(){var p=document.getElementById('tvWrrDrillPanel');if(p)p.style.display='none';}
+// Drill panel state
+var _tvDrillWs=[], _tvDrillLs=[], _tvDrillWinsDir=1, _tvDrillLossesDir=1;
+
+function _tvDrillROf(t){ var rv=tvDayR[t.date]; return t.rMultiple!=null?t.rMultiple:(rv&&rv!==0?t.pnl/rv:null); }
+
+function _tvDrillCard(t,isWin){
+  var imgKey=t.date+'_'+t.symbol+'_'+(t.side||'');
+  var img=(typeof tvTradeImages!=='undefined'&&tvTradeImages[imgKey])||myTradeImages[imgKey]||null;
+  var useR=(typeof tvUnit!=='undefined'&&tvUnit==='R');
+  var rVal=_tvDrillROf(t);
+  var pnlStr=useR
+    ?(rVal!=null?(rVal>=0?'+':'')+rVal.toFixed(2)+'R':'--')
+    :(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0);
+  var pnlC=isWin?'#26a69a':'#ef5350';
+  var html='<div style="background:var(--surface);border:1px solid '+(isWin?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)')+';border-radius:6px;overflow:hidden;">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);">';
+  html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>';
+  html+='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>';
+  html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:'+pnlC+';">'+pnlStr+'</span>';
+  html+='</div>';
+  if(img){
+    html+='<img src="'+img+'" style="width:100%;max-height:200px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;" onclick="expandMyImg(this.src)">';
+  } else {
+    html+='<div style="height:60px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--muted);">NO CHART</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function _tvDrillRender(){
+  var winsEl=document.getElementById('tvWrrDrillWins');
+  var lossesEl=document.getElementById('tvWrrDrillLosses');
+  var wArrow=document.getElementById('tvDrillWinsArrow');
+  var lArrow=document.getElementById('tvDrillLossesArrow');
+  if(!winsEl||!lossesEl) return;
+  var sortedWs=_tvDrillWs.slice().sort(function(a,b){ return _tvDrillWinsDir*(b.pnl-a.pnl); });
+  var sortedLs=_tvDrillLs.slice().sort(function(a,b){ return _tvDrillLossesDir*(a.pnl-b.pnl); });
+  if(wArrow) wArrow.textContent=_tvDrillWinsDir===1?'↓':'↑';
+  if(lArrow) lArrow.textContent=_tvDrillLossesDir===1?'↓':'↑';
+  winsEl.innerHTML=sortedWs.length?sortedWs.map(function(t){return _tvDrillCard(t,true);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No wins this period.</div>';
+  lossesEl.innerHTML=sortedLs.length?sortedLs.map(function(t){return _tvDrillCard(t,false);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No losses this period.</div>';
+}
+
+function tvWrrDrillSort(col){
+  if(col==='wins') _tvDrillWinsDir*=-1;
+  else _tvDrillLossesDir*=-1;
+  _tvDrillRender();
+}
+
 function tvWrrDrill(period){
   var trades=tvGetFilteredTrades();
   var pk=function(date){if(tvWrrMode==='monthly')return date.slice(0,7);var d=new Date(date+'T12:00:00'),day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);mon.setDate(d.getDate()+diff);var sun=new Date(mon);sun.setDate(mon.getDate()+6);return mon.toISOString().slice(0,10)+' - '+sun.toISOString().slice(0,10);};
   var pts=trades.filter(function(t){return pk(t.date)===period;});
-  var ws=pts.filter(function(t){return t.pnl>0;});
-  var ls=pts.filter(function(t){return t.pnl<0;});
-  function tradeCard(t,isWin){
-    var imgKey=t.date+'_'+t.symbol+'_'+(t.side||'');
-    var img=(typeof tvTradeImages!=='undefined'&&tvTradeImages[imgKey])||myTradeImages[imgKey]||null;
-    var pnlStr=(t.pnl>=0?'+$':'-$')+Math.abs(t.pnl||0).toFixed(0);
-    var pnlC=isWin?'#26a69a':'#ef5350';
-    var html='<div style="background:var(--surface);border:1px solid '+(isWin?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)')+';border-radius:6px;overflow:hidden;">';
-    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);">';
-    html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>';
-    html+='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>';
-    html+='<span style="font-family:var(--display);font-size:14px;font-weight:bold;color:'+pnlC+';">'+pnlStr+'</span>';
-    html+='</div>';
-    if(img){
-      html+='<img src="'+img+'" style="width:100%;max-height:200px;object-fit:contain;background:#080c14;display:block;cursor:zoom-in;" onclick="expandMyImg(\''+img+'\')">';
-    } else {
-      html+='<div style="height:60px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--muted);">NO CHART</div>';
-    }
-    html+='</div>';
-    return html;
-  }
-  var winsEl=document.getElementById('tvWrrDrillWins');
-  var lossesEl=document.getElementById('tvWrrDrillLosses');
+  _tvDrillWs=pts.filter(function(t){return t.pnl>0;});
+  _tvDrillLs=pts.filter(function(t){return t.pnl<0;});
+  _tvDrillWinsDir=1;
+  _tvDrillLossesDir=1;
   var titleEl=document.getElementById('tvWrrDrillTitle');
   var panel=document.getElementById('tvWrrDrillPanel');
-  if(!winsEl||!lossesEl||!panel) return;
-  titleEl.textContent=period+' — '+ws.length+' WINS / '+ls.length+' LOSSES';
-  winsEl.innerHTML=ws.length?ws.map(function(t){return tradeCard(t,true);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No wins this period.</div>';
-  lossesEl.innerHTML=ls.length?ls.map(function(t){return tradeCard(t,false);}).join(''):'<div style="font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px;">No losses this period.</div>';
+  if(!panel) return;
+  if(titleEl) titleEl.textContent=period+' — '+_tvDrillWs.length+' WINS / '+_tvDrillLs.length+' LOSSES';
   panel.style.display='block';
+  _tvDrillRender();
   setTimeout(function(){panel.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
 }
 function renderTvWrr(){
@@ -5725,7 +5754,7 @@ function renderTT(){
         +'<span style="font-family:var(--mono);font-size:8px;color:#ffffff;font-weight:bold;">'+d2+'</span>'
         +'<span style="font-family:var(--display);font-size:10px;color:'+pair[0]+';white-space:normal;overflow:hidden;word-break:break-word;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+e.ticker+'</span>'
         +'<span style="font-family:var(--display);font-size:11px;font-weight:bold;color:'+pair[0]+';text-align:center;text-shadow:0 1px 2px rgba(0,0,0,0.5);">'+(e.edge!=null?e.edge:'')+'</span>'
-        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;white-space:normal;word-break:break-word;line-height:1.4;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:8px;color:rgba(255,255,255,0.7);padding:0 2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+(e.notes||'')+'</span>'
         +'<span class="tt-rpot-cell" data-id="'+e.id+'" style="font-family:var(--mono);font-size:9px;color:#f5c518;text-align:center;cursor:pointer;font-weight:bold;" title="Click to set R potential">'+(e.rPotential!=null?e.rPotential+'R':'—')+'</span>'
         +(function(){var c=_nvbCell(bt,false);return '<span style="font-family:var(--mono);font-size:'+c.size+';color:'+c.color+';text-align:center;font-weight:'+c.weight+';">'+(c.displayText!==undefined?c.displayText:bt)+'</span>';})()
         +'<span style="font-family:var(--mono);font-size:'+_nvbCell(vt,true).size+';color:'+_nvbCell(vt,true).color+';text-align:center;font-weight:'+_nvbCell(vt,true).weight+';">'+_nvbCell(vt,true).displayText+'</span>'
