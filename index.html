@@ -857,7 +857,9 @@ async function forceReloadFromSupa(){
       page++;
     }
     if(allTrades.length > 0){
-      try{ localStorage.setItem('tvTrades', JSON.stringify(allTrades)); }catch(e){}
+      var allTradesStr = JSON.stringify(allTrades);
+      try{ localStorage.setItem('tvTrades', allTradesStr); }catch(e){}
+      try{ await _supa.from('valgo_data').upsert({ key: 'tvTrades', value: allTradesStr, updated_at: new Date().toISOString() }); }catch(e){}
       alert('Loaded '+allTrades.length+' trades from tv_trades table. Refreshing...');
       location.reload();
     } else {
