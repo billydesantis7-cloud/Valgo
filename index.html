@@ -1897,7 +1897,16 @@ document.addEventListener('DOMContentLoaded',function(){
   // Auto-suggest R
   try{
     var rr=typeof getRollingMerged==='function'?getRollingMerged():[];
-    if(rr.length){var la=rr[rr.length-1].acc,cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
+    if(rr.length){// Use JEPPEZ current month end balance for R calculation
+    var la=rr[rr.length-1].acc;
+    try{
+      var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
+      var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
+      var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+      var _jStart=9816; // June start override
+      if(_jTrades.length>0) la=_jStart+_jPnl;
+    }catch(_je){}
+    var cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
   }catch(er){}
   if(execView!=='ai') renderExecutions();
   connectToBridge();
