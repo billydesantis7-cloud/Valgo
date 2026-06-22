@@ -940,7 +940,7 @@ async function migrateLocalToSupabase() {
 // ── Load all data from Supabase on startup ──────────────────
 async function _sbInitLoad() {
   _sbSetStatus('☁ LOADING...', '#f5c518');
-  // Hard timeout — if Supabase takes more than 6s, fall back to localStorage immediately
+  // Hard timeout — if Supabase takes more than 30s, fall back to localStorage immediately
   var _sbTimedOut = false;
   var _sbTimeout = setTimeout(function() {
     _sbTimedOut = true;
@@ -948,7 +948,7 @@ async function _sbInitLoad() {
     if (typeof renderExecutions === 'function' && execView !== 'ai') renderExecutions();
     if (typeof renderTvTrades === 'function') renderTvTrades();
     if (typeof renderTvCal === 'function') renderTvCal();
-  }, 15000);
+  }, 30000);
 
   try {
     var { data, error } = await _supa.from('valgo_data').select('key,value');
@@ -970,6 +970,28 @@ async function _sbInitLoad() {
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
     }
+    // Always load tvTrades directly from tv_trades table (authoritative source)
+    try {
+      var _allTrades = [], _page = 0, _pageSize = 1000;
+      while(true) {
+        var { data: _td, error: _te } = await _supa.from('tv_trades').select('*').range(_page*_pageSize, (_page+1)*_pageSize-1);
+        if(_te || !_td || !_td.length) break;
+        _td.forEach(function(row) {
+          try {
+            var t = typeof row.raw === 'string' ? JSON.parse(row.raw) : row.raw;
+            if(t) _allTrades.push(t);
+          } catch(e) {
+            _allTrades.push({ id: row.id, date: row.date, symbol: row.symbol, side: row.side, pnl: row.pnl, volume: row.shares, entryPrice: row.entry, exitPrice: row.exit, rMultiple: row.r_multiple||null, openTime: row.open_time||'', closeTime: row.close_time||'' });
+          }
+        });
+        if(_td.length < _pageSize) break;
+        _page++;
+      }
+      if(_allTrades.length > 0) {
+        tvTrades = _allTrades;
+        try { localStorage.setItem('tvTrades', JSON.stringify(_allTrades)); } catch(e) {}
+      }
+    } catch(e) { console.warn('tv_trades direct load failed', e); }
     // Load image URLs from Supabase (with its own timeout)
     var _imgTimeout = new Promise(function(resolve) { setTimeout(resolve, 5000); });
     await Promise.race([
