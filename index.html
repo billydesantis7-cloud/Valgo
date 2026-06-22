@@ -825,12 +825,53 @@ function _dataUrlToBlob(dataUrl) {
 async function forceReloadFromSupa(){
   _sbSetStatus('☁ RELOADING...', '#f5c518');
   try {
+    // Try valgo_data table first (key/value store)
     var { data, error } = await _supa.from('valgo_data').select('key,value');
-    if(error) throw error;
-    if(!data||!data.length){ alert('No data found in Supabase.'); return; }
-    data.forEach(function(row){
-      if(row.value) try{ localStorage.setItem(row.key, row.value); }catch(e){}
-    });
+    if(!error && data && data.length){
+      data.forEach(function(row){
+        if(row.value) try{ localStorage.setItem(row.key, row.value); }catch(e){}
+      });
+    }
+    // Also load from tv_trades table (raw trade rows)
+    var allTrades = [];
+    var page = 0, pageSize = 1000;
+    while(true){
+      var { data: tradeData, error: tradeErr } = await _supa.from('tv_trades').select('*').range(page*pageSize, (page+1)*pageSize-1);
+      if(tradeErr || !tradeData || !tradeData.length) break;
+      tradeData.forEach(function(row){
+        try{
+          var t = typeof row.raw === 'string' ? JSON.parse(row.raw) : row.raw;
+          if(t) allTrades.push(t);
+        }catch(e){
+          // Fall back to using the row columns directly
+          allTrades.push({
+            id: row.id, date: row.date, symbol: row.symbol,
+            side: row.side, pnl: row.pnl, volume: row.shares,
+            entryPrice: row.entry, exitPrice: row.exit,
+            rMultiple: row.r_multiple||null, openTime: row.open_time||'',
+            closeTime: row.close_time||''
+          });
+        }
+      });
+      if(tradeData.length < pageSize) break;
+      page++;
+    }
+    if(allTrades.length > 0){
+      try{ localStorage.setItem('tvTrades', JSON.stringify(allTrades)); }catch(e){}
+      alert('Loaded '+allTrades.length+' trades from tv_trades table. Refreshing...');
+    } else {
+      // Check valgo_data for tvTrades key
+      var { data: vd2, error: vd2err } = await _supa.from('valgo_data').select('key,value').eq('key','tvTrades').single();
+      if(!vd2err && vd2 && vd2.value){
+        try{ localStorage.setItem('tvTrades', vd2.value); }catch(e){}
+        var parsed = JSON.parse(vd2.value||'[]');
+        alert('Loaded '+parsed.length+' trades from valgo_data. Refreshing...');
+      } else {
+        alert('Could not load trades from Supabase.\n\nvalgo_data error: '+(vd2err?vd2err.message:'no data')+'\ntv_trades: 0 rows found.\n\nTry RESTORE from a backup file instead.');
+        _sbSetStatus('☁ LOAD ERR', '#ef5350');
+        return;
+      }
+    }
     try{ executions=JSON.parse(localStorage.getItem('executions_cache')||'[]'); }catch(e){}
     try{ tvTrades=JSON.parse(localStorage.getItem('tvTrades')||'[]'); }catch(e){}
     try{ tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}'); }catch(e){}
