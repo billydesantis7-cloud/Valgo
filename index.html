@@ -717,7 +717,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 //  All data + images live in Supabase. localStorage = fast cache only.
 // ═══════════════════════════════════════════════════════════
 var SUPA_URL = 'https://ffykmqncabvvvlqznobn.supabase.co';
-var SUPA_KEY = 'sb_publishable_nApad8VROoLPtePyj84I3A_j8XQwbnj';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmeWttcW5jYWJ2dnZscXpub2JuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTI4MDksImV4cCI6MjA5MTU2ODgwOX0.KMm7ampPbs9jEnAeKVHXox2QkH0ewBhfIebCMtn1elo';
 var _supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 var SUPA_BUCKET = 'Valgo-images';
 
@@ -1264,7 +1264,7 @@ function imgDebug(){
   // List files
   fetch('https://ffykmqncabvvvlqznobn.supabase.co/storage/v1/object/list/Valgo-images', {
     method:'POST',
-    headers:{'Authorization':'Bearer sb_publishable_nApad8VROoLPtePyj84I3A_j8XQwbnj','Content-Type':'application/json'},
+    headers:{'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmeWttcW5jYWJ2dnZscXpub2JuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTI4MDksImV4cCI6MjA5MTU2ODgwOX0.KMm7ampPbs9jEnAeKVHXox2QkH0ewBhfIebCMtn1elo','Content-Type':'application/json'},
     body:JSON.stringify({prefix:'discordImageCache/',limit:10})
   }).then(function(r){return r.json();}).then(function(files){
     out.innerHTML += '<b>Files in discordImageCache/:</b><br>';
