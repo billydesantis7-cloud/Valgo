@@ -7052,6 +7052,14 @@ function scaUpdateAccountFromRolling(){
     var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
     if(!rows.length) return;
     var lastAcc=rows[rows.length-1].acc;
+    // Override with JEPPEZ current month end balance
+    try{
+      var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
+      var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
+      var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+      var _jStart=9816; // June start override
+      if(_jTrades.length>0) lastAcc=_jStart+_jPnl;
+    }catch(_je){}
     var accEl=document.getElementById('scaAccount');
     if(accEl) accEl.textContent=Math.round(lastAcc);
     // Populate all R display spans
@@ -7595,6 +7603,14 @@ function scaCalcBlock(dir,idx,R){
 var htkFileName='Hotkey.htk';
 
 function htkGetCurrentR(){
+  // Use JEPPEZ current month end balance
+  try{
+    var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
+    var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
+    var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
+    var _jStart=9816; // June start override
+    if(_jTrades.length>0){ return Math.round((_jStart+_jPnl)*0.02*100)/100; }
+  }catch(_je){}
   var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
   if(!rows.length) return null;
   return Math.round(rows[rows.length-1].acc*0.02*100)/100;
