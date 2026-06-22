@@ -859,6 +859,7 @@ async function forceReloadFromSupa(){
     if(allTrades.length > 0){
       try{ localStorage.setItem('tvTrades', JSON.stringify(allTrades)); }catch(e){}
       alert('Loaded '+allTrades.length+' trades from tv_trades table. Refreshing...');
+      location.reload();
     } else {
       // Check valgo_data for tvTrades key
       var { data: vd2, error: vd2err } = await _supa.from('valgo_data').select('key,value').eq('key','tvTrades').single();
