@@ -5545,6 +5545,7 @@ function renderJeppez(){
     var _prevEnd = liveRows.length>0 ? (liveRows[liveRows.length-1].end||null)
                  : (_mi===2 ? 7500 : (patchedStatic.length>0 ? patchedStatic[patchedStatic.length-1].end : 7500));
     if(!_prevEnd && _mi===2) _prevEnd=7500;
+    if(_mi===5 && _prevEnd) _prevEnd=9816; // June start override
     if(_mdata){
       cumRunning+=_mdata.pnl;
       var _mEnd = _prevEnd!=null ? _prevEnd+_mdata.pnl : null;
