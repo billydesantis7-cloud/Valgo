@@ -5350,7 +5350,7 @@ function renderTvWrr(){
   if(!trades.length){el.innerHTML='<div style="padding:20px;font-size:11px;color:var(--muted);">No data</div>';return;}
   var pk=function(date){if(tvWrrMode==='monthly')return date.slice(0,7);var d=new Date(date+'T12:00:00'),day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);mon.setDate(d.getDate()+diff);var sun=new Date(mon);sun.setDate(mon.getDate()+6);return mon.toISOString().slice(0,10)+' - '+sun.toISOString().slice(0,10);};
   var groups={};trades.forEach(function(t){var k=pk(t.date);if(!groups[k])groups[k]=[];groups[k].push(t);});
-  var rOf=function(t){var rv=tvDayR[t.date];return t.rMultiple||(rv?t.pnl/rv:null);};
+  var rOf=function(t){var rv=tvDayR[t.date];return rv?t.pnl/rv:(t.rMultiple||null);};
   var rows=Object.entries(groups).map(function(e){
     var p=e[0],pts=e[1];
     var ws=pts.filter(function(t){return t.pnl>0;}),ls=pts.filter(function(t){return t.pnl<0;});
