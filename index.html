@@ -5371,7 +5371,7 @@ function renderTvWrr(){
     if(f==='l') return d*(a.ls.length-b.ls.length);
     if(f==='avgw'){ var aw1=a.ws.length?a.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ws.length:0; var aw2=b.ws.length?b.ws.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ws.length:0; return d*(aw1-aw2); }
     if(f==='avgl'){ var al1=a.ls.length?a.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/a.ls.length:0; var al2=b.ls.length?b.ls.reduce(function(s,t){return s+(t.rMultiple||0);},0)/b.ls.length:0; return d*(al1-al2); }
-    if(f==='pnl') return d*(a.totalPnl-b.totalPnl);
+    if(f==='pnl') return d*((typeof tvUnit!=='undefined'&&tvUnit==='R')?(a.totalR-b.totalR):(a.totalPnl-b.totalPnl));
     if(f==='pf'){
       var aw_a=a.ws.reduce(function(s,t){return s+(t.pnl||0);},0);
       var al_a=Math.abs(a.ls.reduce(function(s,t){return s+(t.pnl||0);},0));
