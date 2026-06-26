@@ -967,6 +967,18 @@ async function _sbInitLoad() {
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
     }
+    // If tvDayR is empty, restore from tv_day_r table
+    if (typeof tvDayR !== 'undefined' && Object.keys(tvDayR).length === 0) {
+      try {
+        var { data: _drData, error: _drErr } = await _supa.from('tv_day_r').select('date,r_value');
+        if (!_drErr && _drData && _drData.length > 0) {
+          _drData.forEach(function(row) { if(row.date && row.r_value) tvDayR[row.date] = row.r_value; });
+          try { localStorage.setItem('tvDayR', JSON.stringify(tvDayR)); } catch(e) {}
+          sbSave('tvDayR', JSON.stringify(tvDayR));
+          console.log('[VALGO] Restored', Object.keys(tvDayR).length, 'R values from tv_day_r table');
+        }
+      } catch(_dre) { console.warn('tv_day_r restore failed', _dre); }
+    }
     // If tvTrades is empty, load directly from tv_trades table
     if (typeof tvTrades !== 'undefined' && tvTrades.length === 0) {
       try {
@@ -4091,7 +4103,7 @@ try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
 
-function tvSave(){if(tvTrades&&tvTrades.length>0){sbSave('tvTrades',JSON.stringify(tvTrades));}sbSave('tvDayR',JSON.stringify(tvDayR));}
+function tvSave(){if(tvTrades&&tvTrades.length>0){sbSave('tvTrades',JSON.stringify(tvTrades));}if(tvDayR&&Object.keys(tvDayR).length>0){sbSave('tvDayR',JSON.stringify(tvDayR));}}
 
 function tvTab(t){
   var panes={import:'tvImportPane',calendar:'tvCalPane',trades:'tvTradesPane',reports:'tvReportsPane'};
@@ -4284,7 +4296,10 @@ function tvEditDayR(date){
   var num=parseFloat(val);
   if(val===''||isNaN(num)) delete tvDayR[date];
   else{tvDayR[date]=num;tvTrades=tvTrades.map(function(t){return t.date!==date?t:Object.assign({},t,{rMultiple:parseFloat((t.pnl/num).toFixed(2))});});}
-  tvSave(); if(tvDayExpandedDate===date) _renderDayPanel(date); renderTvRecentImports();
+  tvSave();
+  // Also save to dedicated tv_day_r table as backup
+  if(!isNaN(num)){try{_supa.from('tv_day_r').upsert({date:date,r_value:num,updated_at:new Date().toISOString()});}catch(_e){}}
+  if(tvDayExpandedDate===date) _renderDayPanel(date); renderTvRecentImports();
 }
 
 function refreshMyTradesFromTv(){
