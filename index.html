@@ -710,7 +710,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 <div id="mvPanel" style="display:none;"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 //  SUPABASE CLOUD SYNC
@@ -966,6 +966,28 @@ async function _sbInitLoad() {
       if (typeof tvTrades !== 'undefined') try { tvTrades = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
+    }
+    // If tvTrades is empty, load directly from tv_trades table
+    if (typeof tvTrades !== 'undefined' && tvTrades.length === 0) {
+      try {
+        var _allTv = [], _tvPage = 0, _tvPageSize = 1000;
+        while(true) {
+          var { data: _tvd, error: _tve } = await _supa.from('tv_trades').select('raw').range(_tvPage*_tvPageSize, (_tvPage+1)*_tvPageSize-1);
+          if(_tve || !_tvd || !_tvd.length) break;
+          _tvd.forEach(function(row) {
+            try { var t = typeof row.raw === 'string' ? JSON.parse(row.raw) : row.raw; if(t) _allTv.push(t); } catch(e) {}
+          });
+          if(_tvd.length < _tvPageSize) break;
+          _tvPage++;
+        }
+        if(_allTv.length > 0) {
+          tvTrades = _allTv;
+          try { localStorage.setItem('tvTrades', JSON.stringify(_allTv)); } catch(e) {}
+          // Also update valgo_data so next load is fast
+          sbSave('tvTrades', JSON.stringify(_allTv));
+          console.log('[VALGO] Loaded', _allTv.length, 'trades from tv_trades fallback');
+        }
+      } catch(_tve2) { console.warn('tv_trades fallback failed', _tve2); }
     }
     // Load image URLs from Supabase (with its own timeout)
     var _imgTimeout = new Promise(function(resolve) { setTimeout(resolve, 5000); });
@@ -4069,7 +4091,7 @@ try{tvDayR=JSON.parse(localStorage.getItem('tvDayR')||'{}');}catch(e){}
 try{tvDayImages=JSON.parse(localStorage.getItem('tvDayImages')||'{}');}catch(e){}
 try{tvTradeImages=JSON.parse(localStorage.getItem('tvTradeImages')||'{}');}catch(e){}
 
-function tvSave(){sbSave('tvTrades',JSON.stringify(tvTrades));sbSave('tvDayR',JSON.stringify(tvDayR));}
+function tvSave(){if(tvTrades&&tvTrades.length>0){sbSave('tvTrades',JSON.stringify(tvTrades));}sbSave('tvDayR',JSON.stringify(tvDayR));}
 
 function tvTab(t){
   var panes={import:'tvImportPane',calendar:'tvCalPane',trades:'tvTradesPane',reports:'tvReportsPane'};
