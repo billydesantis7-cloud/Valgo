@@ -5559,12 +5559,16 @@ function renderJeppez(){
     var grossW=ws.reduce(function(s,t){return s+(t.pnl||0);},0);
     var grossL=Math.abs(ls.reduce(function(s,t){return s+(t.pnl||0);},0));
     var pf=grossL>0?grossW/grossL:null;
-    var rf=function(t){var rv=tvDayR[t.date];return t.rMultiple||(rv?t.pnl/rv:null);};
+    var rf=function(t){var rv=tvDayR[t.date];return rv?parseFloat((t.pnl/rv).toFixed(2)):(t.rMultiple!=null?t.rMultiple:null);};
     var rT=mt.filter(function(t){return rf(t)!=null;});
     var totalR=rT.reduce(function(s,t){return s+rf(t);},0);
     var dayRVals=mt.map(function(t){return tvDayR[t.date]||null;}).filter(function(v){return v!=null;});
     var avgRisk=dayRVals.length?dayRVals.reduce(function(s,v){return s+v;},0)/dayRVals.length:100;
-    return{pnl:pnl,pct:null,cagr:null,trades:mt.length,wr:wr,avgW:avgW,avgL:avgL,lgW:lgW,lgL:lgL,wlRel:wlRel,lgWL:lgWL,pf:pf,totalR:totalR,avgRisk:avgRisk,totalWon:grossW,totalLost:grossL,live:true};
+    var wsR=ws.map(function(t){return rf(t);}).filter(function(v){return v!=null;});
+    var lsR=ls.map(function(t){return rf(t);}).filter(function(v){return v!=null;});
+    var lgWR=wsR.length?Math.max.apply(null,wsR):null;
+    var lgLR=lsR.length?Math.min.apply(null,lsR):null;
+    return{pnl:pnl,pct:null,cagr:null,trades:mt.length,wr:wr,avgW:avgW,avgL:avgL,lgW:lgW,lgL:lgL,lgWR:lgWR,lgLR:lgLR,wlRel:wlRel,lgWL:lgWL,pf:pf,totalR:totalR,avgRisk:avgRisk,totalWon:grossW,totalLost:grossL,live:true};
   }
   // Dynamic: always compute from current month onwards
   var _now = new Date();
@@ -5654,9 +5658,9 @@ function renderJeppez(){
       +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+(row.totalLost!=null?(isR?'-'+(row.totalLost/rpt).toFixed(2)+'R':'-$'+row.totalLost.toFixed(0)):'—')+'</span>'
       +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+fmtW(avgW)+'</span>'
       +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+fmtL(avgL)+'</span>'
-      +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+fmtW(lgW)+'</span>'
-      +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+fmtL(lgL)+'</span>'
-      +'<span style="font-size:11px;color:'+(lgWL!=null&&lgWL>=1?'#26a69a':'#ef5350')+';text-align:right;">'+(lgWL!=null?lgWL.toFixed(2):'—')+'</span>'
+      +'<span style="font-size:11px;color:#26a69a;text-align:right;">'+(isR?(row.lgWR!=null?'+'+row.lgWR.toFixed(2)+'R':'—'):fmtW(lgW))+'</span>'
+      +'<span style="font-size:11px;color:#ef5350;text-align:right;">'+(isR?(row.lgLR!=null?row.lgLR.toFixed(2)+'R':'—'):fmtL(lgL))+'</span>'
+      +'<span style="font-size:11px;color:'+(lgWL!=null&&lgWL>=1?'#26a69a':'#ef5350')+';text-align:right;">'+(isR&&row.lgWR!=null&&row.lgLR!=null&&row.lgLR!==0?Math.abs(row.lgWR/row.lgLR).toFixed(2):(lgWL!=null?lgWL.toFixed(2):'—'))+'</span>'
       +'</div>';
   }).join('');
 }
