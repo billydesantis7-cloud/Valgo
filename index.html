@@ -1944,7 +1944,7 @@ document.addEventListener('DOMContentLoaded',function(){
       var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
       var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
       var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var _jStart=9816; // June start override
+      var _jStart=12805; // July start override
       if(_jTrades.length>0) la=_jStart+_jPnl;
     }catch(_je){}
     var cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
@@ -5614,7 +5614,7 @@ function renderJeppez(){
     var _prevEnd = liveRows.length>0 ? (liveRows[liveRows.length-1].end||null)
                  : (_mi===2 ? 7500 : (patchedStatic.length>0 ? patchedStatic[patchedStatic.length-1].end : 7500));
     if(!_prevEnd && _mi===2) _prevEnd=7500;
-    if(_mi===5 && _prevEnd) _prevEnd=9816; // June start override
+    if(_mi===6 && _prevEnd) _prevEnd=12805; // July start override
     if(_mdata){
       cumRunning+=_mdata.pnl;
       var _mEnd = _prevEnd!=null ? _prevEnd+_mdata.pnl : null;
@@ -7117,7 +7117,7 @@ function scaUpdateAccountFromRolling(){
       var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
       var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
       var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var _jStart=9816; // June start override
+      var _jStart=12805; // July start override
       if(_jTrades.length>0) lastAcc=_jStart+_jPnl;
     }catch(_je){}
     var accEl=document.getElementById('scaAccount');
@@ -7668,7 +7668,7 @@ function htkGetCurrentR(){
     var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
     var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
     var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-    var _jStart=9816; // June start override
+    var _jStart=12805; // July start override
     if(_jTrades.length>0){ return Math.round((_jStart+_jPnl)*0.02*100)/100; }
   }catch(_je){}
   var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
