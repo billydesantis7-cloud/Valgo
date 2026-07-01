@@ -1930,16 +1930,12 @@ document.addEventListener('DOMContentLoaded',function(){
   var dateInp=document.getElementById('tvImportDate');if(dateInp)dateInp.value=new Date().toISOString().slice(0,10);
   // Auto-suggest R
   try{
-    var rr=typeof getRollingMerged==='function'?getRollingMerged():[];
-    if(rr.length){// Use JEPPEZ current month end balance for R calculation
-    var la=rr[rr.length-1].acc;
-    try{
-      var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
-      var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
-      var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var _jStart=12805; // July start override
-      la=_jStart+_jPnl; // always anchor to July start balance, even with 0 trades so far
-    }catch(_je){}
+    var la=(typeof getJeppezCurrentBalance==='function')?getJeppezCurrentBalance():null;
+    if(la==null){
+      var rr=typeof getRollingMerged==='function'?getRollingMerged():[];
+      if(rr.length) la=rr[rr.length-1].acc;
+    }
+    if(la!=null){
     var cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
   }catch(er){}
   if(execView!=='ai') renderExecutions();
@@ -5541,9 +5537,7 @@ function renderTvWrr(){
 // Jeppez
 var JEPPEZ_STATIC=[{month:'January',start:4683.53,end:4772,pnl:88.47,pct:1.89,r:10.35,riskPerTrade:100,cagr:null,total:88.47,trades:82,wr:20.00,wlRel:4.20,lgWL:3.77,pf:1.04,avgW:130.4,avgL:-30.74,lgW:476,lgL:-100},{month:'February',start:4772,end:5457.12,pnl:685.12,pct:14.36,r:7.19,riskPerTrade:100,cagr:16.52,total:773.59,trades:28,wr:35.70,wlRel:3.45,lgWL:4.24,pf:1.92,avgW:143.10,avgL:-41.44,lgW:404.07,lgL:-120}];
 var JEPPEZ_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-function renderJeppez(){
-  var el=document.getElementById('tvJeppezTable'); if(!el) return;
-  var COLS='110px 80px 80px 90px 80px 70px 70px 70px 90px 80px 80px 80px 90px 80px 90px 80px 90px 90px 90px';
+function computeJeppezRows(){
   function ms(prefix){
     var mt=tvTrades.filter(function(t){return t.date&&t.date.startsWith(prefix);});
     if(!mt.length)return null;
@@ -5611,6 +5605,26 @@ function renderJeppez(){
   }
   var allRows=patchedStatic.concat(liveRows);
   window._jeppezAllRows = allRows;
+  return allRows;
+}
+
+// Returns the most current known account balance per the JEPPEZ page:
+// the live month's running end-of-month value, or its start balance if
+// no trades have posted for the current month yet.
+function getJeppezCurrentBalance(){
+  try{
+    var rows=computeJeppezRows();
+    if(!rows||!rows.length) return null;
+    var last=rows[rows.length-1];
+    var val=(last.end!=null)?last.end:last.start;
+    return (val!=null)?val:null;
+  }catch(e){return null;}
+}
+
+function renderJeppez(){
+  var el=document.getElementById('tvJeppezTable'); if(!el) return;
+  var COLS='110px 80px 80px 90px 80px 70px 70px 70px 90px 80px 80px 80px 90px 80px 90px 80px 90px 90px 90px';
+  var allRows=computeJeppezRows();
   var jepFilter=document.getElementById('jepMonthFilter');
   var jepFilterVal=jepFilter?jepFilter.value:'all';
   var filteredMonths=jepFilterVal==='all'?JEPPEZ_MONTHS:[jepFilterVal];
@@ -7086,17 +7100,13 @@ function scaSubTab(tab){} // legacy no-op
 
 function scaUpdateAccountFromRolling(){
   try{
-    var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
-    if(!rows.length) return;
-    var lastAcc=rows[rows.length-1].acc;
-    // Override with JEPPEZ current month end balance
-    try{
-      var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
-      var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
-      var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-      var _jStart=12805; // July start override
-      if(_jTrades.length>0) lastAcc=_jStart+_jPnl;
-    }catch(_je){}
+    var jb=(typeof getJeppezCurrentBalance==='function')?getJeppezCurrentBalance():null;
+    var lastAcc=jb;
+    if(lastAcc==null){
+      var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
+      if(!rows.length) return;
+      lastAcc=rows[rows.length-1].acc;
+    }
     var accEl=document.getElementById('scaAccount');
     if(accEl) accEl.textContent=Math.round(lastAcc);
     // Populate all R display spans
@@ -7640,13 +7650,9 @@ function scaCalcBlock(dir,idx,R){
 var htkFileName='Hotkey.htk';
 
 function htkGetCurrentR(){
-  // Use JEPPEZ current month end balance
   try{
-    var _jNow=new Date(),_jY=_jNow.getFullYear(),_jM=String(_jNow.getMonth()+1).padStart(2,'0'),_jPfx=_jY+'-'+_jM;
-    var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
-    var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
-    var _jStart=12805; // July start override
-    if(_jTrades.length>0){ return Math.round((_jStart+_jPnl)*0.02*100)/100; }
+    var jb=(typeof getJeppezCurrentBalance==='function')?getJeppezCurrentBalance():null;
+    if(jb!=null) return Math.round(jb*0.02*100)/100;
   }catch(_je){}
   var rows=typeof getRollingMerged==='function'?getRollingMerged():[];
   if(!rows.length) return null;
