@@ -1938,7 +1938,7 @@ document.addEventListener('DOMContentLoaded',function(){
       var _jTrades=tvTrades.filter(function(t){return t.date&&t.date.startsWith(_jPfx);});
       var _jPnl=_jTrades.reduce(function(s,t){return s+(t.pnl||0);},0);
       var _jStart=12805; // July start override
-      if(_jTrades.length>0) la=_jStart+_jPnl;
+      la=_jStart+_jPnl; // always anchor to July start balance, even with 0 trades so far
     }catch(_je){}
     var cr=Math.round(la*0.02);var ri=document.getElementById('tvImportR');var rs=document.getElementById('tvImportRSuggest');if(ri&&cr&&!ri.value){ri.value=cr;ri.style.borderColor='var(--accent)';if(rs){rs.textContent='Auto-filled: $'+cr;rs.style.display='block';}}}
   }catch(er){}
