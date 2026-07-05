@@ -9092,34 +9092,41 @@ var _gradeReviewTrades = [];
 
 var EXEC_SCORE_RUBRIC = [
   {section:'ENTRY', items:[
-    {key:'e1', label:"Didn't fomo chase", weight:2},
-    {key:'e2', label:"Didn't miss an entry", weight:2},
+    {key:'e1', label:'FOMO chase', weight:2, neg:true},
+    {key:'e2', label:'Miss an entry', weight:2, neg:true},
     {key:'e3', label:'Systematic', weight:2},
     {key:'e4', label:'Hit the correct size (not too much or too little)', weight:2},
-    {key:'e5', label:"Didn't hit new lows too early", weight:2},
-    {key:'e6', label:'Not too early', weight:1},
-    {key:'e7', label:'Not forced', weight:1},
+    {key:'e5', label:'Hit new lows too early', weight:2, neg:true},
+    {key:'e6', label:'Too early', weight:1, neg:true},
+    {key:'e7', label:'Forced', weight:1, neg:true},
   ]},
   {section:'EXIT', items:[
     {key:'x1', label:'Good % exits (not too much not too little)', weight:4},
-    {key:'x2', label:"Didn't get flat for no reason", weight:3},
+    {key:'x2', label:'Got flat for no reason', weight:3, neg:true},
     {key:'x3', label:'Systematic', weight:2},
-    {key:'x4', label:'Not forced out mid range', weight:1},
+    {key:'x4', label:'Forced out mid range', weight:1, neg:true},
   ]},
   {section:'STOP', items:[
-    {key:'s1', label:'Not forced to stop', weight:1},
-    {key:'s2', label:'Not flat for no reason', weight:1},
-    {key:'s3', label:"Didn't stop out too much %", weight:1},
+    {key:'s1', label:'Forced to stop', weight:1, neg:true},
+    {key:'s2', label:'Flat for no reason', weight:1, neg:true},
+    {key:'s3', label:'Stopped out too much %', weight:1, neg:true},
   ]},
 ];
 var EXEC_SCORE_MAX = 25;
+
+// For positive items, checking the box earns the weight (good behavior confirmed).
+// For "neg" (error) items, checking the box means the mistake happened, so the
+// weight is only earned when the box is left UNCHECKED (no error).
+function execItemEarned(item, isChecked){
+  return item.neg ? !isChecked : !!isChecked;
+}
 
 function kinfoCalcExecScore(checks){
   // checks is an object {e1:true, e2:false, ...}
   var total = 0;
   EXEC_SCORE_RUBRIC.forEach(function(sec){
     sec.items.forEach(function(item){
-      if(checks && checks[item.key]) total += item.weight;
+      if(execItemEarned(item, checks && checks[item.key])) total += item.weight;
     });
   });
   return Math.round((total / EXEC_SCORE_MAX) * 100);
@@ -10234,7 +10241,7 @@ function kinfoOpenGradeReview(trades, idx) {
           var sd=document.getElementById('_execScoreDisplay_'+t.key);
           if(sd){sd.textContent=score+'/100';sd.style.color=score>=80?'#4caf50':score>=60?'#ff9800':'#ef5350';}
           var td=document.getElementById('_execTotalDisplay_'+t.key);
-          var raw=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(checks[it.key])raw+=it.weight;});});
+          var raw=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(execItemEarned(it,checks[it.key]))raw+=it.weight;});});
           if(td)td.textContent=raw+'/'+EXEC_SCORE_MAX+'  →  '+score+'/100';
           kinfoRenderGrades();
         }
@@ -10254,14 +10261,14 @@ function kinfoOpenGradeReview(trades, idx) {
             cb.onchange=(function(k){return function(){checks[k]=this.checked;saveChecks();};})(item.key);
             var lbl=document.createElement('span');lbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);flex:1;line-height:1.3;';
             lbl.textContent=item.label;
-            var wgt=document.createElement('span');wgt.style.cssText='font-family:var(--mono);font-size:8px;color:rgba(144,202,249,0.5);flex-shrink:0;';
-            wgt.textContent='+'+item.weight;
+            var wgt=document.createElement('span');wgt.style.cssText='font-family:var(--mono);font-size:8px;color:'+(item.neg?'rgba(239,83,80,0.7)':'rgba(144,202,249,0.5)')+';flex-shrink:0;';
+            wgt.textContent=(item.neg?'-':'+')+item.weight;
             row.appendChild(cb);row.appendChild(lbl);row.appendChild(wgt);
             checkDiv.appendChild(row);
           });
         });
 
-        var raw0=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(checks[it.key])raw0+=it.weight;});});
+        var raw0=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(execItemEarned(it,checks[it.key]))raw0+=it.weight;});});
         var totRow=document.createElement('div');
         totRow.style.cssText='display:flex;justify-content:space-between;padding:5px 10px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.06);';
         var totLbl=document.createElement('span');totLbl.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);';totLbl.textContent='TOTAL';
