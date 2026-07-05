@@ -966,6 +966,7 @@ async function _sbInitLoad() {
       if (typeof tvTrades !== 'undefined') try { tvTrades = JSON.parse(localStorage.getItem('tvTrades') || '[]'); } catch(e) {}
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
+      try { ttNeedleMeta = JSON.parse(localStorage.getItem('ttNeedleMeta') || '{}'); } catch(e) {}
     }
     // If tvDayR is empty, restore from tv_day_r table
     if (typeof tvDayR !== 'undefined' && Object.keys(tvDayR).length === 0) {
@@ -5689,6 +5690,18 @@ var ttYear = new Date().getFullYear();
 var ttMonth = new Date().getMonth();
 var ttBtNoColor = localStorage.getItem('ttBtNoColor')||'red';
 
+// Needle Movers per-entry metadata (MR umbrella yes/no, long/short) — cloud-synced
+var ttNeedleMeta = (function(){ try{ return JSON.parse(localStorage.getItem('ttNeedleMeta')||'{}'); }catch(e){ return {}; } })();
+function ttSaveNeedleMeta(id, field, value){
+  if(!ttNeedleMeta[id]) ttNeedleMeta[id]={};
+  // Clicking an already-active value clears it (toggle off); otherwise set it
+  if(ttNeedleMeta[id][field]===value) delete ttNeedleMeta[id][field];
+  else ttNeedleMeta[id][field]=value;
+  if(Object.keys(ttNeedleMeta[id]).length===0) delete ttNeedleMeta[id];
+  try{ localStorage.setItem('ttNeedleMeta', JSON.stringify(ttNeedleMeta)); }catch(e){}
+  if(typeof sbSave==='function') sbSave('ttNeedleMeta', JSON.stringify(ttNeedleMeta));
+}
+
 function ttToggleBtNo(){
   ttBtNoColor = ttBtNoColor==='red'?'orange':'red';
   localStorage.setItem('ttBtNoColor',ttBtNoColor);
@@ -9876,21 +9889,36 @@ function ttShowNeedleMovers(){
   page.id='_ttNeedlePage';
   page.style.cssText='position:fixed;inset:0;z-index:9998;background:#0a0d12;overflow-y:auto;padding:20px;';
 
-  // Get all top-ops with edge >= 50
-  var allEntries=(typeof ttEntries!=='undefined'?ttEntries:[]).filter(function(e){ return (e.edge||0)>=50; });
-  // Sort by edge desc
-  allEntries=allEntries.slice().sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+  var _nmMinEdge=50;
+
+  function getFilteredEntries(){
+    return (typeof ttEntries!=='undefined'?ttEntries:[])
+      .filter(function(e){ return (e.edge||0)>=_nmMinEdge; })
+      .slice()
+      .sort(function(a,b){ return (b.edge||0)-(a.edge||0); });
+  }
 
   function buildPage(){
     page.innerHTML='';
     var wrap=document.createElement('div'); wrap.style.cssText='width:520px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
     var _pa=page.appendChild.bind(page); page.appendChild=function(el){ if(el===wrap) _pa(el); else wrap.appendChild(el); };
 
+    var allEntries=getFilteredEntries();
+
     // Header
     var hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;';
     hdr.innerHTML='<div style="font-family:var(--display);font-size:22px;font-weight:bold;letter-spacing:3px;color:#90caf9;">📍 NEEDLE MOVERS</div>'
-      +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);">top ops across all months · edge ≥ 50</div>';
+      +'<div style="font-family:var(--mono);font-size:10px;color:var(--muted);">top ops across all months</div>';
+    var edgeWrap=document.createElement('div');
+    edgeWrap.style.cssText='display:flex;align-items:center;gap:6px;';
+    edgeWrap.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;">MIN EDGE</span>';
+    var edgeInp=document.createElement('input');
+    edgeInp.type='number'; edgeInp.value=_nmMinEdge; edgeInp.min=0; edgeInp.max=100;
+    edgeInp.style.cssText='width:60px;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:5px 8px;border-radius:4px;';
+    edgeInp.onchange=function(){ var v=parseInt(this.value,10); _nmMinEdge=isNaN(v)?0:v; buildPage(); };
+    edgeWrap.appendChild(edgeInp);
+    hdr.appendChild(edgeWrap);
     var closeBtn=document.createElement('button');
     closeBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:4px;cursor:pointer;';
     closeBtn.textContent='✕ CLOSE';
