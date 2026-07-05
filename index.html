@@ -9901,7 +9901,6 @@ function ttShowNeedleMovers(){
   function buildPage(){
     page.innerHTML='';
     var wrap=document.createElement('div'); wrap.style.cssText='width:520px;max-width:98vw;margin:0 auto;'; page.appendChild(wrap);
-    var _pa=page.appendChild.bind(page); page.appendChild=function(el){ if(el===wrap) _pa(el); else wrap.appendChild(el); };
 
     var allEntries=getFilteredEntries();
 
@@ -9924,7 +9923,7 @@ function ttShowNeedleMovers(){
     closeBtn.textContent='✕ CLOSE';
     closeBtn.onclick=function(){ page.remove(); };
     hdr.appendChild(closeBtn);
-    page.appendChild(hdr);
+    wrap.appendChild(hdr);
 
     // Compute stats
     var total=allEntries.length;
@@ -9956,7 +9955,7 @@ function ttShowNeedleMovers(){
         +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;">'+s.sub+'</div>';
       statsGrid.appendChild(card);
     });
-    page.appendChild(statsGrid);
+    wrap.appendChild(statsGrid);
 
     // Table — same style as top-of-month
     var NM_COL='grid-template-columns:38px 58px 28px 1fr 22px 22px 22px 58px 68px';
@@ -10017,7 +10016,7 @@ function ttShowNeedleMovers(){
       btn.onclick=function(e){ e.stopPropagation(); ttSaveNeedleMeta(btn.dataset.id,'ls',btn.dataset.val); buildPage(); };
     });
 
-    page.appendChild(tableWrap);
+    wrap.appendChild(tableWrap);
   }
 
   buildPage();
