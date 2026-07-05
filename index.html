@@ -9103,41 +9103,68 @@ function kinfoGetGradeTrades() {
 var _gradeReviewIdx = 0;
 var _gradeReviewTrades = [];
 
-var EXEC_SCORE_RUBRIC = [
-  {section:'ENTRY', items:[
-    {key:'e1', label:'FOMO chase', weight:2, neg:true},
-    {key:'e2', label:'Miss an entry', weight:2, neg:true},
-    {key:'e3', label:'Systematic', weight:2},
-    {key:'e4', label:'Hit the correct size (not too much or too little)', weight:2},
-    {key:'e5', label:'Hit new lows too early', weight:2, neg:true},
-    {key:'e6', label:'Too early', weight:1, neg:true},
-    {key:'e7', label:'Forced', weight:1, neg:true},
-  ]},
-  {section:'EXIT', items:[
-    {key:'x1', label:'Good % exits (not too much not too little)', weight:4},
-    {key:'x2', label:'Got flat for no reason', weight:3, neg:true},
-    {key:'x3', label:'Systematic', weight:2},
-    {key:'x4', label:'Forced out mid range', weight:1, neg:true},
-  ]},
-  {section:'STOP', items:[
-    {key:'s1', label:'Forced to stop', weight:1, neg:true},
-    {key:'s2', label:'Flat for no reason', weight:1, neg:true},
-    {key:'s3', label:'Stopped out too much %', weight:1, neg:true},
-  ]},
-];
-var EXEC_SCORE_MAX = 25;
+// EOD Exec Score is now built dynamically from your actual tagged execution
+// errors (the same ENTRIES / EXITS-TAKE PROFIT / EXITS-STOP tags tracked on
+// the EXECUTION ERRORS page). Every trade starts at 100; each issue you check
+// off subtracts points. Only errors that have occurred 9+ times across your
+// trade history are included, and more frequent errors carry a bigger point
+// value than rare ones — weights are recomputed from live frequency data and
+// always sum to exactly 100 points.
+var EXEC_ERR_MIN_OCCURRENCES = 9;
+var EXEC_SCORE_MAX = 100;
 
-// For positive items, checking the box earns the weight (good behavior confirmed).
-// For "neg" (error) items, checking the box means the mistake happened, so the
-// weight is only earned when the box is left UNCHECKED (no error).
+function kinfoBuildDynamicExecRubric(){
+  var catDefs = [
+    {field:'execErrEntry',    section:'ENTRY'},
+    {field:'execErrExitTP',   section:'EXIT — TAKE PROFIT'},
+    {field:'execErrExitStop', section:'EXIT — STOP'},
+  ];
+  var items = [];
+  catDefs.forEach(function(cat){
+    var counts = kinfoGetAllErrTags(cat.field);
+    Object.keys(counts).forEach(function(tag){
+      if(counts[tag] >= EXEC_ERR_MIN_OCCURRENCES){
+        items.push({section:cat.section, field:cat.field, tag:tag, count:counts[tag]});
+      }
+    });
+  });
+  if(!items.length) return [];
+
+  var totalCount = items.reduce(function(s,it){ return s+it.count; }, 0);
+  items.forEach(function(it){
+    it.weight = Math.round(it.count/totalCount*100);
+    it.key = it.field+'|'+it.tag;
+  });
+  // Rounding can leave the sum a point or two off 100 — put the remainder on
+  // the single most frequent error so the total always lands on exactly 100.
+  var sumW = items.reduce(function(s,it){ return s+it.weight; }, 0);
+  var diff = 100 - sumW;
+  if(diff !== 0){
+    var maxIt = items.reduce(function(a,b){ return b.count>a.count?b:a; });
+    maxIt.weight += diff;
+  }
+
+  var order = ['ENTRY','EXIT — TAKE PROFIT','EXIT — STOP'];
+  return order.map(function(sec){
+    return {
+      section: sec,
+      items: items.filter(function(it){ return it.section===sec; })
+        .sort(function(a,b){ return b.weight-a.weight; })
+        .map(function(it){ return {key:it.key, label:it.tag, weight:it.weight, neg:true}; })
+    };
+  }).filter(function(s){ return s.items.length>0; });
+}
+
+// Checking a box means the error happened, so its weight is only earned
+// (kept) when the box is left UNCHECKED.
 function execItemEarned(item, isChecked){
   return item.neg ? !isChecked : !!isChecked;
 }
 
 function kinfoCalcExecScore(checks){
-  // checks is an object {e1:true, e2:false, ...}
+  var rubric = kinfoBuildDynamicExecRubric();
   var total = 0;
-  EXEC_SCORE_RUBRIC.forEach(function(sec){
+  rubric.forEach(function(sec){
     sec.items.forEach(function(item){
       if(execItemEarned(item, checks && checks[item.key])) total += item.weight;
     });
@@ -10245,6 +10272,7 @@ function kinfoOpenGradeReview(trades, idx) {
       // EOD Exec Score checklist — in right panel
       (function(){
         var checks = g2.execChecks || {};
+        var rubric = kinfoBuildDynamicExecRubric();
         var checkDiv = document.createElement('div');
         checkDiv.style.cssText = 'margin-top:10px;border:1px solid rgba(144,202,249,0.2);border-radius:6px;overflow:hidden;';
 
@@ -10268,12 +10296,17 @@ function kinfoOpenGradeReview(trades, idx) {
           var sd=document.getElementById('_execScoreDisplay_'+t.key);
           if(sd){sd.textContent=score+'/100';sd.style.color=score>=80?'#4caf50':score>=60?'#ff9800':'#ef5350';}
           var td=document.getElementById('_execTotalDisplay_'+t.key);
-          var raw=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(execItemEarned(it,checks[it.key]))raw+=it.weight;});});
-          if(td)td.textContent=raw+'/'+EXEC_SCORE_MAX+'  →  '+score+'/100';
+          if(td)td.textContent=score+'/'+EXEC_SCORE_MAX;
           kinfoRenderGrades();
         }
 
-        EXEC_SCORE_RUBRIC.forEach(function(sec){
+        if(!rubric.length){
+          var emptyMsg=document.createElement('div');
+          emptyMsg.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);padding:10px;';
+          emptyMsg.textContent='No execution errors have hit '+EXEC_ERR_MIN_OCCURRENCES+'+ occurrences yet — keep tagging errors on the ENTRIES/EXITS panels above.';
+          checkDiv.appendChild(emptyMsg);
+        }
+        rubric.forEach(function(sec){
           var secHdr=document.createElement('div');
           secHdr.style.cssText='font-family:var(--mono);font-size:7px;letter-spacing:1px;color:var(--muted);padding:4px 10px 2px;background:rgba(0,0,0,0.2);';
           secHdr.textContent=sec.section;
@@ -10295,13 +10328,13 @@ function kinfoOpenGradeReview(trades, idx) {
           });
         });
 
-        var raw0=0;EXEC_SCORE_RUBRIC.forEach(function(s){s.items.forEach(function(it){if(execItemEarned(it,checks[it.key]))raw0+=it.weight;});});
+
         var totRow=document.createElement('div');
         totRow.style.cssText='display:flex;justify-content:space-between;padding:5px 10px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.06);';
         var totLbl=document.createElement('span');totLbl.style.cssText='font-family:var(--mono);font-size:8px;color:var(--muted);';totLbl.textContent='TOTAL';
         var totVal=document.createElement('span');totVal.id='_execTotalDisplay_'+t.key;
         totVal.style.cssText='font-family:var(--mono);font-size:8px;color:#90caf9;font-weight:bold;';
-        totVal.textContent=raw0+'/'+EXEC_SCORE_MAX+'  →  '+cs0+'/100';
+        totVal.textContent=cs0+'/'+EXEC_SCORE_MAX;
         totRow.appendChild(totLbl);totRow.appendChild(totVal);
         checkDiv.appendChild(totRow);
         panel.appendChild(checkDiv);
