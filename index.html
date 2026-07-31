@@ -8619,7 +8619,11 @@ var kinfoSelectedDate = null;
 function kinfoSetRange(r) {
   kinfoRange = r;
   if (_kinfoView === 'errors') { kinfoRenderErrors(); }
-  else if (_kinfoView === 'grades') { kinfoRenderGrades(); }
+  else if (_kinfoView === 'grades') {
+    var gel = document.getElementById('kinfoGradesContent');
+    if (gel && gel._gradesTab === 'execerrs') kinfoRenderExecErrors();
+    else kinfoRenderGrades();
+  }
   ['1W','MTD','1M','3M','1Y'].forEach(function(rr) {
     var btn = document.getElementById('kinfoBtn'+rr);
     if (!btn) return;
