@@ -8619,6 +8619,7 @@ var kinfoSelectedDate = null;
 function kinfoSetRange(r) {
   kinfoRange = r;
   if (_kinfoView === 'errors') { kinfoRenderErrors(); }
+  else if (_kinfoView === 'grades') { kinfoRenderGrades(); }
   ['1W','MTD','1M','3M','1Y'].forEach(function(rr) {
     var btn = document.getElementById('kinfoBtn'+rr);
     if (!btn) return;
@@ -10149,8 +10150,7 @@ function kinfoOpenGradeReview(trades, idx) {
     hdr.innerHTML = '<div style="display:flex;align-items:center;gap:12px;">'
       +'<span style="font-family:var(--display);font-size:18px;font-weight:bold;color:var(--text);">'+t.symbol+'</span>'
       +'<span style="font-family:var(--mono);font-size:11px;color:var(--muted);">'+t.date+' · '+(t.side==='short'?'<span style="color:#ef5350">SHORT</span>':'<span style="color:#26a69a">LONG</span>')+'</span>'
-      +'<span style="font-family:var(--mono);font-size:13px;font-weight:bold;color:'+((t.pnl||0)>0?'var(--bull)':'var(--bear)')+';">'+(((t.pnl||0)>0)?'+':'')+((t.pnl||0).toFixed(0))+'</span>'
-      +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
+      +(t.r!=null?'<span style="font-family:var(--mono);font-size:13px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;">'
       +'<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx>0?idx-1:idx)+')" style="font-size:16px;background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;" '+(idx===0?'disabled':'')+'>◀</button>'
@@ -11238,7 +11238,7 @@ function kinfoRenderExecErrors(){
     col.style.cssText='min-width:0;';
 
     var colHdr = document.createElement('div');
-    colHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid '+cat.color+'44;';
+    colHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid '+cat.color+'44;';
     colHdr.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+cat.color+';display:inline-block;flex-shrink:0;"></span>'
       +'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;color:'+cat.color+';">'+cat.label+'</span>';
     col.appendChild(colHdr);
@@ -11271,22 +11271,21 @@ function kinfoRenderExecErrors(){
     sorted.forEach(function(err,i){
       var data = errMap[err];
       var card = document.createElement('div');
-      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+cat.color+';border-radius:6px;margin-bottom:8px;overflow:hidden;';
+      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-left:3px solid '+cat.color+';border-radius:5px;margin-bottom:4px;overflow:hidden;';
 
       // Card header - clickable to expand
       var cardHdr = document.createElement('div');
-      cardHdr.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;user-select:none;';
-      cardHdr.innerHTML='<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">#'+(i+1)+'</span>'
+      cardHdr.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 9px;cursor:pointer;user-select:none;';
+      cardHdr.innerHTML='<span style="font-family:var(--display);font-size:12px;font-weight:bold;color:'+cat.color+';width:18px;flex-shrink:0;">#'+(i+1)+'</span>'
         +'<div style="flex:1;min-width:0;">'
-          +'<div style="font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+err+'</div>'
-          +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+data.count+' occurrence'+(data.count>1?'s':'')+'</div>'
+          +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+err+'</div>'
         +'</div>'
-        +'<div style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+cat.color+';">'+data.count+'×</div>'
-        +'<span class="_errChevron" style="font-size:10px;color:var(--muted);margin-left:4px;">▶</span>';
+        +'<div style="font-family:var(--display);font-size:12px;font-weight:bold;color:'+cat.color+';">'+data.count+'×</div>'
+        +'<span class="_errChevron" style="font-size:9px;color:var(--muted);margin-left:2px;">▶</span>';
 
       // Fill bar
       var barWrap = document.createElement('div');
-      barWrap.style.cssText='height:3px;background:rgba(255,255,255,0.06);margin:0 12px 8px;border-radius:2px;';
+      barWrap.style.cssText='height:2px;background:rgba(255,255,255,0.06);margin:0 9px 4px;border-radius:2px;';
       var barFill = document.createElement('div');
       barFill.style.cssText='height:100%;width:'+Math.round(data.count/maxCount*100)+'%;background:'+cat.color+';border-radius:2px;';
       barWrap.appendChild(barFill);
