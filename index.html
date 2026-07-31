@@ -4222,7 +4222,7 @@ function tvHandleImport(event){
     tvSave(); refreshMyTradesFromTv();
     var dayPnl=parsed.reduce(function(s,t){return s+(t.pnl||0);},0);
     var res=document.getElementById('tvImportResult'); res.style.display='block';
-    res.innerHTML='<div style="font-size:16px;color:var(--bull);">✓ '+parsed.length+' trades imported</div><div style="font-size:11px;color:var(--muted);margin-top:6px;">'+date+' | '+(dayPnl>=0?'+$':'-$')+Math.abs(dayPnl).toFixed(2)+(rVal?' | '+(dayPnl/rVal>=0?'+':'')+(dayPnl/rVal).toFixed(2)+'R':'')+'</div>';
+    res.innerHTML='<div style="font-size:16px;color:var(--bull);">✓ '+parsed.length+' trades imported</div><div style="font-size:11px;color:var(--muted);margin-top:6px;">'+date+(rVal?' | '+(dayPnl/rVal>=0?'+':'')+(dayPnl/rVal).toFixed(2)+'R':'')+'</div>';
     renderTvRecentImports();
   };
   reader.readAsText(file); event.target.value='';
@@ -4277,9 +4277,8 @@ function renderTvRecentImports(){
       +'<span style="font-size:12px;color:var(--text);min-width:96px;">'+date+'</span>'
       +'<span style="font-size:11px;color:var(--muted);">'+dt.length+'t</span>'
       +'<span style="font-size:10px;color:'+(wins/dt.length>=0.5?'var(--bull)':'var(--bear)')+';">'+wins+'/'+dt.length+'</span>'
-      +'<span style="font-size:16px;font-weight:bold;color:'+(pnl>=0?'var(--bull)':'var(--bear)')+';margin-left:auto;">'+(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(2)+'</span>'
-      +(rVal?'<span style="font-size:14px;color:'+(pnl>=0?'var(--bull)':'var(--bear)')+';"> '+(pnl/rVal>=0?'+':'')+(pnl/rVal).toFixed(2)+'R</span><button onclick="tvEditDayR(\''+date+'\')" style="font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:2px 7px;border-radius:3px;cursor:pointer;">R=$'+rVal+'</button>'
-        :'<button onclick="tvEditDayR(\''+date+'\')" style="font-size:9px;color:var(--accent);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.3);padding:3px 8px;border-radius:3px;cursor:pointer;">+ SET R</button>')
+      +(rVal?'<span style="font-size:16px;font-weight:bold;color:'+(pnl>=0?'var(--bull)':'var(--bear)')+';margin-left:auto;">'+(pnl/rVal>=0?'+':'')+(pnl/rVal).toFixed(2)+'R</span><button onclick="tvEditDayR(\''+date+'\')" style="font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:2px 7px;border-radius:3px;cursor:pointer;">R=$'+rVal+'</button>'
+        :'<span style="margin-left:auto;"></span><button onclick="tvEditDayR(\''+date+'\')" style="font-size:9px;color:var(--accent);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.3);padding:3px 8px;border-radius:3px;cursor:pointer;">+ SET R</button>')
       +'<button onclick="tvDeleteDay(\''+date+'\')" style="font-size:10px;color:var(--bear);background:none;border:1px solid var(--bear);padding:3px 8px;border-radius:4px;cursor:pointer;opacity:0.6;">✕</button>'
       +'</div>';
   }).join('');
@@ -4496,8 +4495,7 @@ function _renderDayPanel(date, overrideEl){
       html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(0,0,0,0.3);">'
         +'<span style="font-size:18px;font-weight:bold;color:#fff;">'+sg.symbol+'</span>'
         +'<span style="font-size:9px;font-weight:bold;color:'+sc+';background:'+sc+'22;padding:2px 8px;border-radius:3px;">'+sg.side.toUpperCase()+'</span>'
-        +'<span style="font-size:14px;font-weight:bold;color:'+(symPnl>=0?'#26a69a':'#ef5350')+';">'+(symPnl>=0?'+$':'-$')+Math.abs(symPnl).toFixed(2)+'</span>'
-        +(symR!=null?'<span style="font-size:12px;color:'+(symPnl>=0?'#26a69a':'#ef5350')+';">'+(symR>=0?'+':'')+symR.toFixed(2)+'R</span>':'')
+        +(symR!=null?'<span style="font-size:14px;font-weight:bold;color:'+(symPnl>=0?'#26a69a':'#ef5350')+';">'+(symR>=0?'+':'')+symR.toFixed(2)+'R</span>':'')
         +'<div style="margin-left:auto;display:flex;gap:6px;">'
         +'<label style="font-size:9px;color:var(--muted);border:1px solid var(--border);padding:3px 8px;border-radius:3px;cursor:pointer;">Replace<input type="file" accept="image/*" style="display:none;" onchange="tvTradeImgSaveAndRefresh(event,\''+imgKey+'\',\''+date+'\')"></label>'
         +(tradeImg?'<button onclick="tvTradeImgDeleteAndRefresh(\''+imgKey+'\',\''+date+'\')" style="font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:3px;cursor:pointer;">Delete</button>':'')
