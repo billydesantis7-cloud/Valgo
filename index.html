@@ -10246,6 +10246,7 @@ function kinfoOpenGradeReview(trades, idx) {
     // System/Algo Exec (after EOD Edge)
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
     // Execution Error categories — right column panel
+    var _tagContainersByCat = {};
     (function(){
       var panel = document.createElement('div');
       panel.style.cssText = 'grid-row:1/20;grid-column:2;padding-left:16px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:14px;';
@@ -10264,6 +10265,7 @@ function kinfoOpenGradeReview(trades, idx) {
         sec.appendChild(lbl);
         var tagContainer = document.createElement('div');
         kinfoMakeTagInput(t.key, tagContainer, null, cat.key);
+        _tagContainersByCat[cat.key] = tagContainer;
         sec.appendChild(tagContainer);
         panel.appendChild(sec);
       });
@@ -10288,6 +10290,18 @@ function kinfoOpenGradeReview(trades, idx) {
         chkScore.textContent = cs0+'/100';
         chkHdr.appendChild(chkLbl); chkHdr.appendChild(chkScore);
         checkDiv.appendChild(chkHdr);
+
+        function syncErrTagFromCheck(field, tag, isChecked){
+          var g3 = kinfoLoadGrades()[t.key]||{};
+          var arr = Array.isArray(g3[field]) ? g3[field].slice() : (g3[field]?[g3[field]]:[]);
+          var idx = arr.indexOf(tag);
+          if(isChecked){ if(idx<0) arr.push(tag); }
+          else { if(idx>=0) arr.splice(idx,1); }
+          kinfoSaveGrade(t.key, field, arr.length?arr:null);
+          var catKey = field==='execErrEntry'?'entry':field==='execErrExitTP'?'exitTP':field==='execErrExitStop'?'exitStop':null;
+          var tc = catKey && _tagContainersByCat[catKey];
+          if(tc) kinfoMakeTagInput(t.key, tc, null, catKey);
+        }
 
         function saveChecks(){
           var score=kinfoCalcExecScore(checks);
@@ -10318,7 +10332,12 @@ function kinfoOpenGradeReview(trades, idx) {
             row.onmouseout=function(){this.style.background='transparent';};
             var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!checks[item.key];
             cb.style.cssText='width:12px;height:12px;cursor:pointer;accent-color:#90caf9;flex-shrink:0;';
-            cb.onchange=(function(k){return function(){checks[k]=this.checked;saveChecks();};})(item.key);
+            cb.onchange=(function(k){return function(){
+              checks[k]=this.checked;
+              saveChecks();
+              var parts=k.split('|');
+              if(parts.length===2) syncErrTagFromCheck(parts[0], parts[1], checks[k]);
+            };})(item.key);
             var lbl=document.createElement('span');lbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--text);flex:1;line-height:1.3;';
             lbl.textContent=item.label;
             var wgt=document.createElement('span');wgt.style.cssText='font-family:var(--mono);font-size:8px;color:'+(item.neg?'rgba(239,83,80,0.7)':'rgba(144,202,249,0.5)')+';flex-shrink:0;';
