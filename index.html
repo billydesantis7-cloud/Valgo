@@ -190,16 +190,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
           <span id="sca175RDisplay" style="font-family:var(--display);font-size:18px;color:#b3e5fc;font-weight:bold;">—</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
-          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">DAILY MAX LOSS (-2R)</span>
+          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">DAILY MAX LOSS (-1.6R)</span>
           <span id="scaDailyMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,0,0,0.15);border:1px solid #ff4444;border-radius:4px;padding:3px 10px;">
-          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">TICKER MAX LOSS (-2R)</span>
+          <span style="font-family:var(--mono);font-size:9px;color:#ff4444;letter-spacing:1px;">TICKER MAX LOSS (-1.6R)</span>
           <span id="scaTickerMax" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#ff4444;">—</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;background:rgba(200,169,0,0.15);border:1px solid #e8d000;border-radius:4px;padding:3px 10px;">
-          <span style="font-family:var(--mono);font-size:9px;color:#e8d000;letter-spacing:1px;">A++ PYRAMID (3R)</span>
-          <span id="scaAplusplus" style="font-family:var(--display);font-size:13px;font-weight:bold;color:#e8d000;">—</span>
         </div>
       </div>
     </div>
@@ -7128,9 +7124,8 @@ function scaUpdateAccountFromRolling(){
     var r125El=document.getElementById('sca125RDisplay'); if(r125El) r125El.textContent='$'+(R*1.25).toFixed(2);
     var r15El=document.getElementById('sca15RDisplay'); if(r15El) r15El.textContent='$'+(R*1.5).toFixed(2);
     var r175El=document.getElementById('sca175RDisplay'); if(r175El) r175El.textContent='$'+(R*1.75).toFixed(2);
-    var dmEl=document.getElementById('scaDailyMax'); if(dmEl) dmEl.textContent='-$'+(R*2).toFixed(2);
-    var tmEl=document.getElementById('scaTickerMax'); if(tmEl) tmEl.textContent='-$'+(R*2).toFixed(2);
-    var apEl=document.getElementById('scaAplusplus'); if(apEl) apEl.textContent='$'+(R*3).toFixed(2);
+    var dmEl=document.getElementById('scaDailyMax'); if(dmEl) dmEl.textContent='-$'+(R*1.6).toFixed(2);
+    var tmEl=document.getElementById('scaTickerMax'); if(tmEl) tmEl.textContent='-$'+(R*1.6).toFixed(2);
     return lastAcc;
   }catch(e){return null;}
 }
@@ -7580,9 +7575,8 @@ function scaRecalcAll(){
   var r125El=document.getElementById('sca125RDisplay'); if(r125El) r125El.textContent=R?'$'+(R*1.25).toFixed(2):'—';
   var r15El=document.getElementById('sca15RDisplay'); if(r15El) r15El.textContent=R?'$'+(R*1.5).toFixed(2):'—';
   var r175El=document.getElementById('sca175RDisplay'); if(r175El) r175El.textContent=R?'$'+(R*1.75).toFixed(2):'—';
-  var dmEl=document.getElementById('scaDailyMax'); if(dmEl) dmEl.textContent=R?'-$'+(R*2).toFixed(2):'—';
-  var tmEl=document.getElementById('scaTickerMax'); if(tmEl) tmEl.textContent=R?'-$'+(R*2).toFixed(2):'—';
-  var apEl=document.getElementById('scaAplusplus'); if(apEl) apEl.textContent=R?'+$'+(R*3).toFixed(2):'—';
+  var dmEl=document.getElementById('scaDailyMax'); if(dmEl) dmEl.textContent=R?'-$'+(R*1.6).toFixed(2):'—';
+  var tmEl=document.getElementById('scaTickerMax'); if(tmEl) tmEl.textContent=R?'-$'+(R*1.6).toFixed(2):'—';
   if(!R) return;
   ['short','long'].forEach(function(dir){
     for(var i=1;i<=(_scaBlockCounts[dir]||2);i++){
