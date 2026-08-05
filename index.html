@@ -8167,6 +8167,7 @@ function videoShowSetup(){
         <button onclick="kinfoSetUnit('$')" id="kinfoBtnDollar" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);">$</button>
         <button onclick="kinfoSetUnit('R')" id="kinfoBtnR" style="font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);">R</button>
       </div>
+      <div id="kinfoRefLineBtns" style="display:flex;gap:4px;margin-left:8px;align-items:center;"></div>
       <div style="margin-left:auto;display:flex;gap:16px;align-items:center;" id="kinfoSummary"></div>
     </div>
     <!-- CHART VIEW -->
@@ -8642,6 +8643,18 @@ function kinfoSetUnit(u) {
   if (db) { db.style.background = u==='$' ? 'var(--accent)' : 'transparent'; db.style.color = u==='$' ? 'var(--bg)' : 'var(--muted)'; db.style.borderColor = u==='$' ? 'var(--accent)' : 'var(--border)'; }
   if (rb) { rb.style.background = u==='R' ? 'var(--accent)' : 'transparent'; rb.style.color = u==='R' ? 'var(--bg)' : 'var(--muted)'; rb.style.borderColor = u==='R' ? 'var(--accent)' : 'var(--border)'; }
   kinfoRender();
+}
+
+function kinfoRenderRefLineBtns(){
+  var wrap = document.getElementById('kinfoRefLineBtns');
+  if (!wrap) return;
+  if (!window._kinfoLines) window._kinfoLines = [-1,-1.25,-1.5,-1.75];
+  wrap.style.display = kinfoUnit === 'R' ? 'flex' : 'none';
+  var presets = [-1,-1.25,-1.5,-1.75];
+  wrap.innerHTML = presets.map(function(val){
+    var on = (window._kinfoLines||[]).indexOf(val) >= 0;
+    return '<button onclick="var ls=window._kinfoLines||[];var idx=ls.indexOf('+val+');if(idx>=0)ls.splice(idx,1);else ls.push('+val+');window._kinfoLines=ls;kinfoRender();" style="font-family:var(--mono);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;border:1px solid '+(on?'rgba(239,83,80,0.8)':'var(--border)')+';background:'+(on?'rgba(239,83,80,0.12)':'transparent')+';color:'+(on?'#ef5350':'var(--muted)')+';">'+val+'R</button>';
+  }).join('');
 }
 
 function kinfoGetDateRange() {
@@ -11565,6 +11578,27 @@ function kinfoRender() {
 
   var starPlugin = { id: 'goldStars' }; // stars handled via HTML overlay
 
+  var kinfoRefLinesPlugin = {
+    id: 'kinfoRefLines',
+    afterDraw: function(chart){
+      if (kinfoUnit !== 'R') return;
+      var lines = window._kinfoLines || [];
+      if (!lines.length) return;
+      var ctx = chart.ctx, yScale = chart.scales.y, xScale = chart.scales.x;
+      if (!yScale || !yScale.getPixelForValue) return;
+      lines.forEach(function(val){
+        var y = yScale.getPixelForValue(val);
+        var col = val >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(239,83,80,0.75)';
+        ctx.save(); ctx.beginPath(); ctx.setLineDash([4,4]);
+        ctx.moveTo(xScale.left, y); ctx.lineTo(xScale.right, y);
+        ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = col; ctx.font = 'bold 9px monospace';
+        ctx.fillText((val>=0?'+':'')+val+'R', xScale.right+4, y+3);
+        ctx.setLineDash([]); ctx.restore();
+      });
+    }
+  };
+
   if (kinfoChart) { kinfoChart.destroy(); kinfoChart = null; }
 
   var canvas = document.getElementById('kinfoChart');
@@ -11617,9 +11651,10 @@ function kinfoRender() {
         }
       }
     },
-    plugins: [starPlugin]
+    plugins: [starPlugin, kinfoRefLinesPlugin]
   });
   kinfoChart._allDates = chartDates;
+  kinfoRenderRefLineBtns();
   setTimeout(function(){
     if(kinfoChart) kinfoChart.resize();
   }, 50);
