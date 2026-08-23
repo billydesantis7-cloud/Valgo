@@ -45,6 +45,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
 .tv-stat-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
 .tv-stat-val{font-family:var(--display);font-size:22px;letter-spacing:1px;color:var(--text);margin-top:4px;}
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Permanent+Marker&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -9098,21 +9099,27 @@ function kinfoGetGradeTrades(fromDateOverride) {
       groups[key].pnl += (t.pnl||0);
     });
   } catch(e){}
-  // Pull images from tvTradeImages using date_SYMBOL_side key
+  // Pull images from tvTradeImages (fall back to myTradeImages) using date_SYMBOL_side key
   var tvi = (typeof tvTradeImages !== 'undefined') ? tvTradeImages : {};
+  var mti = (typeof myTradeImages !== 'undefined') ? myTradeImages : {};
   Object.keys(groups).forEach(function(k) {
     var g = groups[k];
     var imgKey = g.date+'_'+g.symbol+'_'+g.side;
     // Try exact key first, then case variants
-    var src = tvi[imgKey] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_'+g.side]
-      || tvi[g.date+'_'+g.symbol+'_short'] || tvi[g.date+'_'+g.symbol+'_long']
-      || tvi[g.date+'_'+g.symbol.toLowerCase()+'_short'] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_long']
+    var src = tvi[imgKey] || mti[imgKey] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_'+g.side] || mti[g.date+'_'+g.symbol.toLowerCase()+'_'+g.side]
+      || tvi[g.date+'_'+g.symbol+'_short'] || mti[g.date+'_'+g.symbol+'_short'] || tvi[g.date+'_'+g.symbol+'_long'] || mti[g.date+'_'+g.symbol+'_long']
+      || tvi[g.date+'_'+g.symbol.toLowerCase()+'_short'] || mti[g.date+'_'+g.symbol.toLowerCase()+'_short'] || tvi[g.date+'_'+g.symbol.toLowerCase()+'_long'] || mti[g.date+'_'+g.symbol.toLowerCase()+'_long']
       || null;
     if (src) g.images = [src];
     // Also collect all keys matching this date+symbol
     Object.keys(tvi).forEach(function(ik){
       if(ik.startsWith(g.date+'_'+g.symbol+'_')||ik.startsWith(g.date+'_'+g.symbol.toLowerCase()+'_')){
         if(g.images.indexOf(tvi[ik])<0) g.images.push(tvi[ik]);
+      }
+    });
+    Object.keys(mti).forEach(function(ik){
+      if(ik.startsWith(g.date+'_'+g.symbol+'_')||ik.startsWith(g.date+'_'+g.symbol.toLowerCase()+'_')){
+        if(g.images.indexOf(mti[ik])<0) g.images.push(mti[ik]);
       }
     });
   });
@@ -10189,7 +10196,7 @@ function kinfoOpenGradeReview(trades, idx) {
       var imgWrap = document.createElement('div');
       imgWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:16px;';
       t.images.slice(0,4).forEach(function(src) {
-        var resolved = typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src;
+        var resolved = (typeof src==='string' && src.indexOf('data:')===0) ? src : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src);
         var img = document.createElement('img');
         img.src = resolved;
         img.style.cssText = 'width:100%;border-radius:6px;background:#080c14;cursor:zoom-in;border:1px solid rgba(255,255,255,0.1);margin-bottom:8px;';
@@ -10422,18 +10429,22 @@ function renderComparePage(){
 
   if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
   var filters = window._compareFilters;
+  var scrapbook = !!window._compareScrapbook;
+
+  var panel = document.getElementById('comparePanel');
+  if(panel) panel.style.background = scrapbook ? '#3e2f22' : '';
 
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;';
-  hdr.innerHTML = '<span style="font-family:var(--display);font-size:20px;font-weight:bold;letter-spacing:2px;color:var(--accent);">COMPARE</span>'
-    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Valkyrie vs. your trades</span>';
+  hdr.innerHTML = '<span style="font-family:var(--display);font-size:20px;font-weight:bold;letter-spacing:2px;color:'+(scrapbook?'#f0dfc0':'var(--accent)')+';">COMPARE</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:'+(scrapbook?'#c9b696':'var(--muted)')+';">Valkyrie vs. your trades</span>';
   wrap.appendChild(hdr);
 
   var filterBar = document.createElement('div');
-  filterBar.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:18px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;';
+  filterBar.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:18px;padding:10px 14px;background:'+(scrapbook?'rgba(0,0,0,0.2)':'var(--surface)')+';border:1px solid '+(scrapbook?'rgba(255,255,255,0.12)':'var(--border)')+';border-radius:8px;flex-wrap:wrap;';
   function filterToggle(label, key, color){
     var lab = document.createElement('label');
-    lab.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:'+(filters[key]?color:'var(--muted)')+';';
+    lab.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:'+(filters[key]?color:(scrapbook?'#c9b696':'var(--muted)'))+';';
     var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!filters[key];
     cb.style.cssText='accent-color:'+color+';cursor:pointer;';
     cb.onchange = function(){ filters[key]=this.checked; renderComparePage(); };
@@ -10443,8 +10454,15 @@ function renderComparePage(){
   }
   filterBar.appendChild(filterToggle('VAL MATCH = 1', 'match', '#42a5f5'));
   filterBar.appendChild(filterToggle('VAL APPROVE = 1', 'approve', '#ab47bc'));
+
+  var sbBtn = document.createElement('button');
+  sbBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid '+(scrapbook?'#e8b84b':'var(--border)')+';background:'+(scrapbook?'rgba(232,184,75,0.18)':'transparent')+';color:'+(scrapbook?'#e8b84b':'var(--muted)')+';';
+  sbBtn.textContent = '📔 SCRAPBOOK MODE';
+  sbBtn.onclick = function(){ window._compareScrapbook = !scrapbook; renderComparePage(); };
+  filterBar.appendChild(sbBtn);
+
   var countLbl = document.createElement('span');
-  countLbl.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);';
+  countLbl.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:'+(scrapbook?'#c9b696':'var(--muted)')+';';
   filterBar.appendChild(countLbl);
   wrap.appendChild(filterBar);
 
@@ -10459,38 +10477,59 @@ function renderComparePage(){
 
   if(!matched.length){
     var empty = document.createElement('div');
-    empty.style.cssText='text-align:center;padding:50px 20px;color:var(--muted);font-family:var(--mono);font-size:12px;font-style:italic;';
+    empty.style.cssText='text-align:center;padding:50px 20px;color:'+(scrapbook?'#c9b696':'var(--muted)')+';font-family:var(--mono);font-size:12px;font-style:italic;';
     empty.textContent = (filters.match||filters.approve) ? 'No trades match yet — grade some trades as Val Match / Val Approve on the KINFO page.' : 'Turn on at least one filter above.';
     wrap.appendChild(empty);
     return;
   }
 
-  matched.forEach(function(t){
+  matched.forEach(function(t, idx2){
     var g = grades[t.key]||{};
     var card = document.createElement('div');
-    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;';
+    if(scrapbook){
+      card.style.cssText='background:#f3e4c4;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,0.02) 0,rgba(0,0,0,0.02) 1px,transparent 1px,transparent 26px);border-radius:4px;padding:20px 20px 20px 44px;margin-bottom:26px;box-shadow:0 8px 22px rgba(0,0,0,0.45);position:relative;transform:rotate('+((idx2%2===0?-1:1)*0.6)+'deg);';
+      // Spiral binder down the left edge
+      var spiral=document.createElement('div');
+      spiral.style.cssText='position:absolute;left:6px;top:0;bottom:0;width:22px;background-image:radial-gradient(circle,#8a8f98 0,#8a8f98 4px,transparent 4.5px);background-size:22px 22px;background-repeat:repeat-y;background-position:center top;opacity:0.85;';
+      card.appendChild(spiral);
+    } else {
+      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;';
+    }
 
     var rowHdr = document.createElement('div');
-    rowHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;';
-    rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);">'+t.symbol+(t.side==='short'?' <span style="color:#ef5350;font-size:11px;">SHORT</span>':' <span style="color:#26a69a;font-size:11px;">LONG</span>')+'</span>'
-      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>'
-      +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
-      +(g.valMatch===1?'<span style="font-family:var(--mono);font-size:8px;color:#42a5f5;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);padding:2px 6px;border-radius:3px;">VAL MATCH</span>':'')
-      +(g.valApprove===1?'<span style="font-family:var(--mono);font-size:8px;color:#ab47bc;background:rgba(171,71,188,0.12);border:1px solid rgba(171,71,188,0.35);padding:2px 6px;border-radius:3px;">VAL APPROVE</span>':'');
+    rowHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:'+(scrapbook?'14px':'10px')+';flex-wrap:wrap;position:relative;z-index:1;';
+    if(scrapbook){
+      rowHdr.innerHTML = '<span style="font-family:\'Permanent Marker\',cursive;font-size:22px;color:#3e2f22;">'+t.symbol+'</span>'
+        +'<span style="font-family:\'Caveat\',cursive;font-size:18px;font-weight:700;color:'+(t.side==='short'?'#c0392b':'#1e7d4b')+';">'+(t.side==='short'?'short':'long')+'</span>'
+        +'<span style="font-family:\'Caveat\',cursive;font-size:18px;color:#5a4a37;">'+t.date+'</span>'
+        +(t.r!=null?'<span style="font-family:\'Caveat\',cursive;font-size:20px;font-weight:700;color:'+(t.r>0?'#1e7d4b':'#c0392b')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'');
+    } else {
+      rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);">'+t.symbol+(t.side==='short'?' <span style="color:#ef5350;font-size:11px;">SHORT</span>':' <span style="color:#26a69a;font-size:11px;">LONG</span>')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>'
+        +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
+        +(g.valMatch===1?'<span style="font-family:var(--mono);font-size:8px;color:#42a5f5;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);padding:2px 6px;border-radius:3px;">VAL MATCH</span>':'')
+        +(g.valApprove===1?'<span style="font-family:var(--mono);font-size:8px;color:#ab47bc;background:rgba(171,71,188,0.12);border:1px solid rgba(171,71,188,0.35);padding:2px 6px;border-radius:3px;">VAL APPROVE</span>':'');
+    }
     var openBtn=document.createElement('button');
-    openBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:4px 10px;border-radius:4px;cursor:pointer;';
+    openBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:'+(scrapbook?'#5a4a37':'var(--muted)')+';background:none;border:1px solid '+(scrapbook?'#5a4a37':'var(--border)')+';padding:4px 10px;border-radius:4px;cursor:pointer;';
     openBtn.textContent='⤢ OPEN';
     openBtn.onclick=(function(tt){ return function(){ kinfoOpenGradeReview([tt],0); }; })(t);
     rowHdr.appendChild(openBtn);
     card.appendChild(rowHdr);
 
     var grid = document.createElement('div');
-    grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:12px;';
+    grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:'+(scrapbook?'22px':'12px')+';position:relative;z-index:1;';
+
+    function photoFrame(rotateDeg){
+      return scrapbook ? 'background:#fff;padding:8px 8px 22px;box-shadow:0 4px 10px rgba(0,0,0,0.35);border-radius:2px;transform:rotate('+rotateDeg+'deg);' : '';
+    }
 
     // LEFT — Valkyrie chart, keyed by ticker so it persists across every trade on that symbol
     var leftCol = document.createElement('div');
-    leftCol.style.cssText='display:flex;flex-direction:column;gap:6px;';
-    var leftLbl=document.createElement('div'); leftLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; leftLbl.textContent='VALKYRIE — '+t.symbol;
+    leftCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(-1.5):'');
+    var leftLbl=document.createElement('div');
+    leftLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:16px;color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
+    leftLbl.textContent = scrapbook ? 'Valkyrie — '+t.symbol : 'VALKYRIE — '+t.symbol;
     leftCol.appendChild(leftLbl);
 
     var valKey = 'compareVal_'+t.symbol.toUpperCase();
@@ -10498,18 +10537,18 @@ function renderComparePage(){
       while(leftCol.children.length>1) leftCol.removeChild(leftCol.lastChild);
       var img = myTradeImages[valKey];
       if(img){
-        var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
+        var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
         im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
         leftCol.appendChild(im);
-        var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;';
+        var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;'+(scrapbook?'justify-content:center;':'');
         var delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.cssText='font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
         delBtn.onclick=function(){ imgDelete('myTradeImages', valKey); delete myTradeImages[valKey]; buildValBox(); };
         actRow.appendChild(delBtn);
         leftCol.appendChild(actRow);
       } else {
         var paste=document.createElement('div'); paste.tabIndex=0;
-        paste.style.cssText='min-height:140px;border:2px dashed rgba(66,165,245,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;';
-        paste.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click, then <b style="color:#42a5f5;">Ctrl+V</b> to paste Valkyrie\'s '+t.symbol+' chart</span>';
+        paste.style.cssText='min-height:140px;border:2px dashed '+(scrapbook?'rgba(66,165,245,0.5)':'rgba(66,165,245,0.3)')+';border-radius:'+(scrapbook?'0':'8px')+';display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;'+(scrapbook?'background:rgba(0,0,0,0.03);':'');
+        paste.innerHTML='<span style="font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:#5a4a37;":'var(--mono);font-size:10px;color:var(--muted);')+'">Click, then <b style="color:#42a5f5;">Ctrl+V</b> to paste Valkyrie&#39;s '+t.symbol+' chart</span>';
         paste.onclick=function(){paste.focus();};
         paste.addEventListener('paste', function(ev){
           var its=ev.clipboardData&&ev.clipboardData.items; if(!its) return;
@@ -10528,18 +10567,20 @@ function renderComparePage(){
 
     // RIGHT — My trade chart (already saved on this specific trade)
     var rightCol = document.createElement('div');
-    rightCol.style.cssText='display:flex;flex-direction:column;gap:6px;';
-    var rightLbl=document.createElement('div'); rightLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; rightLbl.textContent='MY TRADE';
+    rightCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(1.5):'');
+    var rightLbl=document.createElement('div');
+    rightLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:16px;color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
+    rightLbl.textContent = scrapbook ? 'My trade' : 'MY TRADE';
     rightCol.appendChild(rightLbl);
     if(t.images && t.images.length){
       t.images.slice(0,2).forEach(function(src){
-        var resolved = typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src;
-        var im=document.createElement('img'); im.src=resolved; im.style.cssText='width:100%;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
+        var resolved = (typeof src==='string' && src.indexOf('data:')===0) ? src : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src);
+        var im=document.createElement('img'); im.src=resolved; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
         im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
         rightCol.appendChild(im);
       });
     } else {
-      var noImg=document.createElement('div'); noImg.style.cssText='min-height:140px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.2);font-style:italic;border:1px dashed rgba(255,255,255,0.1);border-radius:8px;';
+      var noImg=document.createElement('div'); noImg.style.cssText='min-height:140px;display:flex;align-items:center;justify-content:center;font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:rgba(0,0,0,0.3);":'var(--mono);font-size:10px;color:rgba(255,255,255,0.2);')+'font-style:italic;border:1px dashed '+(scrapbook?'rgba(0,0,0,0.15)':'rgba(255,255,255,0.1)')+';border-radius:'+(scrapbook?'0':'8px')+';';
       noImg.textContent='No chart saved for this trade.';
       rightCol.appendChild(noImg);
     }
