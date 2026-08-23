@@ -10225,6 +10225,28 @@ function kinfoOpenGradeReview(trades, idx) {
       });
       return sec;
     }
+    function makeGradeSectionBinary(label, field, current) {
+      var sec = document.createElement('div');
+      sec.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
+      lbl.textContent = label;
+      sec.appendChild(lbl);
+      [0,1].forEach(function(v) {
+        var isAct = current===v;
+        var col = v===0?'#ef5350':'#4caf50';
+        var btn = document.createElement('button');
+        btn.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;width:52px;height:32px;border-radius:4px;cursor:pointer;border:2px solid '+(isAct?col:'rgba(255,255,255,0.15)')+';background:'+(isAct?col+'33':'transparent')+';color:'+(isAct?col:'rgba(255,255,255,0.4)')+';transition:all 0.1s;';
+        btn.textContent = v.toString();
+        btn.onclick = function(){
+          var newVal = current===v ? null : v;
+          kinfoSaveGrade(t.key, field, newVal);
+          renderModal();
+        };
+        sec.appendChild(btn);
+      });
+      return sec;
+    }
     var navBar = document.createElement('div');
     navBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);';
     navBar.innerHTML = '<button onclick="kinfoOpenGradeReview(_gradeReviewTrades,'+(idx>0?idx-1:idx)+')" style="font-family:var(--mono);font-size:12px;background:none;border:1px solid var(--border);color:var(--text);padding:5px 16px;border-radius:4px;cursor:pointer;"'+(idx===0?' disabled':'')+'>◀ PREV</button>'
@@ -10260,6 +10282,8 @@ function kinfoOpenGradeReview(trades, idx) {
     })();
     // System/Algo Exec (after EOD Edge)
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
+    box.appendChild(makeGradeSectionBinary('VAL MATCH?', 'valMatch', g2.valMatch!=null?g2.valMatch:null));
+    box.appendChild(makeGradeSectionBinary('VAL APPROVE', 'valApprove', g2.valApprove!=null?g2.valApprove:null));
     // Execution Error categories — right column panel
     var _tagContainersByCat = {};
     (function(){
@@ -10638,6 +10662,57 @@ function kinfoRenderGrades() {
     el.appendChild(buildBreakdown('DISCRETION SELECTION', '#f5c518', 'disc'));
     el.appendChild(buildBreakdown('SYSTEM / ALGO EXECUTION', '#90caf9', 'exec'));
 
+    function buildBinaryBreakdown(title, color, field) {
+      var relevant = allTvTrades.filter(function(t){ return (allGrades[t.key]||{})[field]!=null; });
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
+      wrap.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+        +'<div style="width:3px;height:18px;background:'+color+';border-radius:2px;"></div>'
+        +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:'+color+';">'+title+'</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">'+relevant.length+' graded</div>'
+        +'</div>';
+      var tableDiv = document.createElement('div');
+      tableDiv.style.cssText = 'display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
+      ['VALUE','TRADES','WIN RATE','TOTAL R'].forEach(function(h, hi) {
+        var hcell = document.createElement('div');
+        hcell.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:6px 10px;background:rgba(0,0,0,0.3);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hcell.textContent = h;
+        tableDiv.appendChild(hcell);
+      });
+      [{v:0,col:'#ef5350',lbl:'0'},{v:1,col:'#4caf50',lbl:'1'}].forEach(function(gv) {
+        var sub = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
+        var subWins = sub.filter(function(t){ return t.pnl>0; });
+        var wr = sub.length ? Math.round(subWins.length/sub.length*100) : 0;
+        var totalR = sub.reduce(function(s,t){ return s+(t.r||0); }, 0);
+
+        var vCell = document.createElement('div');
+        vCell.style.cssText = 'font-family:var(--mono);font-size:13px;font-weight:bold;color:'+gv.col+';padding:10px;background:'+gv.col+'0d;border-top:1px solid var(--border);text-align:center;';
+        vCell.textContent = gv.lbl;
+        tableDiv.appendChild(vCell);
+
+        var countCell = document.createElement('div');
+        countCell.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+gv.col+'08;font-family:var(--display);font-size:16px;font-weight:bold;color:'+(sub.length?gv.col:'var(--muted)')+';';
+        countCell.textContent = sub.length;
+        tableDiv.appendChild(countCell);
+
+        var wrCell = document.createElement('div');
+        wrCell.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+gv.col+'08;font-family:var(--display);font-size:16px;font-weight:bold;color:'+(sub.length?gv.col:'var(--muted)')+';';
+        wrCell.textContent = sub.length ? wr+'%' : '—';
+        tableDiv.appendChild(wrCell);
+
+        var rCell = document.createElement('div');
+        var rCol = totalR>0?'#4caf50':totalR<0?'#ef5350':'var(--muted)';
+        rCell.style.cssText = 'padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+gv.col+'08;font-family:var(--display);font-size:16px;font-weight:bold;color:'+(sub.length?rCol:'var(--muted)')+';';
+        rCell.textContent = sub.length ? (totalR>=0?'+':'')+totalR.toFixed(2)+'R' : '—';
+        tableDiv.appendChild(rCell);
+      });
+      wrap.appendChild(tableDiv);
+      return wrap;
+    }
+
+    el.appendChild(buildBinaryBreakdown('VAL MATCH?', '#42a5f5', 'valMatch'));
+    el.appendChild(buildBinaryBreakdown('VAL APPROVE', '#ab47bc', 'valApprove'));
+
     // ── SECTION 3: PERIOD COMPARISON (WEEKLY + MONTHLY) ──
     var monthDiv = document.createElement('div');
     monthDiv.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
@@ -10887,10 +10962,44 @@ function kinfoRenderGrades() {
     return;
   }
   // ── TRADES VIEW ──
-  var COLS = '90px 90px 65px 120px 72px 120px 72px 110px 40px';
+  // Val Match / Val Approve filters
+  (function(){
+    var filterBar = document.createElement('div');
+    filterBar.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;';
+    function makeValFilterGroup(label, stateKey){
+      var g2 = document.createElement('div');
+      g2.style.cssText = 'display:flex;align-items:center;gap:5px;';
+      var lb = document.createElement('span');
+      lb.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
+      lb.textContent = label+':';
+      g2.appendChild(lb);
+      [['ALL',null],['1',1],['0',0]].forEach(function(opt){
+        var val = opt[1];
+        var cur = el[stateKey]!=null ? el[stateKey] : null;
+        var isOn = cur===val;
+        var col = val===1?'#4caf50':val===0?'#ef5350':'var(--accent)';
+        var btn = document.createElement('button');
+        btn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?col:'var(--border)')+';background:'+(isOn?col+'22':'transparent')+';color:'+(isOn?col:'var(--muted)')+';';
+        btn.textContent = opt[0];
+        btn.onclick = function(){ el[stateKey]=val; kinfoRenderGrades(); };
+        g2.appendChild(btn);
+      });
+      return g2;
+    }
+    filterBar.appendChild(makeValFilterGroup('VAL MATCH', '_valMatchFilter'));
+    filterBar.appendChild(makeValFilterGroup('VAL APPROVE', '_valApproveFilter'));
+    el.appendChild(filterBar);
+  })();
+  if (el._valMatchFilter != null) {
+    trades = trades.filter(function(t){ var g3=grades[t.key]||{}; return g3.valMatch===el._valMatchFilter; });
+  }
+  if (el._valApproveFilter != null) {
+    trades = trades.filter(function(t){ var g3=grades[t.key]||{}; return g3.valApprove===el._valApproveFilter; });
+  }
+  var COLS = '90px 90px 65px 120px 72px 120px 72px 66px 66px 110px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
-  ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','EXEC ERRORS',''].forEach(function(h) {
+  ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','VAL\nMATCH?','VAL\nAPPROVE','EXEC ERRORS',''].forEach(function(h) {
     var s = document.createElement('span');
     s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
     s.textContent = h;
@@ -10912,6 +11021,24 @@ function kinfoRenderGrades() {
         var arr=Array.isArray(currentVal)?currentVal.slice():(currentVal!=null?[currentVal]:[]);
         var pos=arr.indexOf(v); if(pos>=0)arr.splice(pos,1); else arr.push(v);
         kinfoSaveGrade(key,field,arr.length===0?null:(arr.length===1?arr[0]:arr));
+        kinfoRenderGrades(); };
+      wrap.appendChild(btn);
+    });
+    return wrap;
+  }
+
+  function gradeCellBinary(key, field, currentVal) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:2px;align-items:center;';
+    [0,1].forEach(function(v) {
+      var isAct = currentVal===v;
+      var col = v===0?'#ef5350':'#4caf50';
+      var btn = document.createElement('button');
+      btn.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;width:24px;height:20px;border-radius:3px;cursor:pointer;border:1px solid '+(isAct?col:'rgba(255,255,255,0.12)')+';background:'+(isAct?col:'transparent')+';color:'+(isAct?'#fff':'rgba(255,255,255,0.3)')+';';
+      btn.textContent = v.toString();
+      btn.onclick = function(e){ e.stopPropagation();
+        var newVal = currentVal===v ? null : v;
+        kinfoSaveGrade(key,field,newVal);
         kinfoRenderGrades(); };
       wrap.appendChild(btn);
     });
@@ -10988,6 +11115,10 @@ function kinfoRenderGrades() {
       execCell.appendChild(inp);
       row.appendChild(execCell);
     })();
+
+    // Val Match? / Val Approve
+    row.appendChild(gradeCellBinary(t.key,'valMatch',g.valMatch!=null?g.valMatch:null));
+    row.appendChild(gradeCellBinary(t.key,'valApprove',g.valApprove!=null?g.valApprove:null));
 
     // Exec Error — compact tag display from all 3 categories
     (function(){
