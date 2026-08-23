@@ -53,6 +53,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
   <div class="nav-tabs">
     <button class="nav-tab" id="mainTabValgo" onclick="switchMainTab('valgo')">VALGO</button>
     <button class="nav-tab" id="mainTabTv" onclick="switchMainTab('tv')">TRADERVUE</button>
+    <button class="nav-tab" id="mainTabCompare" onclick="switchMainTab('compare')">COMPARE</button>
     <button class="nav-tab" id="mainTabTt" onclick="switchMainTab('tt')">TICKER TRACKER</button>
     <button class="nav-tab" id="mainTabSca" onclick="switchMainTab('sca')">CALCULATOR</button>
     
@@ -1415,7 +1416,7 @@ function switchMainTab(tab){
     sideNav = document.createElement('div');
     sideNav.id = 'scaSideNav';
     sideNav.style.cssText = 'position:fixed;top:0;left:0;width:28px;height:100vh;background:#0a0e1a;border-right:1px solid rgba(255,255,255,0.08);z-index:200;display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:2px;';
-    var tabs=[['V','valgo','#c8a96e'],['TV','tv','#26a69a'],['TT','tt','#90caf9'],['CAL','sca','#e8d000'],['KI','kinfo','#c8a96e']];
+    var tabs=[['V','valgo','#c8a96e'],['TV','tv','#26a69a'],['CMP','compare','#4caf50'],['TT','tt','#90caf9'],['CAL','sca','#e8d000'],['KI','kinfo','#c8a96e']];
     tabs.forEach(function(t){
       var btn=document.createElement('button');
       btn.style.cssText='writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);font-size:7px;letter-spacing:1px;color:'+(t[1]==='sca'?t[2]:'rgba(255,255,255,0.35)')+';background:'+(t[1]==='sca'?'rgba(232,208,0,0.1)':'transparent')+';border:none;padding:4px 2px;cursor:pointer;width:24px;border-radius:2px;';
@@ -1427,11 +1428,11 @@ function switchMainTab(tab){
   } else if (sideNav) {
     sideNav.style.display = tab==='sca' ? 'flex' : 'none';
   }
-  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','kinfoPanel'];
-  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabKinfo'];
-  var tabNames=['valgo','tv','tt','sca','kinfo'];
+  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','kinfoPanel','comparePanel'];
+  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabKinfo','mainTabCompare'];
+  var tabNames=['valgo','tv','tt','sca','kinfo','compare'];
   document.querySelector('.exec-panel').style.display='none';
-  ['tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  ['tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel','comparePanel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   tabIds.forEach(function(id){var b=document.getElementById(id);if(b){b.style.background='transparent';b.style.color='var(--muted)';}});
   var activeBtn=document.getElementById(tabIds[tabNames.indexOf(tab)]);
   if(activeBtn){activeBtn.style.background='var(--accent)';activeBtn.style.color='var(--bg)';}
@@ -1441,6 +1442,7 @@ function switchMainTab(tab){
   else if(tab==='sca'){var p=document.getElementById('scaPanel');if(p){p.style.display='block';if(typeof scaInit==='function')scaInit();}}
   
   else if(tab==='kinfo'){var p=document.getElementById('kinfoPanel');if(p){p.style.display='block';setTimeout(function(){if(typeof kinfoRender==='function'){kinfoRender();}},150);}}
+  else if(tab==='compare'){var p=document.getElementById('comparePanel');if(p){p.style.display='block';if(typeof renderComparePage==='function')renderComparePage();}}
 }
 
 // ── Filters ───────────────────────────────────────────────
@@ -8143,6 +8145,11 @@ function videoShowSetup(){
 
 </script>
 
+<!-- COMPARE PANEL -->
+<div id="comparePanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:12px 16px;box-sizing:border-box;background:var(--bg);overflow-y:auto;">
+  <div id="compareContent" style="max-width:900px;margin:0 auto;"></div>
+</div>
+
 <!-- VALGO CONDENSED PANEL -->
 <div id="kinfoPanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:12px 16px;box-sizing:border-box;background:var(--bg);overflow-y:auto;">
   <div style="max-width:1100px;margin:0 auto;">
@@ -9073,8 +9080,8 @@ function kinfoSaveGrade(tradeKey, field, value) {
 }
 function kinfoLoadGrades() { try { return JSON.parse(localStorage.getItem('kinfo_grades')||'{}'); } catch(e){ return {}; } }
 
-function kinfoGetGradeTrades() {
-  var fromDate = kinfoGetDateRange();
+function kinfoGetGradeTrades(fromDateOverride) {
+  var fromDate = fromDateOverride || kinfoGetDateRange();
   var groups = {};
   try {
     var all = JSON.parse(localStorage.getItem('tvTrades')||'[]');
@@ -10406,6 +10413,141 @@ function kinfoOpenGradeReview(trades, idx) {
   modal.appendChild(box);
   modal.onclick = function(e){ if(e.target===modal){ modal.remove(); kinfoRenderGrades(); } };
   document.body.appendChild(modal);
+}
+
+function renderComparePage(){
+  var wrap = document.getElementById('compareContent');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
+  var filters = window._compareFilters;
+
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;';
+  hdr.innerHTML = '<span style="font-family:var(--display);font-size:20px;font-weight:bold;letter-spacing:2px;color:var(--accent);">COMPARE</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Valkyrie vs. your trades</span>';
+  wrap.appendChild(hdr);
+
+  var filterBar = document.createElement('div');
+  filterBar.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:18px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;';
+  function filterToggle(label, key, color){
+    var lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:'+(filters[key]?color:'var(--muted)')+';';
+    var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!filters[key];
+    cb.style.cssText='accent-color:'+color+';cursor:pointer;';
+    cb.onchange = function(){ filters[key]=this.checked; renderComparePage(); };
+    lab.appendChild(cb);
+    var sp=document.createElement('span'); sp.textContent=label; lab.appendChild(sp);
+    return lab;
+  }
+  filterBar.appendChild(filterToggle('VAL MATCH = 1', 'match', '#42a5f5'));
+  filterBar.appendChild(filterToggle('VAL APPROVE = 1', 'approve', '#ab47bc'));
+  var countLbl = document.createElement('span');
+  countLbl.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);';
+  filterBar.appendChild(countLbl);
+  wrap.appendChild(filterBar);
+
+  var trades = kinfoGetGradeTrades('2000-01-01');
+  var grades = kinfoLoadGrades();
+  var matched = trades.filter(function(t){
+    var g=grades[t.key]||{};
+    return (filters.match && g.valMatch===1) || (filters.approve && g.valApprove===1);
+  }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+
+  countLbl.textContent = matched.length+' trade'+(matched.length===1?'':'s');
+
+  if(!matched.length){
+    var empty = document.createElement('div');
+    empty.style.cssText='text-align:center;padding:50px 20px;color:var(--muted);font-family:var(--mono);font-size:12px;font-style:italic;';
+    empty.textContent = (filters.match||filters.approve) ? 'No trades match yet — grade some trades as Val Match / Val Approve on the KINFO page.' : 'Turn on at least one filter above.';
+    wrap.appendChild(empty);
+    return;
+  }
+
+  matched.forEach(function(t){
+    var g = grades[t.key]||{};
+    var card = document.createElement('div');
+    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;';
+
+    var rowHdr = document.createElement('div');
+    rowHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;';
+    rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);">'+t.symbol+(t.side==='short'?' <span style="color:#ef5350;font-size:11px;">SHORT</span>':' <span style="color:#26a69a;font-size:11px;">LONG</span>')+'</span>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>'
+      +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
+      +(g.valMatch===1?'<span style="font-family:var(--mono);font-size:8px;color:#42a5f5;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);padding:2px 6px;border-radius:3px;">VAL MATCH</span>':'')
+      +(g.valApprove===1?'<span style="font-family:var(--mono);font-size:8px;color:#ab47bc;background:rgba(171,71,188,0.12);border:1px solid rgba(171,71,188,0.35);padding:2px 6px;border-radius:3px;">VAL APPROVE</span>':'');
+    var openBtn=document.createElement('button');
+    openBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:4px 10px;border-radius:4px;cursor:pointer;';
+    openBtn.textContent='⤢ OPEN';
+    openBtn.onclick=(function(tt){ return function(){ kinfoOpenGradeReview([tt],0); }; })(t);
+    rowHdr.appendChild(openBtn);
+    card.appendChild(rowHdr);
+
+    var grid = document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:12px;';
+
+    // LEFT — Valkyrie chart, keyed by ticker so it persists across every trade on that symbol
+    var leftCol = document.createElement('div');
+    leftCol.style.cssText='display:flex;flex-direction:column;gap:6px;';
+    var leftLbl=document.createElement('div'); leftLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; leftLbl.textContent='VALKYRIE — '+t.symbol;
+    leftCol.appendChild(leftLbl);
+
+    var valKey = 'compareVal_'+t.symbol.toUpperCase();
+    function buildValBox(){
+      while(leftCol.children.length>1) leftCol.removeChild(leftCol.lastChild);
+      var img = myTradeImages[valKey];
+      if(img){
+        var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
+        im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
+        leftCol.appendChild(im);
+        var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;';
+        var delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.cssText='font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
+        delBtn.onclick=function(){ imgDelete('myTradeImages', valKey); delete myTradeImages[valKey]; buildValBox(); };
+        actRow.appendChild(delBtn);
+        leftCol.appendChild(actRow);
+      } else {
+        var paste=document.createElement('div'); paste.tabIndex=0;
+        paste.style.cssText='min-height:140px;border:2px dashed rgba(66,165,245,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;';
+        paste.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click, then <b style="color:#42a5f5;">Ctrl+V</b> to paste Valkyrie\'s '+t.symbol+' chart</span>';
+        paste.onclick=function(){paste.focus();};
+        paste.addEventListener('paste', function(ev){
+          var its=ev.clipboardData&&ev.clipboardData.items; if(!its) return;
+          for(var pi=0; pi<its.length; pi++){
+            if(!its[pi].type.startsWith('image/')) continue;
+            var rd=new FileReader();
+            rd.onload=function(e2){ myTradeImages[valKey]=e2.target.result; imgSave('myTradeImages', valKey, e2.target.result); buildValBox(); };
+            rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
+          }
+        });
+        leftCol.appendChild(paste);
+      }
+    }
+    buildValBox();
+    grid.appendChild(leftCol);
+
+    // RIGHT — My trade chart (already saved on this specific trade)
+    var rightCol = document.createElement('div');
+    rightCol.style.cssText='display:flex;flex-direction:column;gap:6px;';
+    var rightLbl=document.createElement('div'); rightLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; rightLbl.textContent='MY TRADE';
+    rightCol.appendChild(rightLbl);
+    if(t.images && t.images.length){
+      t.images.slice(0,2).forEach(function(src){
+        var resolved = typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src;
+        var im=document.createElement('img'); im.src=resolved; im.style.cssText='width:100%;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
+        im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
+        rightCol.appendChild(im);
+      });
+    } else {
+      var noImg=document.createElement('div'); noImg.style.cssText='min-height:140px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.2);font-style:italic;border:1px dashed rgba(255,255,255,0.1);border-radius:8px;';
+      noImg.textContent='No chart saved for this trade.';
+      rightCol.appendChild(noImg);
+    }
+    grid.appendChild(rightCol);
+
+    card.appendChild(grid);
+    wrap.appendChild(card);
+  });
 }
 
 function kinfoRenderGrades() {
