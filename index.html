@@ -10488,17 +10488,22 @@ function compareBuildCard(t, g, scrapbook, big){
   leftLbl.textContent = scrapbook ? 'Valkyrie — '+t.symbol : 'VALKYRIE — '+t.symbol;
   leftCol.appendChild(leftLbl);
 
-  var valKey = 'compareVal_'+t.symbol.toUpperCase();
+  var valKey = 'compareVal_'+t.key;
   function buildValBox(){
     while(leftCol.children.length>1) leftCol.removeChild(leftCol.lastChild);
-    var img = myTradeImages[valKey];
+    var legacyKey = 'compareVal_'+t.symbol.toUpperCase();
+    var img = myTradeImages[valKey] || myTradeImages[legacyKey];
     if(img){
       var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:'+maxH+';';
       im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
       leftCol.appendChild(im);
       var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;'+(scrapbook?'justify-content:center;':'');
       var delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.cssText='font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
-      delBtn.onclick=function(){ imgDelete('myTradeImages', valKey); delete myTradeImages[valKey]; buildValBox(); };
+      delBtn.onclick=function(){
+        imgDelete('myTradeImages', valKey); delete myTradeImages[valKey];
+        imgDelete('myTradeImages', legacyKey); delete myTradeImages[legacyKey];
+        buildValBox();
+      };
       actRow.appendChild(delBtn);
       leftCol.appendChild(actRow);
     } else {
