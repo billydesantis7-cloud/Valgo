@@ -10423,7 +10423,7 @@ function kinfoOpenGradeReview(trades, idx) {
 }
 
 function compareGetMatchedTrades(){
-  if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
+  if(!window._compareFilters) window._compareFilters = {match:true, approve:true, bothImgs:false};
   if(!window._compareSort) window._compareSort = 'desc';
   var filters = window._compareFilters;
   var trades = kinfoGetGradeTrades('2000-01-01');
@@ -10434,6 +10434,15 @@ function compareGetMatchedTrades(){
   }).sort(function(a,b){
     return window._compareSort==='asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
   });
+  if(filters.bothImgs){
+    matched = matched.filter(function(t){
+      var valKey='compareVal_'+t.key;
+      var legacyKey='compareVal_'+t.symbol.toUpperCase();
+      var hasVal = !!(myTradeImages[valKey]||myTradeImages[legacyKey]);
+      var hasMine = !!(t.images && t.images.length);
+      return hasVal && hasMine;
+    });
+  }
   return {matched:matched, grades:grades};
 }
 
@@ -10620,7 +10629,7 @@ function renderComparePage(){
   if(!wrap) return;
   wrap.innerHTML = '';
 
-  if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
+  if(!window._compareFilters) window._compareFilters = {match:true, approve:true, bothImgs:false};
   if(!window._compareSort) window._compareSort = 'desc';
   var filters = window._compareFilters;
   var scrapbook = !!window._compareScrapbook;
@@ -10650,6 +10659,7 @@ function renderComparePage(){
   }
   filterBar.appendChild(filterToggle('VAL MATCH = 1', 'match', '#42a5f5'));
   filterBar.appendChild(filterToggle('VAL APPROVE = 1', 'approve', '#ab47bc'));
+  filterBar.appendChild(filterToggle('BOTH IMAGES', 'bothImgs', '#4caf50'));
 
   var sortBtn = document.createElement('button');
   sortBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid '+(scrapbook?'rgba(255,255,255,0.3)':'var(--border)')+';background:transparent;color:'+(scrapbook?'#f0dfc0':'var(--muted)')+';';
@@ -10684,7 +10694,7 @@ function renderComparePage(){
   if(!matched.length){
     var empty = document.createElement('div');
     empty.style.cssText='text-align:center;padding:50px 20px;color:'+(scrapbook?'#c9b696':'var(--muted)')+';font-family:var(--mono);font-size:12px;font-style:italic;';
-    empty.textContent = (filters.match||filters.approve) ? 'No trades match yet — grade some trades as Val Match / Val Approve on the KINFO page.' : 'Turn on at least one filter above.';
+    empty.textContent = !(filters.match||filters.approve) ? 'Turn on at least one filter above.' : (filters.bothImgs ? 'No trades have both images saved yet — paste Valkyrie\'s chart on a trade that already has yours.' : 'No trades match yet — grade some trades as Val Match / Val Approve on the KINFO page.');
     wrap.appendChild(empty);
     return;
   }
