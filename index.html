@@ -10422,17 +10422,208 @@ function kinfoOpenGradeReview(trades, idx) {
   document.body.appendChild(modal);
 }
 
+function compareGetMatchedTrades(){
+  if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
+  if(!window._compareSort) window._compareSort = 'desc';
+  var filters = window._compareFilters;
+  var trades = kinfoGetGradeTrades('2000-01-01');
+  var grades = kinfoLoadGrades();
+  var matched = trades.filter(function(t){
+    var g=grades[t.key]||{};
+    return (filters.match && g.valMatch===1) || (filters.approve && g.valApprove===1);
+  }).sort(function(a,b){
+    return window._compareSort==='asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+  });
+  return {matched:matched, grades:grades};
+}
+
+function compareBuildCard(t, g, scrapbook, big){
+  var card = document.createElement('div');
+  var rot = (t.key.length%2===0?-1:1)*0.6;
+  if(scrapbook){
+    card.style.cssText='background:#f3e4c4;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,0.02) 0,rgba(0,0,0,0.02) 1px,transparent 1px,transparent 26px);border-radius:4px;padding:'+(big?'28px 28px 28px 56px':'20px 20px 20px 44px')+';'+(big?'':'margin-bottom:26px;')+'box-shadow:0 8px 22px rgba(0,0,0,0.45);position:relative;'+(big?'':'transform:rotate('+rot+'deg);')+(big?'width:100%;max-width:1100px;':'');
+    var spiral=document.createElement('div');
+    spiral.style.cssText='position:absolute;left:'+(big?'10px':'6px')+';top:0;bottom:0;width:'+(big?'26px':'22px')+';background-image:radial-gradient(circle,#8a8f98 0,#8a8f98 4px,transparent 4.5px);background-size:'+(big?'26px 26px':'22px 22px')+';background-repeat:repeat-y;background-position:center top;opacity:0.85;';
+    card.appendChild(spiral);
+  } else {
+    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;';
+  }
+
+  var rowHdr = document.createElement('div');
+  rowHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:'+(scrapbook?(big?'18px':'14px'):'10px')+';flex-wrap:wrap;position:relative;z-index:1;';
+  if(scrapbook){
+    rowHdr.innerHTML = '<span style="font-family:\'Permanent Marker\',cursive;font-size:'+(big?'28px':'22px')+';color:#3e2f22;">'+t.symbol+'</span>'
+      +'<span style="font-family:\'Caveat\',cursive;font-size:'+(big?'22px':'18px')+';font-weight:700;color:'+(t.side==='short'?'#c0392b':'#1e7d4b')+';">'+(t.side==='short'?'short':'long')+'</span>'
+      +'<span style="font-family:\'Caveat\',cursive;font-size:'+(big?'22px':'18px')+';color:#5a4a37;">'+t.date+'</span>'
+      +(t.r!=null?'<span style="font-family:\'Caveat\',cursive;font-size:'+(big?'24px':'20px')+';font-weight:700;color:'+(t.r>0?'#1e7d4b':'#c0392b')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'');
+  } else {
+    rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);">'+t.symbol+(t.side==='short'?' <span style="color:#ef5350;font-size:11px;">SHORT</span>':' <span style="color:#26a69a;font-size:11px;">LONG</span>')+'</span>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>'
+      +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
+      +(g.valMatch===1?'<span style="font-family:var(--mono);font-size:8px;color:#42a5f5;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);padding:2px 6px;border-radius:3px;">VAL MATCH</span>':'')
+      +(g.valApprove===1?'<span style="font-family:var(--mono);font-size:8px;color:#ab47bc;background:rgba(171,71,188,0.12);border:1px solid rgba(171,71,188,0.35);padding:2px 6px;border-radius:3px;">VAL APPROVE</span>':'');
+  }
+  if(!big){
+    var openBtn=document.createElement('button');
+    openBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:'+(scrapbook?'#5a4a37':'var(--muted)')+';background:none;border:1px solid '+(scrapbook?'#5a4a37':'var(--border)')+';padding:4px 10px;border-radius:4px;cursor:pointer;';
+    openBtn.textContent='⤢ OPEN';
+    openBtn.onclick=(function(tt){ return function(){ kinfoOpenGradeReview([tt],0); }; })(t);
+    rowHdr.appendChild(openBtn);
+  }
+  card.appendChild(rowHdr);
+
+  var grid = document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:'+(scrapbook?(big?'32px':'22px'):'12px')+';position:relative;z-index:1;';
+
+  function photoFrame(rotateDeg){
+    return scrapbook ? 'background:#fff;padding:8px 8px 22px;box-shadow:0 4px 10px rgba(0,0,0,0.35);border-radius:2px;transform:rotate('+rotateDeg+'deg);' : '';
+  }
+  var maxH = big ? '560px' : '320px';
+
+  // LEFT — Valkyrie chart, keyed by ticker so it persists across every trade on that symbol
+  var leftCol = document.createElement('div');
+  leftCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(-1.5):'');
+  var leftLbl=document.createElement('div');
+  leftLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:'+(big?'19px':'16px')+';color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
+  leftLbl.textContent = scrapbook ? 'Valkyrie — '+t.symbol : 'VALKYRIE — '+t.symbol;
+  leftCol.appendChild(leftLbl);
+
+  var valKey = 'compareVal_'+t.symbol.toUpperCase();
+  function buildValBox(){
+    while(leftCol.children.length>1) leftCol.removeChild(leftCol.lastChild);
+    var img = myTradeImages[valKey];
+    if(img){
+      var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:'+maxH+';';
+      im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
+      leftCol.appendChild(im);
+      var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;'+(scrapbook?'justify-content:center;':'');
+      var delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.cssText='font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
+      delBtn.onclick=function(){ imgDelete('myTradeImages', valKey); delete myTradeImages[valKey]; buildValBox(); };
+      actRow.appendChild(delBtn);
+      leftCol.appendChild(actRow);
+    } else {
+      var paste=document.createElement('div'); paste.tabIndex=0;
+      paste.style.cssText='min-height:'+(big?'260px':'140px')+';border:2px dashed '+(scrapbook?'rgba(66,165,245,0.5)':'rgba(66,165,245,0.3)')+';border-radius:'+(scrapbook?'0':'8px')+';display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;'+(scrapbook?'background:rgba(0,0,0,0.03);':'');
+      paste.innerHTML='<span style="font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:#5a4a37;":'var(--mono);font-size:10px;color:var(--muted);')+'">Click, then <b style="color:#42a5f5;">Ctrl+V</b> to paste Valkyrie&#39;s '+t.symbol+' chart</span>';
+      paste.onclick=function(){paste.focus();};
+      paste.addEventListener('paste', function(ev){
+        var its=ev.clipboardData&&ev.clipboardData.items; if(!its) return;
+        for(var pi=0; pi<its.length; pi++){
+          if(!its[pi].type.startsWith('image/')) continue;
+          var rd=new FileReader();
+          rd.onload=function(e2){ myTradeImages[valKey]=e2.target.result; imgSave('myTradeImages', valKey, e2.target.result); buildValBox(); };
+          rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
+        }
+      });
+      leftCol.appendChild(paste);
+      if(big) setTimeout(function(){ paste.focus(); }, 60);
+    }
+  }
+  buildValBox();
+  grid.appendChild(leftCol);
+
+  // RIGHT — My trade chart (already saved on this specific trade) — exactly one image
+  var rightCol = document.createElement('div');
+  rightCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(1.5):'');
+  var rightLbl=document.createElement('div');
+  rightLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:'+(big?'19px':'16px')+';color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
+  rightLbl.textContent = scrapbook ? 'My trade' : 'MY TRADE';
+  rightCol.appendChild(rightLbl);
+  var myImg = (t.images && t.images.length) ? t.images[0] : null;
+  if(myImg){
+    var resolved = (typeof myImg==='string' && myImg.indexOf('data:')===0) ? myImg : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(myImg) : myImg);
+    var im=document.createElement('img'); im.src=resolved; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:'+maxH+';';
+    im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
+    rightCol.appendChild(im);
+  } else {
+    var noImg=document.createElement('div'); noImg.style.cssText='min-height:'+(big?'260px':'140px')+';display:flex;align-items:center;justify-content:center;font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:rgba(0,0,0,0.3);":'var(--mono);font-size:10px;color:rgba(255,255,255,0.2);')+'font-style:italic;border:1px dashed '+(scrapbook?'rgba(0,0,0,0.15)':'rgba(255,255,255,0.1)')+';border-radius:'+(scrapbook?'0':'8px')+';';
+    noImg.textContent='No chart saved for this trade.';
+    rightCol.appendChild(noImg);
+  }
+  grid.appendChild(rightCol);
+
+  card.appendChild(grid);
+  return card;
+}
+
+function compareOpenFullscreen(startIdx){
+  var data = compareGetMatchedTrades();
+  var matched = data.matched, grades = data.grades;
+  if(!matched.length) return;
+  var idx = Math.max(0, Math.min(startIdx||0, matched.length-1));
+
+  var existing = document.getElementById('_compareFullscreen');
+  if(existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = '_compareFullscreen';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#3e2f22;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;box-sizing:border-box;';
+  document.body.appendChild(ov);
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'position:absolute;top:18px;right:22px;font-family:var(--mono);font-size:13px;background:none;border:1px solid rgba(255,255,255,0.3);color:#f0dfc0;padding:6px 14px;border-radius:4px;cursor:pointer;';
+  closeBtn.textContent = '✕ CLOSE';
+  closeBtn.onclick = function(){ ov.remove(); document.removeEventListener('keydown', keyHandler); };
+  ov.appendChild(closeBtn);
+
+  var cardSlot = document.createElement('div');
+  cardSlot.style.cssText = 'flex:1;width:100%;display:flex;align-items:center;justify-content:center;overflow-y:auto;';
+  ov.appendChild(cardSlot);
+
+  var navRow = document.createElement('div');
+  navRow.style.cssText = 'display:flex;align-items:center;gap:20px;margin-top:16px;';
+  var prevBtn = document.createElement('button');
+  prevBtn.style.cssText = 'font-family:var(--mono);font-size:20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#f0dfc0;width:44px;height:44px;border-radius:50%;cursor:pointer;';
+  prevBtn.textContent = '◀';
+  var pageLbl = document.createElement('span');
+  pageLbl.style.cssText = 'font-family:\'Caveat\',cursive;font-size:22px;color:#f0dfc0;min-width:80px;text-align:center;';
+  var nextBtn = document.createElement('button');
+  nextBtn.style.cssText = 'font-family:var(--mono);font-size:20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#f0dfc0;width:44px;height:44px;border-radius:50%;cursor:pointer;';
+  nextBtn.textContent = '▶';
+  navRow.appendChild(prevBtn); navRow.appendChild(pageLbl); navRow.appendChild(nextBtn);
+  ov.appendChild(navRow);
+
+  function renderSlide(){
+    cardSlot.innerHTML = '';
+    var t = matched[idx];
+    var g = grades[t.key] || {};
+    var card = compareBuildCard(t, g, true, true);
+    cardSlot.appendChild(card);
+    pageLbl.textContent = (idx+1)+' / '+matched.length;
+    prevBtn.disabled = idx===0;
+    nextBtn.disabled = idx===matched.length-1;
+    prevBtn.style.opacity = idx===0 ? '0.3' : '1';
+    nextBtn.style.opacity = idx===matched.length-1 ? '0.3' : '1';
+  }
+  function goPrev(){ if(idx>0){ idx--; renderSlide(); } }
+  function goNext(){ if(idx<matched.length-1){ idx++; renderSlide(); } }
+  prevBtn.onclick = goPrev;
+  nextBtn.onclick = goNext;
+
+  function keyHandler(ev){
+    if(ev.key==='ArrowLeft') goPrev();
+    else if(ev.key==='ArrowRight') goNext();
+    else if(ev.key==='Escape'){ ov.remove(); document.removeEventListener('keydown', keyHandler); }
+  }
+  document.addEventListener('keydown', keyHandler);
+
+  renderSlide();
+}
+
 function renderComparePage(){
   var wrap = document.getElementById('compareContent');
   if(!wrap) return;
   wrap.innerHTML = '';
 
   if(!window._compareFilters) window._compareFilters = {match:true, approve:true};
+  if(!window._compareSort) window._compareSort = 'desc';
   var filters = window._compareFilters;
   var scrapbook = !!window._compareScrapbook;
 
   var panel = document.getElementById('comparePanel');
   if(panel) panel.style.background = scrapbook ? '#3e2f22' : '';
+  var contentEl = document.getElementById('compareContent');
+  if(contentEl) contentEl.style.maxWidth = scrapbook ? '1200px' : '900px';
 
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;';
@@ -10455,23 +10646,33 @@ function renderComparePage(){
   filterBar.appendChild(filterToggle('VAL MATCH = 1', 'match', '#42a5f5'));
   filterBar.appendChild(filterToggle('VAL APPROVE = 1', 'approve', '#ab47bc'));
 
+  var sortBtn = document.createElement('button');
+  sortBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid '+(scrapbook?'rgba(255,255,255,0.3)':'var(--border)')+';background:transparent;color:'+(scrapbook?'#f0dfc0':'var(--muted)')+';';
+  sortBtn.textContent = window._compareSort==='asc' ? '↑ OLDEST FIRST' : '↓ NEWEST FIRST';
+  sortBtn.onclick = function(){ window._compareSort = window._compareSort==='asc' ? 'desc' : 'asc'; renderComparePage(); };
+  filterBar.appendChild(sortBtn);
+
   var sbBtn = document.createElement('button');
   sbBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid '+(scrapbook?'#e8b84b':'var(--border)')+';background:'+(scrapbook?'rgba(232,184,75,0.18)':'transparent')+';color:'+(scrapbook?'#e8b84b':'var(--muted)')+';';
   sbBtn.textContent = '📔 SCRAPBOOK MODE';
   sbBtn.onclick = function(){ window._compareScrapbook = !scrapbook; renderComparePage(); };
   filterBar.appendChild(sbBtn);
 
+  if(scrapbook){
+    var fsBtn = document.createElement('button');
+    fsBtn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid #e8b84b;background:rgba(232,184,75,0.18);color:#e8b84b;';
+    fsBtn.textContent = '⛶ FULLSCREEN SLIDESHOW';
+    fsBtn.onclick = function(){ compareOpenFullscreen(0); };
+    filterBar.appendChild(fsBtn);
+  }
+
   var countLbl = document.createElement('span');
   countLbl.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:'+(scrapbook?'#c9b696':'var(--muted)')+';';
   filterBar.appendChild(countLbl);
   wrap.appendChild(filterBar);
 
-  var trades = kinfoGetGradeTrades('2000-01-01');
-  var grades = kinfoLoadGrades();
-  var matched = trades.filter(function(t){
-    var g=grades[t.key]||{};
-    return (filters.match && g.valMatch===1) || (filters.approve && g.valApprove===1);
-  }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+  var data = compareGetMatchedTrades();
+  var matched = data.matched, grades = data.grades;
 
   countLbl.textContent = matched.length+' trade'+(matched.length===1?'':'s');
 
@@ -10485,108 +10686,14 @@ function renderComparePage(){
 
   matched.forEach(function(t, idx2){
     var g = grades[t.key]||{};
-    var card = document.createElement('div');
+    var card = compareBuildCard(t, g, scrapbook, false);
     if(scrapbook){
-      card.style.cssText='background:#f3e4c4;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,0.02) 0,rgba(0,0,0,0.02) 1px,transparent 1px,transparent 26px);border-radius:4px;padding:20px 20px 20px 44px;margin-bottom:26px;box-shadow:0 8px 22px rgba(0,0,0,0.45);position:relative;transform:rotate('+((idx2%2===0?-1:1)*0.6)+'deg);';
-      // Spiral binder down the left edge
-      var spiral=document.createElement('div');
-      spiral.style.cssText='position:absolute;left:6px;top:0;bottom:0;width:22px;background-image:radial-gradient(circle,#8a8f98 0,#8a8f98 4px,transparent 4.5px);background-size:22px 22px;background-repeat:repeat-y;background-position:center top;opacity:0.85;';
-      card.appendChild(spiral);
-    } else {
-      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;';
+      var rot = (idx2%2===0?-1:1)*0.6;
+      card.style.transform = 'rotate('+rot+'deg)';
+      card.style.cursor = 'pointer';
+      card.title = 'Click to open fullscreen slideshow';
+      card.onclick = (function(ii){ return function(ev){ if(ev.target.tagName==='BUTTON'||ev.target.tagName==='INPUT') return; compareOpenFullscreen(ii); }; })(idx2);
     }
-
-    var rowHdr = document.createElement('div');
-    rowHdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:'+(scrapbook?'14px':'10px')+';flex-wrap:wrap;position:relative;z-index:1;';
-    if(scrapbook){
-      rowHdr.innerHTML = '<span style="font-family:\'Permanent Marker\',cursive;font-size:22px;color:#3e2f22;">'+t.symbol+'</span>'
-        +'<span style="font-family:\'Caveat\',cursive;font-size:18px;font-weight:700;color:'+(t.side==='short'?'#c0392b':'#1e7d4b')+';">'+(t.side==='short'?'short':'long')+'</span>'
-        +'<span style="font-family:\'Caveat\',cursive;font-size:18px;color:#5a4a37;">'+t.date+'</span>'
-        +(t.r!=null?'<span style="font-family:\'Caveat\',cursive;font-size:20px;font-weight:700;color:'+(t.r>0?'#1e7d4b':'#c0392b')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'');
-    } else {
-      rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);">'+t.symbol+(t.side==='short'?' <span style="color:#ef5350;font-size:11px;">SHORT</span>':' <span style="color:#26a69a;font-size:11px;">LONG</span>')+'</span>'
-        +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+t.date+'</span>'
-        +(t.r!=null?'<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:'+(t.r>0?'var(--bull)':'var(--bear)')+';">'+(t.r>0?'+':'')+t.r.toFixed(2)+'R</span>':'')
-        +(g.valMatch===1?'<span style="font-family:var(--mono);font-size:8px;color:#42a5f5;background:rgba(66,165,245,0.12);border:1px solid rgba(66,165,245,0.35);padding:2px 6px;border-radius:3px;">VAL MATCH</span>':'')
-        +(g.valApprove===1?'<span style="font-family:var(--mono);font-size:8px;color:#ab47bc;background:rgba(171,71,188,0.12);border:1px solid rgba(171,71,188,0.35);padding:2px 6px;border-radius:3px;">VAL APPROVE</span>':'');
-    }
-    var openBtn=document.createElement('button');
-    openBtn.style.cssText='margin-left:auto;font-family:var(--mono);font-size:9px;color:'+(scrapbook?'#5a4a37':'var(--muted)')+';background:none;border:1px solid '+(scrapbook?'#5a4a37':'var(--border)')+';padding:4px 10px;border-radius:4px;cursor:pointer;';
-    openBtn.textContent='⤢ OPEN';
-    openBtn.onclick=(function(tt){ return function(){ kinfoOpenGradeReview([tt],0); }; })(t);
-    rowHdr.appendChild(openBtn);
-    card.appendChild(rowHdr);
-
-    var grid = document.createElement('div');
-    grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:'+(scrapbook?'22px':'12px')+';position:relative;z-index:1;';
-
-    function photoFrame(rotateDeg){
-      return scrapbook ? 'background:#fff;padding:8px 8px 22px;box-shadow:0 4px 10px rgba(0,0,0,0.35);border-radius:2px;transform:rotate('+rotateDeg+'deg);' : '';
-    }
-
-    // LEFT — Valkyrie chart, keyed by ticker so it persists across every trade on that symbol
-    var leftCol = document.createElement('div');
-    leftCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(-1.5):'');
-    var leftLbl=document.createElement('div');
-    leftLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:16px;color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
-    leftLbl.textContent = scrapbook ? 'Valkyrie — '+t.symbol : 'VALKYRIE — '+t.symbol;
-    leftCol.appendChild(leftLbl);
-
-    var valKey = 'compareVal_'+t.symbol.toUpperCase();
-    function buildValBox(){
-      while(leftCol.children.length>1) leftCol.removeChild(leftCol.lastChild);
-      var img = myTradeImages[valKey];
-      if(img){
-        var im=document.createElement('img'); im.src=img; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
-        im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
-        leftCol.appendChild(im);
-        var actRow=document.createElement('div'); actRow.style.cssText='display:flex;gap:6px;'+(scrapbook?'justify-content:center;':'');
-        var delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.cssText='font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
-        delBtn.onclick=function(){ imgDelete('myTradeImages', valKey); delete myTradeImages[valKey]; buildValBox(); };
-        actRow.appendChild(delBtn);
-        leftCol.appendChild(actRow);
-      } else {
-        var paste=document.createElement('div'); paste.tabIndex=0;
-        paste.style.cssText='min-height:140px;border:2px dashed '+(scrapbook?'rgba(66,165,245,0.5)':'rgba(66,165,245,0.3)')+';border-radius:'+(scrapbook?'0':'8px')+';display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;'+(scrapbook?'background:rgba(0,0,0,0.03);':'');
-        paste.innerHTML='<span style="font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:#5a4a37;":'var(--mono);font-size:10px;color:var(--muted);')+'">Click, then <b style="color:#42a5f5;">Ctrl+V</b> to paste Valkyrie&#39;s '+t.symbol+' chart</span>';
-        paste.onclick=function(){paste.focus();};
-        paste.addEventListener('paste', function(ev){
-          var its=ev.clipboardData&&ev.clipboardData.items; if(!its) return;
-          for(var pi=0; pi<its.length; pi++){
-            if(!its[pi].type.startsWith('image/')) continue;
-            var rd=new FileReader();
-            rd.onload=function(e2){ myTradeImages[valKey]=e2.target.result; imgSave('myTradeImages', valKey, e2.target.result); buildValBox(); };
-            rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
-          }
-        });
-        leftCol.appendChild(paste);
-      }
-    }
-    buildValBox();
-    grid.appendChild(leftCol);
-
-    // RIGHT — My trade chart (already saved on this specific trade)
-    var rightCol = document.createElement('div');
-    rightCol.style.cssText='display:flex;flex-direction:column;gap:6px;'+(scrapbook?photoFrame(1.5):'');
-    var rightLbl=document.createElement('div');
-    rightLbl.style.cssText = scrapbook ? 'font-family:\'Caveat\',cursive;font-size:16px;color:#5a4a37;text-align:center;' : 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
-    rightLbl.textContent = scrapbook ? 'My trade' : 'MY TRADE';
-    rightCol.appendChild(rightLbl);
-    if(t.images && t.images.length){
-      t.images.slice(0,2).forEach(function(src){
-        var resolved = (typeof src==='string' && src.indexOf('data:')===0) ? src : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src);
-        var im=document.createElement('img'); im.src=resolved; im.style.cssText='width:100%;object-fit:contain;border-radius:'+(scrapbook?'0':'8px')+';background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
-        im.onclick=function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
-        rightCol.appendChild(im);
-      });
-    } else {
-      var noImg=document.createElement('div'); noImg.style.cssText='min-height:140px;display:flex;align-items:center;justify-content:center;font-family:'+(scrapbook?"'Caveat',cursive;font-size:15px;color:rgba(0,0,0,0.3);":'var(--mono);font-size:10px;color:rgba(255,255,255,0.2);')+'font-style:italic;border:1px dashed '+(scrapbook?'rgba(0,0,0,0.15)':'rgba(255,255,255,0.1)')+';border-radius:'+(scrapbook?'0':'8px')+';';
-      noImg.textContent='No chart saved for this trade.';
-      rightCol.appendChild(noImg);
-    }
-    grid.appendChild(rightCol);
-
-    card.appendChild(grid);
     wrap.appendChild(card);
   });
 }
