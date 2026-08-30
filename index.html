@@ -11037,6 +11037,7 @@ function kinfoRenderGrades() {
       if(!months.length) return;
 
       var wrap2 = document.createElement('div');
+      wrap2.id = 'kinfoMonthlyValCompare';
       wrap2.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
       wrap2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
         +'<div style="width:3px;height:18px;background:#e8d000;border-radius:2px;"></div>'
@@ -11163,7 +11164,7 @@ function kinfoRenderGrades() {
     }
 
     // Build sortable comparison table
-    var _pMode='weekly', _pSort='period', _pSortDir=1;
+    var _pMode='monthly', _pSort='period', _pSortDir=1;
 
     var mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -11327,8 +11328,10 @@ function kinfoRenderGrades() {
 
     renderPeriodTable();
 
-    // Prepend at top, then insights, then breakdown
+    // Prepend at top: insights, then period comparison, then monthly val-match comparison, then everything else
+    var monthlyValDiv = document.getElementById('kinfoMonthlyValCompare');
     el.insertBefore(monthDiv, el.firstChild);
+    if (monthlyValDiv) el.insertBefore(monthlyValDiv, monthDiv.nextSibling);
     el.insertBefore(insightDiv, el.firstChild);
     return;
   }
