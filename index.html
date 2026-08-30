@@ -11025,8 +11025,9 @@ function kinfoRenderGrades() {
       var byMonth = {};
       allTvTrades.forEach(function(t){
         var mo = t.date.slice(0,7); // YYYY-MM
-        if(!byMonth[mo]) byMonth[mo] = {total:0, match:0, approve:0, signedOff:0};
+        if(!byMonth[mo]) byMonth[mo] = {total:0, match:0, approve:0, signedOff:0, r:0};
         byMonth[mo].total++;
+        byMonth[mo].r += (t.r||0);
         var g = allGrades[t.key]||{};
         if(g.valMatch===1) byMonth[mo].match++;
         if(g.valApprove===1) byMonth[mo].approve++;
@@ -11040,38 +11041,42 @@ function kinfoRenderGrades() {
       wrap2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
         +'<div style="width:3px;height:18px;background:#e8d000;border-radius:2px;"></div>'
         +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#e8d000;">MONTHLY COMPARISON</div>'
-        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">regardless of P&amp;L</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">rate = count / trades that month · green ≥50%, red &lt;50%</div>'
         +'</div>';
 
       var tbl = document.createElement('div');
-      tbl.style.cssText = 'display:grid;grid-template-columns:100px 1fr 1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
+      tbl.style.cssText = 'display:grid;grid-template-columns:130px 90px 1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
       ['MONTH','TRADES','VAL MATCH','VAL APPROVE','SIGNED OFF'].forEach(function(h,hi){
         var hcell = document.createElement('div');
-        hcell.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:6px 10px;background:rgba(0,0,0,0.3);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hcell.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:8px 10px;background:rgba(0,0,0,0.35);'+(hi>0?'border-left:1px solid var(--border);':'');
         hcell.textContent = h;
         tbl.appendChild(hcell);
       });
-      months.forEach(function(mo){
+      months.forEach(function(mo, mi){
         var d = byMonth[mo];
         var moLabel = new Date(mo+'-02').toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+        var rowBg = mi%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
 
         var moCell = document.createElement('div');
-        moCell.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);padding:8px 10px;border-top:1px solid var(--border);';
-        moCell.textContent = moLabel;
+        moCell.style.cssText = 'display:flex;flex-direction:column;gap:2px;padding:10px;border-top:1px solid var(--border);'+rowBg;
+        moCell.innerHTML = '<span style="font-family:var(--mono);font-size:12px;font-weight:bold;color:var(--text);">'+moLabel+'</span>'
+          +'<span style="font-family:var(--mono);font-size:10px;font-weight:bold;color:'+(d.r>=0?'var(--bull)':'var(--bear)')+';">'+(d.r>=0?'+':'')+d.r.toFixed(2)+'R</span>';
         tbl.appendChild(moCell);
 
         var totCell = document.createElement('div');
-        totCell.style.cssText = 'font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);';
+        totCell.style.cssText = 'font-family:var(--display);font-size:16px;font-weight:bold;color:var(--text);padding:10px;border-top:1px solid var(--border);border-left:1px solid var(--border);'+rowBg;
         totCell.textContent = d.total;
         tbl.appendChild(totCell);
 
-        [['match','#42a5f5'],['approve','#ab47bc'],['signedOff','#66bb6a']].forEach(function(pair){
-          var key=pair[0], col=pair[1];
+        ['match','approve','signedOff'].forEach(function(key){
           var count = d[key];
           var pct = d.total ? Math.round(count/d.total*100) : 0;
+          var good = pct >= 50;
+          var col = good ? '#4caf50' : '#ef5350';
           var cell = document.createElement('div');
-          cell.style.cssText = 'font-family:var(--display);font-size:15px;font-weight:bold;color:'+col+';padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+col+'0a;';
-          cell.textContent = count+' ('+pct+'%)';
+          cell.style.cssText = 'display:flex;flex-direction:column;gap:1px;padding:10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+col+'14;'+rowBg;
+          cell.innerHTML = '<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:'+col+';">'+pct+'%</span>'
+            +'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);">'+count+' / '+d.total+' trades</span>';
           tbl.appendChild(cell);
         });
       });
