@@ -10298,6 +10298,7 @@ function kinfoOpenGradeReview(trades, idx) {
     box.appendChild(makeGradeSection('SYSTEM / ALGO EXEC', 'exec', g2.exec));
     box.appendChild(makeGradeSectionBinary('VAL MATCH?', 'valMatch', g2.valMatch!=null?g2.valMatch:null));
     box.appendChild(makeGradeSectionBinary('VAL APPROVE', 'valApprove', g2.valApprove!=null?g2.valApprove:null));
+    box.appendChild(makeGradeSectionBinary('SIGNED OFF IN ADVANCE', 'signedOff', g2.signedOff!=null?g2.signedOff:null));
     // Execution Error categories — right column panel
     var _tagContainersByCat = {};
     (function(){
@@ -10819,7 +10820,7 @@ function kinfoRenderGrades() {
     var allGrades = kinfoLoadGrades();
     // Use ALL tvTrades for monthly comparison, not just filtered
     // Use grouped trades (per ticker per day) — same as the trades list view
-    var allTvTrades = kinfoGetGradeTrades();
+    var allTvTrades = kinfoGetGradeTrades('2000-01-01');
     function tvTradeKey(t) { return t.key || (t.date+'_'+t.symbol+'_'+(t.side||'')); }
     var gradedTrades = allTvTrades.filter(function(t){ var g=allGrades[t.key]||{}; return g.disc!=null||g.exec!=null; }).map(function(t){ var g=allGrades[t.key]||{}; return Object.assign({},t,{g:g}); });
     var ungraded = allTvTrades.length - gradedTrades.length;
@@ -11017,6 +11018,66 @@ function kinfoRenderGrades() {
 
     el.appendChild(buildBinaryBreakdown('VAL MATCH?', '#42a5f5', 'valMatch'));
     el.appendChild(buildBinaryBreakdown('VAL APPROVE', '#ab47bc', 'valApprove'));
+    el.appendChild(buildBinaryBreakdown('SIGNED OFF IN ADVANCE', '#66bb6a', 'signedOff'));
+
+    // ── MONTHLY COMPARISON — trade counts + val match/approve/signoff rates by month ──
+    (function(){
+      var byMonth = {};
+      allTvTrades.forEach(function(t){
+        var mo = t.date.slice(0,7); // YYYY-MM
+        if(!byMonth[mo]) byMonth[mo] = {total:0, match:0, approve:0, signedOff:0};
+        byMonth[mo].total++;
+        var g = allGrades[t.key]||{};
+        if(g.valMatch===1) byMonth[mo].match++;
+        if(g.valApprove===1) byMonth[mo].approve++;
+        if(g.signedOff===1) byMonth[mo].signedOff++;
+      });
+      var months = Object.keys(byMonth).sort(); // ascending chronological
+      if(!months.length) return;
+
+      var wrap2 = document.createElement('div');
+      wrap2.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;';
+      wrap2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+        +'<div style="width:3px;height:18px;background:#e8d000;border-radius:2px;"></div>'
+        +'<div style="font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:2px;color:#e8d000;">MONTHLY COMPARISON</div>'
+        +'<div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto;">regardless of P&amp;L</div>'
+        +'</div>';
+
+      var tbl = document.createElement('div');
+      tbl.style.cssText = 'display:grid;grid-template-columns:100px 1fr 1fr 1fr 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;';
+      ['MONTH','TRADES','VAL MATCH','VAL APPROVE','SIGNED OFF'].forEach(function(h,hi){
+        var hcell = document.createElement('div');
+        hcell.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;padding:6px 10px;background:rgba(0,0,0,0.3);'+(hi>0?'border-left:1px solid var(--border);':'');
+        hcell.textContent = h;
+        tbl.appendChild(hcell);
+      });
+      months.forEach(function(mo){
+        var d = byMonth[mo];
+        var moLabel = new Date(mo+'-02').toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+
+        var moCell = document.createElement('div');
+        moCell.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;color:var(--text);padding:8px 10px;border-top:1px solid var(--border);';
+        moCell.textContent = moLabel;
+        tbl.appendChild(moCell);
+
+        var totCell = document.createElement('div');
+        totCell.style.cssText = 'font-family:var(--display);font-size:15px;font-weight:bold;color:var(--text);padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);';
+        totCell.textContent = d.total;
+        tbl.appendChild(totCell);
+
+        [['match','#42a5f5'],['approve','#ab47bc'],['signedOff','#66bb6a']].forEach(function(pair){
+          var key=pair[0], col=pair[1];
+          var count = d[key];
+          var pct = d.total ? Math.round(count/d.total*100) : 0;
+          var cell = document.createElement('div');
+          cell.style.cssText = 'font-family:var(--display);font-size:15px;font-weight:bold;color:'+col+';padding:8px 10px;border-top:1px solid var(--border);border-left:1px solid var(--border);background:'+col+'0a;';
+          cell.textContent = count+' ('+pct+'%)';
+          tbl.appendChild(cell);
+        });
+      });
+      wrap2.appendChild(tbl);
+      el.appendChild(wrap2);
+    })();
 
     // ── SECTION 3: PERIOD COMPARISON (WEEKLY + MONTHLY) ──
     var monthDiv = document.createElement('div');
@@ -11293,6 +11354,7 @@ function kinfoRenderGrades() {
     }
     filterBar.appendChild(makeValFilterGroup('VAL MATCH', '_valMatchFilter'));
     filterBar.appendChild(makeValFilterGroup('VAL APPROVE', '_valApproveFilter'));
+    filterBar.appendChild(makeValFilterGroup('SIGNED OFF', '_signedOffFilter'));
     el.appendChild(filterBar);
   })();
   if (el._valMatchFilter != null) {
@@ -11301,10 +11363,13 @@ function kinfoRenderGrades() {
   if (el._valApproveFilter != null) {
     trades = trades.filter(function(t){ var g3=grades[t.key]||{}; return g3.valApprove===el._valApproveFilter; });
   }
-  var COLS = '90px 90px 65px 120px 72px 120px 72px 66px 66px 110px 40px';
+  if (el._signedOffFilter != null) {
+    trades = trades.filter(function(t){ var g3=grades[t.key]||{}; return g3.signedOff===el._signedOffFilter; });
+  }
+  var COLS = '90px 90px 65px 120px 72px 120px 72px 66px 66px 66px 110px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
-  ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','VAL\nMATCH?','VAL\nAPPROVE','EXEC ERRORS',''].forEach(function(h) {
+  ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','VAL\nMATCH?','VAL\nAPPROVE','SIGNED\nOFF?','EXEC ERRORS',''].forEach(function(h) {
     var s = document.createElement('span');
     s.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;white-space:pre-line;line-height:1.3;';
     s.textContent = h;
@@ -11424,6 +11489,7 @@ function kinfoRenderGrades() {
     // Val Match? / Val Approve
     row.appendChild(gradeCellBinary(t.key,'valMatch',g.valMatch!=null?g.valMatch:null));
     row.appendChild(gradeCellBinary(t.key,'valApprove',g.valApprove!=null?g.valApprove:null));
+    row.appendChild(gradeCellBinary(t.key,'signedOff',g.signedOff!=null?g.signedOff:null));
 
     // Exec Error — compact tag display from all 3 categories
     (function(){
