@@ -10192,18 +10192,17 @@ function kinfoOpenGradeReview(trades, idx) {
     box.appendChild(hdr);
 
     // Images
-    if (t.images && t.images.length) {
+    var myImg0 = (t.images && t.images.length) ? t.images[0] : null;
+    if (myImg0) {
       var imgWrap = document.createElement('div');
       imgWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:16px;';
-      t.images.slice(0,4).forEach(function(src) {
-        var resolved = (typeof src==='string' && src.indexOf('data:')===0) ? src : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(src) : src);
-        var img = document.createElement('img');
-        img.src = resolved;
-        img.style.cssText = 'width:100%;border-radius:6px;background:#080c14;cursor:zoom-in;border:1px solid rgba(255,255,255,0.1);margin-bottom:8px;';
-        img.onerror = function(){ this.style.display='none'; };
-        img.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(resolved); };
-        imgWrap.appendChild(img);
-      });
+      var resolved0 = (typeof myImg0==='string' && myImg0.indexOf('data:')===0) ? myImg0 : (typeof resolveDiscordImg==='function' ? resolveDiscordImg(myImg0) : myImg0);
+      var img0 = document.createElement('img');
+      img0.src = resolved0;
+      img0.style.cssText = 'width:100%;border-radius:6px;background:#080c14;cursor:zoom-in;border:1px solid rgba(255,255,255,0.1);margin-bottom:8px;';
+      img0.onerror = function(){ this.style.display='none'; };
+      img0.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(resolved0); };
+      imgWrap.appendChild(img0);
       box.appendChild(imgWrap);
     } else {
       var noImg = document.createElement('div');
@@ -10246,9 +10245,9 @@ function kinfoOpenGradeReview(trades, idx) {
       lbl.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;min-width:160px;';
       lbl.textContent = label;
       sec.appendChild(lbl);
-      [0,1].forEach(function(v) {
+      [0,0.5,1].forEach(function(v) {
         var isAct = current===v;
-        var col = v===0?'#ef5350':'#4caf50';
+        var col = v===0?'#ef5350':v===0.5?'#f5c518':'#4caf50';
         var btn = document.createElement('button');
         btn.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;width:52px;height:32px;border-radius:4px;cursor:pointer;border:2px solid '+(isAct?col:'rgba(255,255,255,0.15)')+';background:'+(isAct?col+'33':'transparent')+';color:'+(isAct?col:'rgba(255,255,255,0.4)')+';transition:all 0.1s;';
         btn.textContent = v.toString();
@@ -10985,7 +10984,7 @@ function kinfoRenderGrades() {
         hcell.textContent = h;
         tableDiv.appendChild(hcell);
       });
-      [{v:0,col:'#ef5350',lbl:'0'},{v:1,col:'#4caf50',lbl:'1'}].forEach(function(gv) {
+      [{v:0,col:'#ef5350',lbl:'0'},{v:0.5,col:'#f5c518',lbl:'0.5'},{v:1,col:'#4caf50',lbl:'1'}].forEach(function(gv) {
         var sub = relevant.filter(function(t){ return (allGrades[t.key]||{})[field]===gv.v; });
         var subWins = sub.filter(function(t){ return t.pnl>0; });
         var wr = sub.length ? Math.round(subWins.length/sub.length*100) : 0;
@@ -11347,11 +11346,11 @@ function kinfoRenderGrades() {
       lb.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;';
       lb.textContent = label+':';
       g2.appendChild(lb);
-      [['ALL',null],['1',1],['0',0]].forEach(function(opt){
+      [['ALL',null],['1',1],['.5',0.5],['0',0]].forEach(function(opt){
         var val = opt[1];
         var cur = el[stateKey]!=null ? el[stateKey] : null;
         var isOn = cur===val;
-        var col = val===1?'#4caf50':val===0?'#ef5350':'var(--accent)';
+        var col = val===1?'#4caf50':val===0.5?'#f5c518':val===0?'#ef5350':'var(--accent)';
         var btn = document.createElement('button');
         btn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:3px 10px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?col:'var(--border)')+';background:'+(isOn?col+'22':'transparent')+';color:'+(isOn?col:'var(--muted)')+';';
         btn.textContent = opt[0];
@@ -11374,7 +11373,7 @@ function kinfoRenderGrades() {
   if (el._signedOffFilter != null) {
     trades = trades.filter(function(t){ var g3=grades[t.key]||{}; return g3.signedOff===el._signedOffFilter; });
   }
-  var COLS = '90px 90px 65px 120px 72px 120px 72px 66px 66px 66px 110px 40px';
+  var COLS = '90px 90px 65px 120px 72px 120px 72px 82px 82px 82px 110px 40px';
   var hdr = document.createElement('div');
   hdr.style.cssText = 'display:grid;grid-template-columns:'+COLS+';gap:0;padding:6px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;position:sticky;top:0;z-index:2;';
   ['DATE','SYMBOL','R','DISC\nSELECTION','EOD\nEDGE','SYSTEM\nALGO EXEC','EOD\nEXEC','VAL\nMATCH?','VAL\nAPPROVE','SIGNED\nOFF?','EXEC ERRORS',''].forEach(function(h) {
@@ -11408,12 +11407,12 @@ function kinfoRenderGrades() {
   function gradeCellBinary(key, field, currentVal) {
     var wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;gap:2px;align-items:center;';
-    [0,1].forEach(function(v) {
+    [0,0.5,1].forEach(function(v) {
       var isAct = currentVal===v;
-      var col = v===0?'#ef5350':'#4caf50';
+      var col = v===0?'#ef5350':v===0.5?'#f5c518':'#4caf50';
       var btn = document.createElement('button');
-      btn.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;width:24px;height:20px;border-radius:3px;cursor:pointer;border:1px solid '+(isAct?col:'rgba(255,255,255,0.12)')+';background:'+(isAct?col:'transparent')+';color:'+(isAct?'#fff':'rgba(255,255,255,0.3)')+';';
-      btn.textContent = v.toString();
+      btn.style.cssText = 'font-family:var(--mono);font-size:8px;font-weight:bold;width:22px;height:20px;border-radius:3px;cursor:pointer;border:1px solid '+(isAct?col:'rgba(255,255,255,0.12)')+';background:'+(isAct?col:'transparent')+';color:'+(isAct?'#fff':'rgba(255,255,255,0.3)')+';padding:0;';
+      btn.textContent = v===0.5?'.5':v.toString();
       btn.onclick = function(e){ e.stopPropagation();
         var newVal = currentVal===v ? null : v;
         kinfoSaveGrade(key,field,newVal);
