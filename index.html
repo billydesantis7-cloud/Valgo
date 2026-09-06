@@ -5728,6 +5728,73 @@ var OPTIONS_TIME_BUCKETS = [
   ['pre','Pre-market'],['930-10','9:30–10:00'],['10-11','10:00–11:00'],['11-12','11:00–12:00'],['pm','After 12:00']
 ];
 
+// Builds a paste-multiple-images gallery for an options trade.
+// o.imageKeys is an array of myTradeImages keys. onChange fires whenever the list changes,
+// so the caller can persist immediately (card view) or just hold it in memory (add/edit form).
+function optionsBuildImageGallery(o, container, onChange){
+  if(!o.imageKeys) o.imageKeys = [];
+  // One-time migration from the old single-image scheme
+  var legacyKey = 'opt_'+o.id;
+  if(!o.imageKeys.length && myTradeImages[legacyKey]){
+    o.imageKeys = [legacyKey];
+  }
+
+  function rebuild(){
+    container.innerHTML = '';
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;';
+    o.imageKeys.forEach(function(key){
+      var img = myTradeImages[key];
+      if(!img) return;
+      var thumbWrap = document.createElement('div');
+      thumbWrap.style.cssText = 'position:relative;width:150px;';
+      var im = document.createElement('img');
+      im.src = img;
+      im.style.cssText = 'width:150px;height:100px;object-fit:cover;border-radius:6px;background:rgba(0,0,0,0.3);cursor:zoom-in;border:1px solid var(--border);';
+      im.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
+      thumbWrap.appendChild(im);
+      var xBtn = document.createElement('button');
+      xBtn.textContent = '✕';
+      xBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,0.7);color:#ef5350;font-size:11px;font-weight:bold;cursor:pointer;line-height:1;';
+      xBtn.onclick = function(ev){
+        ev.stopPropagation();
+        imgDelete('myTradeImages', key); delete myTradeImages[key];
+        o.imageKeys = o.imageKeys.filter(function(k){ return k!==key; });
+        if(onChange) onChange(o.imageKeys);
+        rebuild();
+      };
+      thumbWrap.appendChild(xBtn);
+      grid.appendChild(thumbWrap);
+    });
+    container.appendChild(grid);
+
+    var paste = document.createElement('div');
+    paste.tabIndex = 0;
+    paste.style.cssText = 'min-height:70px;border:2px dashed rgba(200,169,110,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:12px;text-align:center;';
+    paste.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click, then <b style="color:var(--accent);">Ctrl+V</b> to paste'+(o.imageKeys.length?' another chart':' a chart')+' — paste as many as you need</span>';
+    paste.onclick = function(){ paste.focus(); };
+    paste.addEventListener('paste', function(ev){
+      var its = ev.clipboardData && ev.clipboardData.items; if(!its) return;
+      for(var pi=0; pi<its.length; pi++){
+        if(!its[pi].type.startsWith('image/')) continue;
+        var rd = new FileReader();
+        rd.onload = function(e2){
+          var newKey = 'opt_'+o.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+          myTradeImages[newKey] = e2.target.result;
+          imgSave('myTradeImages', newKey, e2.target.result);
+          o.imageKeys.push(newKey);
+          if(onChange) onChange(o.imageKeys);
+          rebuild();
+        };
+        rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
+      }
+    });
+    container.appendChild(paste);
+    setTimeout(function(){ paste.focus(); }, 30);
+  }
+  rebuild();
+}
+
 function renderOptionsPage(){
   var wrap = document.getElementById('optionsContent');
   if(!wrap) return;
@@ -5826,6 +5893,7 @@ function renderOptionsPage(){
       if(!confirm('Delete this options trade?')) return;
       optionsTrades = optionsTrades.filter(function(x){ return x.id!==oo.id; });
       optionsSaveAll();
+      (oo.imageKeys||[]).forEach(function(k){ imgDelete('myTradeImages',k); delete myTradeImages[k]; });
       imgDelete('myTradeImages','opt_'+oo.id); delete myTradeImages['opt_'+oo.id];
       renderOptionsPage();
     }; })(o);
@@ -5840,42 +5908,13 @@ function renderOptionsPage(){
       card.appendChild(notesDiv);
     }
 
-    // Chart paste zone, same imgSave pipeline as everything else
-    var imgKey = 'opt_'+o.id;
+    // Chart images — supports pasting multiple, persists immediately since this card is already saved
     var imgSlot = document.createElement('div');
-    function buildImgSlot(){
-      imgSlot.innerHTML = '';
-      var img = myTradeImages[imgKey];
-      if(img){
-        var im = document.createElement('img');
-        im.src = img;
-        im.style.cssText = 'width:100%;max-width:520px;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
-        im.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
-        imgSlot.appendChild(im);
-        var delImgBtn = document.createElement('button');
-        delImgBtn.textContent = 'Delete image';
-        delImgBtn.style.cssText = 'display:block;margin-top:6px;font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
-        delImgBtn.onclick = function(){ imgDelete('myTradeImages', imgKey); delete myTradeImages[imgKey]; buildImgSlot(); };
-        imgSlot.appendChild(delImgBtn);
-      } else {
-        var paste = document.createElement('div');
-        paste.tabIndex = 0;
-        paste.style.cssText = 'max-width:520px;min-height:100px;border:2px dashed rgba(200,169,110,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;';
-        paste.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click, then <b style="color:var(--accent);">Ctrl+V</b> to paste a chart</span>';
-        paste.onclick = function(){ paste.focus(); };
-        paste.addEventListener('paste', function(ev){
-          var its = ev.clipboardData && ev.clipboardData.items; if(!its) return;
-          for(var pi=0; pi<its.length; pi++){
-            if(!its[pi].type.startsWith('image/')) continue;
-            var rd = new FileReader();
-            rd.onload = function(e2){ myTradeImages[imgKey]=e2.target.result; imgSave('myTradeImages', imgKey, e2.target.result); buildImgSlot(); };
-            rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
-          }
-        });
-        imgSlot.appendChild(paste);
-      }
-    }
-    buildImgSlot();
+    optionsBuildImageGallery(o, imgSlot, function(newKeys){
+      o.imageKeys = newKeys;
+      optionsTrades = optionsTrades.map(function(x){ return x.id===o.id ? o : x; });
+      optionsSaveAll();
+    });
     card.appendChild(imgSlot);
 
     wrap.appendChild(card);
@@ -5886,9 +5925,16 @@ function optionsOpenForm(existing){
   var isEdit = !!existing;
   var o = existing ? Object.assign({}, existing) : {id:'opt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), ticker:'', date:new Date().toISOString().slice(0,10), dte:null, entryTime:'', strikeType:null, strikePrice:null, notes:''};
 
+  function closeModal(){
+    if(!isEdit && o.imageKeys && o.imageKeys.length){
+      o.imageKeys.forEach(function(k){ imgDelete('myTradeImages',k); delete myTradeImages[k]; });
+    }
+    ov.remove();
+  }
+
   var ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px;';
-  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+  ov.onclick = function(e){ if(e.target===ov) closeModal(); };
   document.body.appendChild(ov);
 
   var modal = document.createElement('div');
@@ -5992,6 +6038,12 @@ function optionsOpenForm(existing){
   strikePriceInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:4px;';
   fStrikeType.appendChild(strikePriceInp);
 
+  // Chart images — paste as many as needed, right in the form
+  var fImages = field('CHART IMAGES (OPTIONAL)');
+  var imgGalleryEl = document.createElement('div');
+  fImages.appendChild(imgGalleryEl);
+  optionsBuildImageGallery(o, imgGalleryEl, null);
+
   // Notes
   var fNotes = field('NOTES (OPTIONAL)');
   var notesInp = document.createElement('textarea');
@@ -6006,7 +6058,7 @@ function optionsOpenForm(existing){
   var cancelBtn = document.createElement('button');
   cancelBtn.textContent = 'CANCEL';
   cancelBtn.style.cssText = 'flex:1;font-family:var(--mono);font-size:11px;font-weight:bold;padding:10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);';
-  cancelBtn.onclick = function(){ ov.remove(); };
+  cancelBtn.onclick = closeModal;
   var saveBtn = document.createElement('button');
   saveBtn.textContent = isEdit ? 'SAVE CHANGES' : 'ADD TRADE';
   saveBtn.style.cssText = 'flex:1;font-family:var(--mono);font-size:11px;font-weight:bold;padding:10px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);';
