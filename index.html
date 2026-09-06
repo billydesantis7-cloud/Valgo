@@ -5731,7 +5731,8 @@ var OPTIONS_TIME_BUCKETS = [
 // Builds a paste-multiple-images gallery for an options trade.
 // o.imageKeys is an array of myTradeImages keys. onChange fires whenever the list changes,
 // so the caller can persist immediately (card view) or just hold it in memory (add/edit form).
-function optionsBuildImageGallery(o, container, onChange){
+function optionsBuildImageGallery(o, container, onChange, thumbSize){
+  var tw = thumbSize || 150, th = Math.round(tw*2/3);
   if(!o.imageKeys) o.imageKeys = [];
   // One-time migration from the old single-image scheme
   var legacyKey = 'opt_'+o.id;
@@ -5747,10 +5748,10 @@ function optionsBuildImageGallery(o, container, onChange){
       var img = myTradeImages[key];
       if(!img) return;
       var thumbWrap = document.createElement('div');
-      thumbWrap.style.cssText = 'position:relative;width:150px;';
+      thumbWrap.style.cssText = 'position:relative;width:'+tw+'px;';
       var im = document.createElement('img');
       im.src = img;
-      im.style.cssText = 'width:150px;height:100px;object-fit:cover;border-radius:6px;background:rgba(0,0,0,0.3);cursor:zoom-in;border:1px solid var(--border);';
+      im.style.cssText = 'width:'+tw+'px;height:'+th+'px;object-fit:cover;border-radius:6px;background:rgba(0,0,0,0.3);cursor:zoom-in;border:1px solid var(--border);';
       im.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
       thumbWrap.appendChild(im);
       var xBtn = document.createElement('button');
@@ -6123,7 +6124,7 @@ function optionsOpenForm(existing){
   document.body.appendChild(ov);
 
   var modal = document.createElement('div');
-  modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;';
+  modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:700px;max-width:96vw;max-height:90vh;overflow-y:auto;';
   ov.appendChild(modal);
 
   var title = document.createElement('div');
@@ -6225,7 +6226,12 @@ function optionsOpenForm(existing){
 
   // Reusable single-select button group (click active to clear back to null)
   function buildSingleSelect(labelText, options, colorFn, initialVal, onSet){
-    var f = field(labelText);
+    var f = document.createElement('div');
+    f.style.cssText = 'flex:1;min-width:170px;';
+    var l = document.createElement('div');
+    l.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;';
+    l.textContent = labelText;
+    f.appendChild(l);
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
     var val = initialVal;
@@ -6248,22 +6254,26 @@ function optionsOpenForm(existing){
     });
     rebuild();
     f.appendChild(row);
+    return f;
   }
-  buildSingleSelect('LIQUIDITY (OPTIONAL)', ['Liquid','Illiquid'], function(v){ return v==='Liquid'?'#4caf50':'#ef5350'; }, o.liquidity, function(v){ o.liquidity = v; });
-  buildSingleSelect('CALLS OR PUTS (OPTIONAL)', ['Calls','Puts'], function(v){ return v==='Calls'?'#4caf50':'#ef5350'; }, o.optionType, function(v){ o.optionType = v; });
-  buildSingleSelect('TRADE QUALITY (OPTIONAL)', ['Bad Trade','Good Trade','Insane Trade'], function(v){ return v==='Bad Trade'?'#ef5350':v==='Good Trade'?'#4caf50':'#ab47bc'; }, o.quality, function(v){ o.quality = v; });
+  var tagRow = document.createElement('div');
+  tagRow.style.cssText = 'display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;';
+  tagRow.appendChild(buildSingleSelect('LIQUIDITY (OPTIONAL)', ['Liquid','Illiquid'], function(v){ return v==='Liquid'?'#4caf50':'#ef5350'; }, o.liquidity, function(v){ o.liquidity = v; }));
+  tagRow.appendChild(buildSingleSelect('CALLS OR PUTS (OPTIONAL)', ['Calls','Puts'], function(v){ return v==='Calls'?'#4caf50':'#ef5350'; }, o.optionType, function(v){ o.optionType = v; }));
+  tagRow.appendChild(buildSingleSelect('TRADE QUALITY (OPTIONAL)', ['Bad Trade','Good Trade','Insane Trade'], function(v){ return v==='Bad Trade'?'#ef5350':v==='Good Trade'?'#4caf50':'#ab47bc'; }, o.quality, function(v){ o.quality = v; }));
+  modal.appendChild(tagRow);
 
   // Chart images — paste as many as needed, right in the form
   var fImages = field('CHART IMAGES (OPTIONAL)');
   var imgGalleryEl = document.createElement('div');
   fImages.appendChild(imgGalleryEl);
-  optionsBuildImageGallery(o, imgGalleryEl, null);
+  optionsBuildImageGallery(o, imgGalleryEl, null, 260);
 
   // Notes
   var fNotes = field('NOTES (OPTIONAL)');
   var notesInp = document.createElement('textarea');
   notesInp.value = o.notes||'';
-  notesInp.rows = 2;
+  notesInp.rows = 4;
   notesInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:4px;resize:vertical;';
   fNotes.appendChild(notesInp);
 
