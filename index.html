@@ -55,6 +55,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:h
     <button class="nav-tab" id="mainTabValgo" onclick="switchMainTab('valgo')">VALGO</button>
     <button class="nav-tab" id="mainTabTv" onclick="switchMainTab('tv')">TRADERVUE</button>
     <button class="nav-tab" id="mainTabCompare" onclick="switchMainTab('compare')">COMPARE</button>
+    <button class="nav-tab" id="mainTabOptions" onclick="switchMainTab('options')">OPTIONS</button>
     <button class="nav-tab" id="mainTabTt" onclick="switchMainTab('tt')">TICKER TRACKER</button>
     <button class="nav-tab" id="mainTabSca" onclick="switchMainTab('sca')">CALCULATOR</button>
     
@@ -969,6 +970,7 @@ async function _sbInitLoad() {
       if (typeof tvDayR !== 'undefined') try { tvDayR = JSON.parse(localStorage.getItem('tvDayR') || '{}'); } catch(e) {}
       if (typeof ttEntries !== 'undefined') try { ttEntries = JSON.parse(localStorage.getItem('ttEntries') || '[]'); } catch(e) {}
       try { ttNeedleMeta = JSON.parse(localStorage.getItem('ttNeedleMeta') || '{}'); } catch(e) {}
+      try { optionsTrades = JSON.parse(localStorage.getItem('optionsTrades') || '[]'); } catch(e) {}
     }
     // If tvDayR is empty, restore from tv_day_r table
     if (typeof tvDayR !== 'undefined' && Object.keys(tvDayR).length === 0) {
@@ -1429,11 +1431,11 @@ function switchMainTab(tab){
   } else if (sideNav) {
     sideNav.style.display = tab==='sca' ? 'flex' : 'none';
   }
-  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','kinfoPanel','comparePanel'];
-  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabKinfo','mainTabCompare'];
-  var tabNames=['valgo','tv','tt','sca','kinfo','compare'];
+  var panels=['exec-panel','tvPanel','ttPanel','scaPanel','kinfoPanel','comparePanel','optionsPanel'];
+  var tabIds=['mainTabValgo','mainTabTv','mainTabTt','mainTabSca','mainTabKinfo','mainTabCompare','mainTabOptions'];
+  var tabNames=['valgo','tv','tt','sca','kinfo','compare','options'];
   document.querySelector('.exec-panel').style.display='none';
-  ['tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel','comparePanel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  ['tvPanel','ttPanel','scaPanel','algoPanel','kinfoPanel','comparePanel','optionsPanel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   tabIds.forEach(function(id){var b=document.getElementById(id);if(b){b.style.background='transparent';b.style.color='var(--muted)';}});
   var activeBtn=document.getElementById(tabIds[tabNames.indexOf(tab)]);
   if(activeBtn){activeBtn.style.background='var(--accent)';activeBtn.style.color='var(--bg)';}
@@ -1444,6 +1446,7 @@ function switchMainTab(tab){
   
   else if(tab==='kinfo'){var p=document.getElementById('kinfoPanel');if(p){p.style.display='block';setTimeout(function(){if(typeof kinfoRender==='function'){kinfoRender();}},150);}}
   else if(tab==='compare'){var p=document.getElementById('comparePanel');if(p){p.style.display='block';if(typeof renderComparePage==='function')renderComparePage();}}
+  else if(tab==='options'){var p=document.getElementById('optionsPanel');if(p){p.style.display='block';if(typeof renderOptionsPage==='function')renderOptionsPage();}}
 }
 
 // ── Filters ───────────────────────────────────────────────
@@ -5703,6 +5706,335 @@ function ttSaveNeedleMeta(id, field, value){
   if(typeof sbSave==='function') sbSave('ttNeedleMeta', JSON.stringify(ttNeedleMeta));
 }
 
+// ── OPTIONS MOVE TRACKER ──
+var optionsTrades = (function(){ try{ return JSON.parse(localStorage.getItem('optionsTrades')||'[]'); }catch(e){ return []; } })();
+
+function optionsSaveAll(){
+  try{ localStorage.setItem('optionsTrades', JSON.stringify(optionsTrades)); }catch(e){}
+  if(typeof sbSave==='function') sbSave('optionsTrades', JSON.stringify(optionsTrades));
+}
+
+function optionsTimeBucket(hhmm){
+  if(!hhmm) return null;
+  var parts = hhmm.split(':'); var h = parseInt(parts[0],10), m = parseInt(parts[1],10);
+  var mins = h*60+m;
+  if(mins < 9*60+30) return 'pre';        // before 9:30am
+  if(mins < 10*60) return '930-10';       // 9:30–10:00
+  if(mins < 11*60) return '10-11';        // 10:00–11:00
+  if(mins < 12*60) return '11-12';        // 11:00–12:00
+  return 'pm';                            // 12:00pm+
+}
+var OPTIONS_TIME_BUCKETS = [
+  ['pre','Pre-market'],['930-10','9:30–10:00'],['10-11','10:00–11:00'],['11-12','11:00–12:00'],['pm','After 12:00']
+];
+
+function renderOptionsPage(){
+  var wrap = document.getElementById('optionsContent');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  if(!window._optFilters) window._optFilters = {dte:null, timeBucket:null};
+  var filters = window._optFilters;
+
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;';
+  hdr.innerHTML = '<span style="font-family:var(--display);font-size:20px;font-weight:bold;letter-spacing:2px;color:var(--accent);">OPTIONS MOVES</span>'
+    +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Track option plays separately from your equity trades</span>';
+  var addBtn = document.createElement('button');
+  addBtn.style.cssText = 'margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:bold;letter-spacing:1px;padding:8px 16px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);';
+  addBtn.textContent = '+ ADD TRADE';
+  addBtn.onclick = function(){ optionsOpenForm(null); };
+  hdr.appendChild(addBtn);
+  wrap.appendChild(hdr);
+
+  // Filter bar
+  var filterBar = document.createElement('div');
+  filterBar.style.cssText = 'display:flex;align-items:center;gap:18px;margin-bottom:18px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;';
+
+  var dteWrap = document.createElement('div');
+  dteWrap.style.cssText = 'display:flex;align-items:center;gap:5px;flex-wrap:wrap;';
+  var dteLbl = document.createElement('span'); dteLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; dteLbl.textContent='DTE:';
+  dteWrap.appendChild(dteLbl);
+  [['ALL',null],['0',0],['1',1],['2',2],['3',3],['4',4],['5+',5]].forEach(function(opt){
+    var btn = document.createElement('button');
+    var isOn = filters.dte===opt[1];
+    btn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:4px 9px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?'var(--accent)':'var(--border)')+';background:'+(isOn?'rgba(200,169,110,0.15)':'transparent')+';color:'+(isOn?'var(--accent)':'var(--muted)')+';';
+    btn.textContent = opt[0];
+    btn.onclick = function(){ filters.dte = opt[1]; renderOptionsPage(); };
+    dteWrap.appendChild(btn);
+  });
+  filterBar.appendChild(dteWrap);
+
+  var timeWrap = document.createElement('div');
+  timeWrap.style.cssText = 'display:flex;align-items:center;gap:5px;flex-wrap:wrap;';
+  var timeLbl = document.createElement('span'); timeLbl.style.cssText='font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;'; timeLbl.textContent='ENTRY TIME:';
+  timeWrap.appendChild(timeLbl);
+  var timeOpts = [['ALL',null]].concat(OPTIONS_TIME_BUCKETS);
+  timeOpts.forEach(function(opt){
+    var btn = document.createElement('button');
+    var isOn = filters.timeBucket===opt[0] || (opt[0]==='ALL' && filters.timeBucket===null);
+    btn.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:bold;padding:4px 9px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?'var(--accent)':'var(--border)')+';background:'+(isOn?'rgba(200,169,110,0.15)':'transparent')+';color:'+(isOn?'var(--accent)':'var(--muted)')+';';
+    btn.textContent = opt[1];
+    btn.onclick = function(){ filters.timeBucket = opt[0]==='ALL' ? null : opt[0]; renderOptionsPage(); };
+    timeWrap.appendChild(btn);
+  });
+  filterBar.appendChild(timeWrap);
+
+  var countLbl = document.createElement('span');
+  countLbl.style.cssText = 'margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);';
+  filterBar.appendChild(countLbl);
+  wrap.appendChild(filterBar);
+
+  var list = optionsTrades.slice().sort(function(a,b){ return (b.date+((b.entryTime)||'')).localeCompare(a.date+((a.entryTime)||'')); });
+  if(filters.dte!=null){
+    list = list.filter(function(o){ return filters.dte===5 ? (o.dte!=null && o.dte>=5) : o.dte===filters.dte; });
+  }
+  if(filters.timeBucket!=null){
+    list = list.filter(function(o){ return optionsTimeBucket(o.entryTime)===filters.timeBucket; });
+  }
+  countLbl.textContent = list.length+' trade'+(list.length===1?'':'s');
+
+  if(!list.length){
+    var empty = document.createElement('div');
+    empty.style.cssText = 'text-align:center;padding:50px 20px;color:var(--muted);font-family:var(--mono);font-size:12px;font-style:italic;';
+    empty.textContent = optionsTrades.length ? 'No trades match these filters.' : 'No options moves tracked yet — click + ADD TRADE to start.';
+    wrap.appendChild(empty);
+    return;
+  }
+
+  list.forEach(function(o){
+    var card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;';
+
+    var rowHdr = document.createElement('div');
+    rowHdr.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;';
+    var dteCol = o.dte===0 ? '#ef5350' : o.dte===1 ? '#ff9800' : '#4caf50';
+    rowHdr.innerHTML = '<span style="font-family:var(--display);font-size:16px;font-weight:bold;color:var(--text);">'+o.ticker+'</span>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+o.date+'</span>'
+      +(o.entryTime?'<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">'+o.entryTime+'</span>':'')
+      +(o.dte!=null?'<span style="font-family:var(--mono);font-size:9px;font-weight:bold;color:'+dteCol+';background:'+dteCol+'1a;border:1px solid '+dteCol+'55;padding:2px 8px;border-radius:3px;">'+o.dte+' DTE</span>':'')
+      +(o.strikeType?'<span style="font-family:var(--mono);font-size:9px;color:#90caf9;background:rgba(144,202,249,0.12);border:1px solid rgba(144,202,249,0.35);padding:2px 8px;border-radius:3px;">'+o.strikeType+'</span>':'')
+      +(o.strikePrice!=null?'<span style="font-family:var(--mono);font-size:9px;color:var(--muted);">strike '+o.strikePrice+'</span>':'');
+    var editBtn = document.createElement('button');
+    editBtn.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);background:none;border:1px solid var(--border);padding:4px 10px;border-radius:4px;cursor:pointer;';
+    editBtn.textContent = 'EDIT';
+    editBtn.onclick = (function(oo){ return function(){ optionsOpenForm(oo); }; })(o);
+    var delBtn = document.createElement('button');
+    delBtn.style.cssText = 'font-family:var(--mono);font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:auto;';
+    delBtn.textContent = 'DELETE';
+    delBtn.onclick = (function(oo){ return function(){
+      if(!confirm('Delete this options trade?')) return;
+      optionsTrades = optionsTrades.filter(function(x){ return x.id!==oo.id; });
+      optionsSaveAll();
+      imgDelete('myTradeImages','opt_'+oo.id); delete myTradeImages['opt_'+oo.id];
+      renderOptionsPage();
+    }; })(o);
+    rowHdr.appendChild(editBtn);
+    rowHdr.appendChild(delBtn);
+    card.appendChild(rowHdr);
+
+    if(o.notes){
+      var notesDiv = document.createElement('div');
+      notesDiv.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;';
+      notesDiv.textContent = o.notes;
+      card.appendChild(notesDiv);
+    }
+
+    // Chart paste zone, same imgSave pipeline as everything else
+    var imgKey = 'opt_'+o.id;
+    var imgSlot = document.createElement('div');
+    function buildImgSlot(){
+      imgSlot.innerHTML = '';
+      var img = myTradeImages[imgKey];
+      if(img){
+        var im = document.createElement('img');
+        im.src = img;
+        im.style.cssText = 'width:100%;max-width:520px;object-fit:contain;border-radius:8px;background:rgba(0,0,0,0.3);cursor:zoom-in;max-height:320px;';
+        im.onclick = function(){ if(typeof expandMyImg==='function') expandMyImg(img); };
+        imgSlot.appendChild(im);
+        var delImgBtn = document.createElement('button');
+        delImgBtn.textContent = 'Delete image';
+        delImgBtn.style.cssText = 'display:block;margin-top:6px;font-size:9px;color:#ef5350;background:none;border:1px solid #ef5350;padding:3px 8px;border-radius:4px;cursor:pointer;';
+        delImgBtn.onclick = function(){ imgDelete('myTradeImages', imgKey); delete myTradeImages[imgKey]; buildImgSlot(); };
+        imgSlot.appendChild(delImgBtn);
+      } else {
+        var paste = document.createElement('div');
+        paste.tabIndex = 0;
+        paste.style.cssText = 'max-width:520px;min-height:100px;border:2px dashed rgba(200,169,110,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;padding:14px;text-align:center;';
+        paste.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Click, then <b style="color:var(--accent);">Ctrl+V</b> to paste a chart</span>';
+        paste.onclick = function(){ paste.focus(); };
+        paste.addEventListener('paste', function(ev){
+          var its = ev.clipboardData && ev.clipboardData.items; if(!its) return;
+          for(var pi=0; pi<its.length; pi++){
+            if(!its[pi].type.startsWith('image/')) continue;
+            var rd = new FileReader();
+            rd.onload = function(e2){ myTradeImages[imgKey]=e2.target.result; imgSave('myTradeImages', imgKey, e2.target.result); buildImgSlot(); };
+            rd.readAsDataURL(its[pi].getAsFile()); ev.preventDefault(); break;
+          }
+        });
+        imgSlot.appendChild(paste);
+      }
+    }
+    buildImgSlot();
+    card.appendChild(imgSlot);
+
+    wrap.appendChild(card);
+  });
+}
+
+function optionsOpenForm(existing){
+  var isEdit = !!existing;
+  var o = existing ? Object.assign({}, existing) : {id:'opt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), ticker:'', date:new Date().toISOString().slice(0,10), dte:null, entryTime:'', strikeType:null, strikePrice:null, notes:''};
+
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+  document.body.appendChild(ov);
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;';
+  ov.appendChild(modal);
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-family:var(--display);font-size:16px;font-weight:bold;color:var(--accent);margin-bottom:18px;';
+  title.textContent = isEdit ? 'EDIT OPTIONS TRADE' : 'ADD OPTIONS TRADE';
+  modal.appendChild(title);
+
+  function field(labelText){
+    var f = document.createElement('div');
+    f.style.cssText = 'margin-bottom:16px;';
+    var l = document.createElement('div');
+    l.style.cssText = 'font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;';
+    l.textContent = labelText;
+    f.appendChild(l);
+    modal.appendChild(f);
+    return f;
+  }
+
+  // Ticker
+  var fTicker = field('TICKER');
+  var tickerInp = document.createElement('input');
+  tickerInp.type = 'text'; tickerInp.value = o.ticker; tickerInp.placeholder = 'e.g. SPY';
+  tickerInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:4px;text-transform:uppercase;';
+  fTicker.appendChild(tickerInp);
+
+  // Date
+  var fDate = field('DATE');
+  var dateInp = document.createElement('input');
+  dateInp.type = 'date'; dateInp.value = o.date;
+  dateInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:4px;';
+  fDate.appendChild(dateInp);
+
+  // DTE
+  var fDte = field('DAYS TO EXPIRATION (DTE)');
+  var dteRow = document.createElement('div');
+  dteRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+  var dteVal = o.dte;
+  [0,1,2,3,4,5].forEach(function(n){
+    var btn = document.createElement('button');
+    btn.type='button';
+    btn.textContent = n===5?'5+':String(n);
+    function refreshDte(){
+      var isOn = dteVal===n;
+      btn.style.cssText = 'font-family:var(--mono);font-size:11px;font-weight:bold;width:38px;height:34px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?'var(--accent)':'var(--border)')+';background:'+(isOn?'rgba(200,169,110,0.18)':'transparent')+';color:'+(isOn?'var(--accent)':'var(--muted)')+';';
+    }
+    refreshDte();
+    btn.onclick = function(){ dteVal = dteVal===n ? null : n; rebuildDteButtons(); };
+    dteRow.appendChild(btn);
+  });
+  function rebuildDteButtons(){
+    Array.prototype.forEach.call(dteRow.children, function(btn, i){
+      var n = i;
+      var isOn = dteVal===n;
+      btn.style.border = '1px solid '+(isOn?'var(--accent)':'var(--border)');
+      btn.style.background = isOn?'rgba(200,169,110,0.18)':'transparent';
+      btn.style.color = isOn?'var(--accent)':'var(--muted)';
+    });
+  }
+  fDte.appendChild(dteRow);
+
+  // Entry time (optional)
+  var fTime = field('ENTRY TIME (OPTIONAL)');
+  var timeInp = document.createElement('input');
+  timeInp.type = 'time'; timeInp.value = o.entryTime||'';
+  timeInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:4px;';
+  fTime.appendChild(timeInp);
+
+  // Strike type
+  var fStrikeType = field('STRIKE (OPTIONAL)');
+  var strikeTypeRow = document.createElement('div');
+  strikeTypeRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;';
+  var strikeTypeVal = o.strikeType;
+  ['ITM','Close ATM','Slightly OTM','OTM','Far OTM'].forEach(function(label){
+    var btn = document.createElement('button');
+    btn.type='button'; btn.textContent = label;
+    function refresh(){
+      var isOn = strikeTypeVal===label;
+      btn.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:bold;padding:6px 10px;border-radius:4px;cursor:pointer;border:1px solid '+(isOn?'#90caf9':'var(--border)')+';background:'+(isOn?'rgba(144,202,249,0.15)':'transparent')+';color:'+(isOn?'#90caf9':'var(--muted)')+';';
+    }
+    refresh();
+    btn.onclick = function(){ strikeTypeVal = strikeTypeVal===label ? null : label; rebuildStrikeButtons(); };
+    strikeTypeRow.appendChild(btn);
+  });
+  var strikeLabels = ['ITM','Close ATM','Slightly OTM','OTM','Far OTM'];
+  function rebuildStrikeButtons(){
+    Array.prototype.forEach.call(strikeTypeRow.children, function(btn, i){
+      var isOn = strikeTypeVal===strikeLabels[i];
+      btn.style.border = '1px solid '+(isOn?'#90caf9':'var(--border)');
+      btn.style.background = isOn?'rgba(144,202,249,0.15)':'transparent';
+      btn.style.color = isOn?'#90caf9':'var(--muted)';
+    });
+  }
+  fStrikeType.appendChild(strikeTypeRow);
+  var strikePriceInp = document.createElement('input');
+  strikePriceInp.type = 'number'; strikePriceInp.step = '0.5'; strikePriceInp.value = o.strikePrice!=null?o.strikePrice:'';
+  strikePriceInp.placeholder = 'Exact strike price (optional)';
+  strikePriceInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:4px;';
+  fStrikeType.appendChild(strikePriceInp);
+
+  // Notes
+  var fNotes = field('NOTES (OPTIONAL)');
+  var notesInp = document.createElement('textarea');
+  notesInp.value = o.notes||'';
+  notesInp.rows = 2;
+  notesInp.style.cssText = 'width:100%;box-sizing:border-box;background:#111;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:4px;resize:vertical;';
+  fNotes.appendChild(notesInp);
+
+  // Buttons
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:10px;margin-top:8px;';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'CANCEL';
+  cancelBtn.style.cssText = 'flex:1;font-family:var(--mono);font-size:11px;font-weight:bold;padding:10px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);';
+  cancelBtn.onclick = function(){ ov.remove(); };
+  var saveBtn = document.createElement('button');
+  saveBtn.textContent = isEdit ? 'SAVE CHANGES' : 'ADD TRADE';
+  saveBtn.style.cssText = 'flex:1;font-family:var(--mono);font-size:11px;font-weight:bold;padding:10px;border-radius:4px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--bg);';
+  saveBtn.onclick = function(){
+    var ticker = tickerInp.value.trim().toUpperCase();
+    if(!ticker){ alert('Enter a ticker.'); return; }
+    if(!dateInp.value){ alert('Set a date.'); return; }
+    o.ticker = ticker;
+    o.date = dateInp.value;
+    o.dte = dteVal;
+    o.entryTime = timeInp.value || null;
+    o.strikeType = strikeTypeVal;
+    o.strikePrice = strikePriceInp.value!=='' ? parseFloat(strikePriceInp.value) : null;
+    o.notes = notesInp.value.trim();
+    if(isEdit){
+      optionsTrades = optionsTrades.map(function(x){ return x.id===o.id ? o : x; });
+    } else {
+      optionsTrades.push(o);
+    }
+    optionsSaveAll();
+    ov.remove();
+    renderOptionsPage();
+  };
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(saveBtn);
+  modal.appendChild(btnRow);
+}
+
 function ttToggleBtNo(){
   ttBtNoColor = ttBtNoColor==='red'?'orange':'red';
   localStorage.setItem('ttBtNoColor',ttBtNoColor);
@@ -8149,6 +8481,11 @@ function videoShowSetup(){
 <!-- COMPARE PANEL -->
 <div id="comparePanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:12px 16px;box-sizing:border-box;background:var(--bg);overflow-y:auto;">
   <div id="compareContent" style="max-width:900px;margin:0 auto;"></div>
+</div>
+
+<!-- OPTIONS PANEL -->
+<div id="optionsPanel" style="display:none;width:100%;min-height:calc(100vh - 65px);padding:12px 16px;box-sizing:border-box;background:var(--bg);overflow-y:auto;">
+  <div id="optionsContent" style="max-width:1000px;margin:0 auto;"></div>
 </div>
 
 <!-- VALGO CONDENSED PANEL -->
